@@ -389,7 +389,7 @@ class Ui_Dialog(object):
             "1.新增后台运行模式，勾选后，窗口可以被完全遮挡，但是不能最小化""<br>"
             "2.新增窗口同步器的功能，在一个游戏的操作可以同步到其他游戏""<br>"
             "3.修复已知bug""<br>"
-            " <a href='https://github.com/RMA-MUN/OnmyoujiAuto'>"
+            " <a href='https://github.com/RMA-MUN/OnmyojiAuto'>"
             "点击跳转至仓库！"
             "</a>"
         )
@@ -430,4 +430,5 @@ class Ui_Dialog(object):
             self.window_table.setCellWidget(i, 0, checkbox)
             # 第二列放置窗口信息
             info_item = QtWidgets.QTableWidgetItem(f"{window['title']}")
+
             self.window_table.setItem(i, 1, info_item)
