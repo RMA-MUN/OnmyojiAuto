@@ -1,0 +1,57 @@
+QDialog {
+    background-color: #f0f0f0;
+    font-family: "Microsoft YaHei";
+}
+
+QLabel {
+    font-size: 14px;
+    color: #333;
+}
+
+QComboBox {
+    font-size: 14px;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+QSpinBox {
+    font-size: 12px;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+QPushButton {
+    font-size: 11px;
+    padding: 5px 15px;
+    background-color: rgba(245, 245, 232, 180);
+    color: black;
+    border: none;
+    border-radius: 3px;
+}
+
+QPushButton:hover {
+    background-color: #ADAD95;
+}
+
+QTextBrowser {
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+}
+
+QTextBrowser QScrollBar {
+    background: transparent;
+}
+
+QTextBrowser::viewport {
+    background-color: transparent;
+}
+
+QPushButton#clearButton, QPushButton#selctButton, QPushButton#startButton{
+    background-color: rgba(245, 245, 232, 180);
+    color: black;
+    border: none;
+    align: left;
+}
