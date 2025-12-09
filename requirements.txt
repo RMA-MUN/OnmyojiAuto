@@ -1,0 +1,14 @@
+# 在终端中打开这个文件，可以直接在pycharm中右键此文件，在打开中选择在终端打开
+# 然后运行:pip install -r requirements.txt
+# 即可安装所有的依赖包
+opencv-python == 4.8.0.74
+pillow == 9.5.0
+PyQt6 == 6.8.1
+pyautogui == 0.9.54
+pygetwindow == 0.0.9
+PyYAML == 6.0.1
+pyscreeze == 0.1.28
+pywin32 == 310
+pynput == 1.8.1
+pyyaml == 6.0.1
+

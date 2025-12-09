@@ -1,0 +1,6 @@
+# 契灵探查配置文件
+image_paths:
+  jieshu: 'jieshu.png'
+  tiaozhan: 'tiaozhan.png'
+  xiezhu: 'xiezhu.png'
+  zuihou: 'zuihou.png'

@@ -1,0 +1,23 @@
+{
+  "请选择模式": "",
+  "魂土": {
+    "default": "huntu",
+    "队长": "huntu",
+    "队员": "huntu_double"
+  },
+  "魂王": {
+    "default": "hunwang_double",
+    "队长": "hunwang_double",
+    "队员": "hunwang_double"
+  },
+  "业原火": "yeyuanhuo",
+  "觉醒": "juexing",
+  "爬塔": {
+    "default": "pata",
+    "门票": "pata",
+    "体力": "pata_tili"
+  },
+  "灵染试炼": "lingran",
+  "御灵": "yuling",
+  "契灵探查": "qilingtancha"
+}
