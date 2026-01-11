@@ -6,10 +6,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Python编译文件
+# 编译文件
 __pycache__/
 *.py[cod]
 *$py.class
+main.build
+main.dist
 
 # PyInstaller生成文件
 build/
@@ -51,3 +53,9 @@ update.txt
 
 # 排除venv虚拟环境文件夹
 .venv
+
+# 排除nuitka-crash-report.xml文件
+nuitka-crash-report.xml
+
+# 排除platforms依赖文件夹
+platforms/

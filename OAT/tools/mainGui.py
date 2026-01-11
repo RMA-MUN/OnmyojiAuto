@@ -9,6 +9,7 @@ import yaml
 
 from typing import TextIO
 from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6.QtWidgets import QMessageBox
 
 from ..source import MODE_MAPPING
 from .startMore import multi_open_app
@@ -69,7 +70,7 @@ class LogRedirect(QtCore.QObject):
             # 检查是否为目标调用点
             if module and not module.__name__.startswith('OAT.utils.logging') and not module.__name__.startswith('OAT.tools.mainGui'):
                 return f"{module.__name__}:{frame.lineno}"
-        
+
         # 如果没有找到合适的调用点，回退到原逻辑
         frame = stack[3] if len(stack) > 3 else stack[-1]
         module = inspect.getmodule(frame[0])
@@ -131,6 +132,7 @@ class MainWindow(QtWidgets.QDialog):
         self.main_config = self.main_config_reader.read_config()
 
         self.sync = WindowSynchronizer()
+        self.sync_mode = False
 
         # 最大化和最小化按钮
         self.setWindowFlags(QtCore.Qt.WindowType.WindowCloseButtonHint | QtCore.Qt.WindowType.WindowMinMaxButtonsHint)
@@ -155,6 +157,7 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.select_button.clicked.connect(self.select_file)
         self.ui.clear_button.clicked.connect(self.clear_file)
         self.ui.start_button.clicked.connect(self.get_info)
+        self.ui.sync_instruction_btn.clicked.connect(self.sync_instruction)
         self.ui.refresh_windows_btn.clicked.connect(self.update_window_table)
         self.ui.select_all_btn.clicked.connect(self.select_all)
         self.ui.invert_selection_btn.clicked.connect(self.deselect_all)
@@ -164,7 +167,6 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.stop_sync_btn.clicked.connect(self.stop_sync)
         self.ui.arrange_btn.clicked.connect(self.arrange_connect)
         self.ui.client_choose.currentTextChanged.connect(self.update_window_title)
-
 
         # 给按钮绑定快捷键
         self.ui.pushButton.setShortcut("Ctrl+W")
@@ -287,7 +289,7 @@ class MainWindow(QtWidgets.QDialog):
         times = self.ui.spinBox.value()
         mode = self.ui.comboBox.currentText()
         sub_mode = ""
-        
+
         # 动态获取子模式，不再硬编码判断
         if hasattr(self.ui, 'radioButton1') and hasattr(self.ui, 'radioButton2'):
             # 检查哪个单选按钮被选中
@@ -297,7 +299,7 @@ class MainWindow(QtWidgets.QDialog):
             elif self.ui.radioButton2.isChecked():
                 sub_mode = self.ui.radioButton2.text()
                 print(f"选择：{mode}, {sub_mode}")
-            
+
         # 获取隐藏窗口捕获复选框状态
         if self.ui.hidden_window_checkbox.isChecked():
             hidden_window = True
@@ -309,13 +311,19 @@ class MainWindow(QtWidgets.QDialog):
         else:
             hidden_window = False
 
+        # 检查是否启动同步模式
+        if self.sync_mode is True:
+            print("="*50)
+            print("       已启用窗口同步模式      ")
+            print("  窗口同步模式下，程序会自动同步主窗口的点击内容到副窗口")
+            print("="*50)
+
 
         print(f"获取挑战次数：{times}，模式：{mode}")
 
-
         try:
             # 创建并管理线程
-            thread = threading.Thread(target=self.safe_mode_choice, args=(mode, sub_mode, times, hidden_window))
+            thread = threading.Thread(target=self.safe_mode_choice, args=(mode, sub_mode, times, hidden_window, self.sync_mode))
             thread.daemon = True
             with self.lock:
                 if self.shutdown_flag:
@@ -326,7 +334,7 @@ class MainWindow(QtWidgets.QDialog):
             print("请输入有效的整数挑战次数。")
 
     # 用锁来确保模式的选择只会选择一个
-    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False):
+    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False):
         try:
             with self.lock:  # 使用with语句自动管理锁
                 if self.shutdown_flag:
@@ -346,14 +354,17 @@ class MainWindow(QtWidgets.QDialog):
                 sub_config_reader = ConfigReader(sub_config_path)
                 sub_config = sub_config_reader.read_config()
                 if sub_config:
-                    mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title, hidden_window=hidden_window)
+                    # 获取synchronizer实例，如果存在的话
+                    synchronizer = self.sync if hasattr(self, 'sync') else None
+                    mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
+                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer)
                 else:
                     print(f"读取 {sub_config_path} 配置文件失败。")
             else:
                 print('暂不支持此模式，敬请期待！')
 
         except Exception as e:
-            error_msg = f"执行挑战��出现异常: {e}"
+            error_msg = f"执行挑战时出现异常: {e}"
             print(error_msg)
             self.log_redirect.log_to_file(error_msg)
             # 修改日志文件路径
@@ -584,23 +595,27 @@ class MainWindow(QtWidgets.QDialog):
 
         try:
             self.sync = WindowSynchronizer()
-            self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title)
-            self.sync.start_listening()
-
+            # 将句柄转换为整数类型并传递
+            main_hwnd = int(self.main_window)
+            sub_hwnds = [int(hwnd) for hwnd in self.sub_windows]
+            self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
+            self.sync.set_true_enable()
+            self.sync_mode = True
             print("窗口同步已启动")
+            return True
+
         except Exception as e:
             print(f"同步失败: {str(e)}")
             self.log_redirect.log_to_file(f"同步异常: {traceback.format_exc()}")
         # 将主窗口通过句柄激活到前台
         win32gui.SetForegroundWindow(self.main_window)
 
-    # 停止方法
+    # 停止同步方法
     def stop_sync(self):
-        try:
-            self.sync.stop_listening()
+        if self.sync_mode:
+            self.sync.set_false_enable()
+            self.sync_mode = False
             print("窗口同步已停止")
-        except Exception as e:
-            print(f"停止同步异常: {str(e)}")
 
     def arrange_connect(self):
         # 获取主窗口的句柄
@@ -610,3 +625,33 @@ class MainWindow(QtWidgets.QDialog):
 
         # 调用WindowSynchronizer的arrange_windows方法
         self.sync.arrange_windows(main_window_hwnd, sub_window_hwnd)
+
+    def sync_instruction(self):
+        """
+        显示同步器使用说明的对话框
+        """
+        instruction_text = """
+        同步器使用步骤：
+
+    1. 刷新窗口：点击"刷新窗口"按钮获取当前所有符合条件的窗口列表，如果需要自定义窗口标题，可以在client.yaml文件里配置
+    2. 选择窗口：在表格中勾选需要参与同步的窗口
+    3. 设置主窗口：选择一个窗口并点击"设置主窗口"，主窗口将作为操作源
+    4. 设置副窗口：选择一个或多个窗口并点击"设置副窗口"，这些窗口将跟随主窗口操作
+    5. 排列窗口：点击"窗口排列"按钮，系统会自动排列所有选择的窗口
+    6. 开始同步：点击"开始同步"按钮启动同步功能
+    7. 停止同步：点击"停止同步"按钮停止同步功能
+    
+    注意事项：
+    - 主窗口只能设置一个
+    - 副窗口至少设置一个
+    - 开始同步前请确保已正确设置主窗口和副窗口
+    - 同步过程中请勿关闭主窗口
+    - 如需调整同步窗口，建议先停止同步
+    """
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("同步器使用说明")
+        msg_box.setText(instruction_text)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.exec()
+        msg_box = None
