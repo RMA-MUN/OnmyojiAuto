@@ -349,18 +349,8 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "OAT-v1.4"))
+        Dialog.setWindowTitle(_translate("Dialog", "OAT"))
         self.groupBox.setTitle(_translate("Dialog", "功能"))
-
-
-        # self.comboBox.setItemText(0, _translate("Dialog", "请选择模式"))
-        # self.comboBox.setItemText(1, _translate("Dialog", "魂土"))
-        # self.comboBox.setItemText(2, _translate("Dialog", "魂王"))
-        # self.comboBox.setItemText(3, _translate("Dialog", "业原火"))
-        # self.comboBox.setItemText(4, _translate("Dialog", "觉醒"))
-        # self.comboBox.setItemText(5, _translate("Dialog", "爬塔"))
-        # self.comboBox.setItemText(6, _translate("Dialog", "灵染试炼"))
-        # self.comboBox.setItemText(7, _translate("Dialog", "契灵探查"))
 
         self.label.setText(_translate("Dialog", "请输入要挑战的次数"))
         self.pushButton4.setText(_translate("Dialog", "刷新窗口"))

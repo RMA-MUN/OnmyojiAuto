@@ -1,0 +1,53 @@
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller生成文件
+build/
+dist/
+*.spec
+
+# 日志文件
+logs/
+*.log
+log.txt
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 测试文件
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+test/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.old
+
+# 单独排除update.txt文件
+update.txt
+
+# 排除venv虚拟环境文件夹
+.venv
