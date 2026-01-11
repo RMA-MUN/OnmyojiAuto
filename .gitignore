@@ -57,5 +57,3 @@ update.txt
 # 排除nuitka-crash-report.xml文件
 nuitka-crash-report.xml
 
-# 排除platforms依赖文件夹
-platforms/
