@@ -5,7 +5,7 @@
 （可自行替换背景图片：将替换后的png图片图片命名为`background.png`即可覆盖)
 
 程序运行主页截图
-![项目怒截图](home.png)
+![项目运行截图](home.png)
 
 
 ## 📌 项目简介
@@ -99,4 +99,5 @@ pip install -r requirements.txt
 
 ## 📞 联系作者
 - 邮箱：n3032747608@163.com
+
 
