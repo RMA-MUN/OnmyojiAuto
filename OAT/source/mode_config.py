@@ -1,7 +1,7 @@
 from typing import Optional
 import json
 
-def mode_config(path) -> Optional[dict]:
+def mode_config(path: str) -> Optional[dict]:
     """读取当前目录下的json文件，获取其中的模式配置并返回"""
 
     try:
@@ -16,7 +16,7 @@ def mode_config(path) -> Optional[dict]:
         print(f"JSON解析错误: {path}")
         return None
 
-def mode_choice(path) -> Optional[list]:
+def mode_choice(path: str) -> Optional[list]:
     """读取json文件，然后返回每个模式的名称"""
     config = mode_config(path)
     if config:

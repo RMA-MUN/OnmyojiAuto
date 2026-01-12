@@ -36,7 +36,11 @@ def get_script_dir(mode: str, sub_mode: Optional[str] = None) -> str:
     return script_dir
 
 # 模式选择函数
-def mode_choice(mode, sub_mode, times, config, window_title, hidden_window=False, sync_mode=False, synchronizer=None):
+def mode_choice(
+        mode: str, sub_mode: str, times: int, config: dict,
+        window_title: str, hidden_window: bool=False, sync_mode: bool=False,
+        synchronizer=None
+):
     try:
         # 调用缓存函数获取路径
         script_dir = get_script_dir(mode, sub_mode)

@@ -13,7 +13,7 @@ from .WindowSynchronizer import WindowSynchronizer
 
 
 class OnmyjiAutomation:
-    def __init__(self, window_title, synchronizer=None):
+    def __init__(self, window_title: str, synchronizer=None):
         self.window_title = window_title
         # 窗口信息获取与初始化
         self.hwnd = win32gui.FindWindow(None, window_title)
@@ -41,19 +41,19 @@ class OnmyjiAutomation:
         self.default_confidence = 0.85  # 默认置信度
         self.image_templates = {}
 
-    def print_window_info(self):
+    def print_window_info(self) -> None:
         """输出窗口信息"""
         print('已获取到游戏窗口信息\n'
               f'窗口左上角的位置是({self.x1},{self.y1})\n'
               f'窗口右下角的位置是({self.x2},{self.y2})\n')
 
-    def get_window_rect(self):
+    def get_window_rect(self) -> tuple:
         """获取窗口矩形区域"""
         rect = win32gui.GetWindowRect(self.hwnd)
         x1, y1, x2, y2 = rect
         return x1, y1, x2 - x1, y2 - y1
 
-    def preload_image(self, logo_path):
+    def preload_image(self, logo_path: str) -> bool:
         """预加载并缓存图像模板"""
         if logo_path not in self.image_templates:
             try:
@@ -70,14 +70,14 @@ class OnmyjiAutomation:
         return True
 
     @lru_cache(maxsize=32)
-    def _get_scaled_logo(self, logo, scale=1.0):
+    def _get_scaled_logo(self, logo: str, scale: float=1.0):
         """缓存并返回缩放后的图像模板"""
         # 确保先预加载图像
         self.preload_image(logo)
         # 这里可以添加图像预处理逻辑，如缩放、灰度化
         return logo
 
-    def onmyji(self, logo, use_cache=True):
+    def find_img(self, logo: str, use_cache=True) -> bool:
         """图像识别 + 缓存机制"""
         current_time = time.time()
 
@@ -123,12 +123,12 @@ class OnmyjiAutomation:
             return True
         return False
 
-    def move_mouse(self, x, y):
+    def move_mouse(self, x: int, y: int) -> None:
         """鼠标移动"""
         # 使用绝对坐标移动，更高效
         win32api.SetCursorPos((x, y))
 
-    def win32_double_click(self):
+    def win32_double_click(self) -> None:
         """优化的双击操作，减少延迟"""
         # 组合鼠标事件，减少系统调用
         flags = win32con.MOUSEEVENTF_LEFTDOWN | win32con.MOUSEEVENTF_LEFTUP
@@ -137,7 +137,7 @@ class OnmyjiAutomation:
         time.sleep(0.03)
         win32api.mouse_event(flags, 0, 0, 0, 0)
         
-    def calc_relative_position(self, absolute_x, absolute_y):
+    def calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
         """
         计算绝对坐标在窗口内的相对位置
         :param absolute_x: 屏幕绝对X坐标
@@ -150,7 +150,7 @@ class OnmyjiAutomation:
         relative_y = absolute_y - window_top
         return relative_x, relative_y
         
-    def send_click_message(self, relative_x, relative_y):
+    def send_click_message(self, relative_x: int, relative_y: int) -> None:
         """
         向指定窗口发送点击消息
         :param relative_x: 窗口内相对X坐标
@@ -166,7 +166,12 @@ class OnmyjiAutomation:
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
 
 
-    def perform_action(self, logo, hidden_window=False, threshold=0.85, sync_mode=False):
+    def perform_action(self,
+                       logo: str,
+                       hidden_window: bool = False,
+                       threshold: float = 0.85,
+                       sync_mode: bool = False
+                       ) -> bool:
         # 先进行识别，减少锁持有时间
         try:
             # 如果启用隐藏窗口捕获
@@ -218,7 +223,7 @@ class OnmyjiAutomation:
                     return self.perform_action(logo, hidden_window=False, threshold=threshold)
                  
             # 常规方法
-            found = self.onmyji(logo)
+            found = self.find_img(logo)
             if not found:
                 return False
 

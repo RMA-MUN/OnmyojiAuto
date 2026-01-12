@@ -6,7 +6,12 @@ import os
 
 from ..tools.OnmyojiAuto import OnmyjiAutomation
 
-def common_challenge(times, config, script_dir, window_title, hidden_window=False, sync_mode=False, synchronizer=None):
+def common_challenge(
+        times: int, config: dict,
+        script_dir: str, window_title: str,
+        hidden_window: bool=False, sync_mode: bool=False,
+        synchronizer=None # 同步器实例
+) -> bool:
     try:
         automation_obj = OnmyjiAutomation(window_title, synchronizer)
 

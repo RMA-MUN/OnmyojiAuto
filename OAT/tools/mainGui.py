@@ -245,14 +245,14 @@ class MainWindow(QtWidgets.QDialog):
         self.log_redirect.print(f"{timestamp} - 窗口已刷新")
 
     # 重写绘制事件
-    def paintEvent(self, event):
+    def paintEvent(self, event: QtGui.QPaintEvent):
         super().paintEvent(event)
         painter = QtGui.QPainter(self)
         # 应用透明度
         painter.setOpacity(self.alpha / 255.0)
         painter.drawPixmap(self.rect(), self.background)
 
-    def handle_mode_change(self, mode):
+    def handle_mode_change(self, mode: str):
         print(f"选择模式：{mode}")
 
     def window_detection(self, *args):
@@ -287,8 +287,8 @@ class MainWindow(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(self, "提示", "已有任务在进行中，请等待完成")
             return
         times = self.ui.spinBox.value()
-        mode = self.ui.comboBox.currentText()
-        sub_mode = ""
+        mode: str = self.ui.comboBox.currentText()
+        sub_mode: str = ""
 
         # 动态获取子模式，不再硬编码判断
         if hasattr(self.ui, 'radioButton1') and hasattr(self.ui, 'radioButton2'):
@@ -334,7 +334,10 @@ class MainWindow(QtWidgets.QDialog):
             print("请输入有效的整数挑战次数。")
 
     # 用锁来确保模式的选择只会选择一个
-    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False):
+    def safe_mode_choice(self,
+                         mode: str, sub_mode: str, times: int,
+                         hidden_window: bool=False, sync_mode: bool=False
+                         ):
         try:
             with self.lock:  # 使用with语句自动管理锁
                 if self.shutdown_flag:
@@ -465,7 +468,7 @@ class MainWindow(QtWidgets.QDialog):
         # 将窗口信息更新到表格中
         self.update_table_with_window_info(window_info)
 
-    def update_table_with_window_info(self, window_info):
+    def update_table_with_window_info(self, window_info: list):
         """
         使用窗口信息更新表格。
         :param window_info: 包含窗口句柄和标题的列表

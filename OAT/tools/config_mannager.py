@@ -2,7 +2,7 @@ import yaml
 import os
 
 class ConfigReader:
-    def __init__(self, file_path):
+    def __init__(self, file_path: str):
         # 如果是相对路径，相对于Onmyoji目录解析
         if not os.path.isabs(file_path):
             # 获取Onmyoji目录的绝对路径

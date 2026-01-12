@@ -6,7 +6,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 class LogEmitter(QObject):
     log_signal = pyqtSignal(str)
 
-    def write(self, message):
+    def write(self, message: str):
         if message.strip():
             # 获取调用栈，找到实际的print触发位置
             stack = traceback.extract_stack()

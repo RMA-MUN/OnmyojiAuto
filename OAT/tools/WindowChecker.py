@@ -116,7 +116,7 @@ class WindowChecker:
 
     # 模糊化查找窗口
     @staticmethod
-    def find_window_by_title(self, title: str) -> dict:
+    def find_window_by_title(self, title: str) -> Optional[dict]:
         """
         先遍历所有窗口，然后将窗口存储到一个列表中
         然后根据已知的要查找的窗口标题内的存在的字符串，遍历列表，找到包含该字符串的窗口并返回其句柄等信息

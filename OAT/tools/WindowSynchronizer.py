@@ -23,7 +23,7 @@ class WindowSynchronizer:
         """
         获取所有相关窗口的句柄和标题
         """
-        def enum_windows_callback(hwnd, window_list):
+        def enum_windows_callback(hwnd: int, window_list: List[Tuple[int, str]]):
             window_text = win32gui.GetWindowText(hwnd)
             # 使用集合快速检查窗口是否已存在
             if hwnd in existing_windows:
@@ -197,8 +197,13 @@ class WindowSynchronizer:
         """设置同步禁用"""
         self.sync_enabled = False
 
-
-    def where_click(self, x, y, button, pressed):
+    def where_click(self, x: int, y: int, button, pressed) -> None:
+        """
+        处理鼠标点击事件
+        :param x, y: 鼠标点击坐标
+        :param button: 点击的按钮
+        :param pressed: 是否按下
+        """
         if pressed and button == mouse.Button.left:
             if self.main_window and self.sub_windows:
                 # 从类属性中获取主窗口和副窗口标题
