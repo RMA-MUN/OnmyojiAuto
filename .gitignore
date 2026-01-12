@@ -22,6 +22,7 @@ dist/
 logs/
 *.log
 log.txt
+更新日志.md
 
 # 操作系统文件
 .DS_Store
