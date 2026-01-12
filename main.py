@@ -3,8 +3,7 @@
 @email: n3032747608@163.com
 @Date: 2025/11/26
 @Version: 1.5
-@Location: https://github.com/RMA-MUN/OnmyoujiAuto
-@Packaging: py2exe-gui
+@Location: https://github.com/RMA-MUN/OnmyojiAuto
 """
 
 import sys

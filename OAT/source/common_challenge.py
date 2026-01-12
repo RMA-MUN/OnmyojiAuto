@@ -6,9 +6,9 @@ import os
 
 from ..tools.OnmyojiAuto import OnmyjiAutomation
 
-def common_challenge(times, config, script_dir, window_title, hidden_window=False):
+def common_challenge(times, config, script_dir, window_title, hidden_window=False, sync_mode=False, synchronizer=None):
     try:
-        automation_obj = OnmyjiAutomation(window_title)
+        automation_obj = OnmyjiAutomation(window_title, synchronizer)
 
         # 预先构建好所有图片路径并预加载
         image_paths = {}
@@ -33,7 +33,7 @@ def common_challenge(times, config, script_dir, window_title, hidden_window=Fals
                 # print(f"正在识别图片：{key}")
                 try:
                     # 尝试识别并执行操作，启用低置信度重试
-                    if automation_obj.perform_action(img_path, hidden_window=hidden_window):
+                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode):
                         # print(f"已成功识别并执行操作：{key}")
                         # 执行开始操作后，i来充当计数器
                         if key == 'tiaozhan' or key == 'kaishi':

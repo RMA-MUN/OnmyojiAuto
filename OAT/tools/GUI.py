@@ -279,6 +279,7 @@ class Ui_Dialog(object):
         sync_buttons_layout = QtWidgets.QHBoxLayout(sync_buttons_widget)
         sync_buttons_layout.setSpacing(10)  # 按钮间距
 
+        self.sync_instruction_btn = QtWidgets.QPushButton("使用说明")
         self.refresh_windows_btn = QPushButton("刷新窗口")
         self.select_all_btn = QPushButton("全选")
         self.invert_selection_btn = QPushButton("反选")
@@ -288,7 +289,7 @@ class Ui_Dialog(object):
         self.stop_sync_btn = QPushButton("停止同步")
         self.arrange_btn = QPushButton("窗口排列")
 
-        for btn in [self.refresh_windows_btn, self.select_all_btn, self.invert_selection_btn,
+        for btn in [self.sync_instruction_btn, self.refresh_windows_btn, self.select_all_btn, self.invert_selection_btn,
                     self.set_main_window_btn, self.set_sub_windows_btn, self.arrange_btn,
                     self.start_sync_btn, self.stop_sync_btn]:
             sync_buttons_layout.addWidget(btn)
@@ -303,21 +304,10 @@ class Ui_Dialog(object):
         self.window_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.window_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
-        # 同步模式选择
-        sync_mode_widget = QtWidgets.QWidget()
-        sync_mode_layout = QtWidgets.QHBoxLayout(sync_mode_widget)
-        sync_mode_layout.setSpacing(10)
-        self.sync_mode_label = QtWidgets.QLabel("同步模式:")
-        self.sync_mode_combo = QtWidgets.QComboBox()
-        self.sync_mode_combo.addItems(["点击同步", "键盘同步", "完全同步"])
-        sync_mode_layout.addWidget(self.sync_mode_label)
-        sync_mode_layout.addWidget(self.sync_mode_combo)
-        sync_mode_layout.addStretch()
 
         # 组装同步器布局
         sync_layout.addWidget(sync_buttons_widget)  # 按钮在上
         sync_layout.addWidget(self.window_table)    # 表格在中
-        sync_layout.addWidget(sync_mode_widget)     # 模式选择在下
 
         # 将两个groupBox加入多开页面布局（上下排列）
         settings_layout.addWidget(self.settings_group)  # 多开设置在上
@@ -361,19 +351,16 @@ class Ui_Dialog(object):
         self.groupBox_4.setTitle(_translate("Dialog", "说明"))
 
         # 同步器文本
-        self.sync_group.setTitle(_translate("Dialog", "同步器设置"))
+        self.sync_group.setTitle(_translate("Dialog", "同步器"))
         self.refresh_windows_btn.setText(_translate("Dialog", "刷新窗口"))
         self.select_all_btn.setText(_translate("Dialog", "全选"))
         self.invert_selection_btn.setText(_translate("Dialog", "反选"))
         self.start_sync_btn.setText(_translate("Dialog", "开始同步"))
         self.stop_sync_btn.setText(_translate("Dialog", "停止同步"))
-        self.sync_mode_label.setText(_translate("Dialog", "同步模式:"))
-
         text = self.get_text()
         self.textBrowser_2.setHtml(text)
 
     def load_stylesheet(self, Dialog):
-        import os
         try:
             # 获取当前文件所在目录
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -390,10 +377,10 @@ class Ui_Dialog(object):
 
     def get_text(self):
         text = (
+            "本程序免费开源，禁止任何形式的倒卖行为！！！""<br>"
             "更新日志：""<br>"
             "1.新增后台运行模式，勾选后，窗口可以被完全遮挡，但是不能最小化""<br>"
-            "2.新增窗口同步器的功能，在一个游戏的操作可以同步到其他游戏""<br>"
-            "3.修复已知bug""<br>"
+            "2.新增窗口同步器的功能，可以同步主窗口的操作到其他游戏窗口""<br>"
             " <a href='https://github.com/RMA-MUN/OnmyoujiAuto'>"
             "点击跳转至仓库！"
             "</a>"

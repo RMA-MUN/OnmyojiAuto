@@ -9,9 +9,11 @@ import random
 from PIL import Image
 from functools import lru_cache
 from .get_DC import WindowCapture
+from .WindowSynchronizer import WindowSynchronizer
+
 
 class OnmyjiAutomation:
-    def __init__(self, window_title):
+    def __init__(self, window_title, synchronizer=None):
         self.window_title = window_title
         # 窗口信息获取与初始化
         self.hwnd = win32gui.FindWindow(None, window_title)
@@ -19,10 +21,15 @@ class OnmyjiAutomation:
             print(f"无法找到窗口 {window_title}")
             raise Exception('无法获取游戏窗口尺寸')
 
+        # 窗口同步器 - 如果没有提供则创建新实例
+        if synchronizer is None:
+            self.synchronizer = WindowSynchronizer()
+        else:
+            self.synchronizer = synchronizer
+
         self.area = self.get_window_rect()
         self.x1, self.y1, self.width, self.height = self.area
         self.x2, self.y2 = self.x1 + self.width, self.y1 + self.height
-
 
         # 线程与控制变量
         self.lock = threading.Lock()
@@ -159,7 +166,7 @@ class OnmyjiAutomation:
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
 
 
-    def perform_action(self, logo, hidden_window=False, threshold=0.85):
+    def perform_action(self, logo, hidden_window=False, threshold=0.85, sync_mode=False):
         # 先进行识别，减少锁持有时间
         try:
             # 如果启用隐藏窗口捕获
@@ -176,8 +183,32 @@ class OnmyjiAutomation:
                         # 使用随机偏移点击
                         relative_x = random.randint(x1, x2)
                         relative_y = random.randint(y1, y2)
-                        # 直接发送点击消息
-                        self.send_click_message(relative_x, relative_y)
+                        # 如果启用窗口同步
+                        if sync_mode and self.synchronizer.sync_enabled:
+                            # 如果self.hwnd不是主窗口的句柄，则替换为主窗口的句柄
+                            if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
+                                self.hwnd = self.synchronizer.main_window[0]
+                                # print(f"【调试】：切换到主窗口{self.hwnd}")
+                            else:
+                                # print(f"【调试】：当前窗口{self.hwnd}为主窗口，无需切换")
+                                pass
+
+                            sub_windows = self.synchronizer.get_sub_windows()
+                            # print(f"【调试】：发现{len(sub_windows)}个副窗口")
+                            # print(f"【调试】：副窗口列表：{sub_windows}")
+                            # 给主窗口发送点击消息
+                            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
+                            # print(f"【调试】：给主窗口{self.hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
+                            # 给副窗口发送点击消息
+                            for sub_hwnd, _ in sub_windows:
+                                self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=relative_x, relative_y=relative_y)
+                                # print(f"【调试】：给副窗口{sub_hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
+                        elif sync_mode and not self.synchronizer.sync_enabled:
+                            # 同步模式已被禁用，只给主窗口发送点击消息
+                            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
+                            # print(f"【调试】：同步已禁用，只给主窗口{self.hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
+                        else:
+                            self.send_click_message(relative_x=relative_x, relative_y=relative_y)
                         time.sleep(random.uniform(1.5, 3.0))
                         return True
                     else:
