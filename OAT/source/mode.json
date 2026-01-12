@@ -2,8 +2,8 @@
   "请选择模式": "",
   "魂土": {
     "default": "huntu",
-    "队长": "huntu",
-    "队员": "huntu_double"
+    "队长": "huntu_double",
+    "队员": "huntu"
   },
   "魂王": {
     "default": "hunwang_double",

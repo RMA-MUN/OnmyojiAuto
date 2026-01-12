@@ -183,8 +183,16 @@ class OnmyjiAutomation:
                         # 使用随机偏移点击
                         relative_x = random.randint(x1, x2)
                         relative_y = random.randint(y1, y2)
-                        # 直接发送点击消息
+                        # 如果启用窗口同步
                         if sync_mode and self.synchronizer.sync_enabled:
+                            # 如果self.hwnd不是主窗口的句柄，则替换为主窗口的句柄
+                            if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
+                                self.hwnd = self.synchronizer.main_window[0]
+                                # print(f"【调试】：切换到主窗口{self.hwnd}")
+                            else:
+                                # print(f"【调试】：当前窗口{self.hwnd}为主窗口，无需切换")
+                                pass
+
                             sub_windows = self.synchronizer.get_sub_windows()
                             # print(f"【调试】：发现{len(sub_windows)}个副窗口")
                             # print(f"【调试】：副窗口列表：{sub_windows}")
