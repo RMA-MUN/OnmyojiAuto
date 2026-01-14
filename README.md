@@ -1,5 +1,8 @@
 # OnmyojiAuto - 阴阳师自动化工具
 
+### 直接下载exe程序的压缩包
+[下载最新版本](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/release/OAT-v1.5.3.zip)
+
 程序背景图片
 ![阴阳师主题背景图](background.png)  
 （可自行替换背景图片：将替换后的png图片图片命名为`background.png`即可覆盖)
@@ -21,8 +24,6 @@ OnmyojiAuto是一款基于Python开发的阴阳师游戏自动化辅助工具，
 
 ## 🛠️ 安装步骤
 
-### 直接下载exe程序的压缩包
-[下载最新版本](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/release/OAT-v1.5.3.zip)
 
 ### 1. 克隆仓库
 ```bash
@@ -98,4 +99,5 @@ pip install -r requirements.txt
 
 ## 📞 联系作者
 - 邮箱：n3032747608@163.com
+
 
