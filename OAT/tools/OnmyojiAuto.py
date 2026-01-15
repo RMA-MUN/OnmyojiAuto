@@ -123,12 +123,12 @@ class OnmyjiAutomation:
             return True
         return False
 
-    def move_mouse(self, x: int, y: int) -> None:
+    def _move_mouse(self, x: int, y: int) -> None:
         """鼠标移动"""
         # 使用绝对坐标移动，更高效
         win32api.SetCursorPos((x, y))
 
-    def win32_double_click(self) -> None:
+    def _win32_double_click(self) -> None:
         """优化的双击操作，减少延迟"""
         # 组合鼠标事件，减少系统调用
         flags = win32con.MOUSEEVENTF_LEFTDOWN | win32con.MOUSEEVENTF_LEFTUP
@@ -137,7 +137,7 @@ class OnmyjiAutomation:
         time.sleep(0.03)
         win32api.mouse_event(flags, 0, 0, 0, 0)
         
-    def calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
+    def _calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
         """
         计算绝对坐标在窗口内的相对位置
         :param absolute_x: 屏幕绝对X坐标
@@ -172,80 +172,90 @@ class OnmyjiAutomation:
                        threshold: float = 0.85,
                        sync_mode: bool = False
                        ) -> bool:
-        # 先进行识别，减少锁持有时间
+        """
+        执行操作：根据是否隐藏窗口选择不同的执行模式
+        :param logo: 要识别的图像路径
+        :param hidden_window: 是否使用隐藏窗口模式
+        :param threshold: 识别阈值
+        :param sync_mode: 是否同步执行
+        :return: 是否成功执行操作
+        """
         try:
-            # 如果启用隐藏窗口捕获
             if hidden_window:
-                # print("使用隐藏窗口捕获模式进行图像识别")
-                try:
-                    # 创建WindowCapture实例
-                    wc = WindowCapture(hwnd=self.hwnd)
-                    # 使用WindowCapture查找图像，只传递必要的参数
-                    position = wc.find_image_precise(logo, threshold=threshold)
-                    if position:
-                        # 从区域范围中计算中心点坐标
-                        (x1, x2), (y1, y2) = position
-                        # 使用随机偏移点击
-                        relative_x = random.randint(x1, x2)
-                        relative_y = random.randint(y1, y2)
-                        # 如果启用窗口同步
-                        if sync_mode and self.synchronizer.sync_enabled:
-                            # 如果self.hwnd不是主窗口的句柄，则替换为主窗口的句柄
-                            if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
-                                self.hwnd = self.synchronizer.main_window[0]
-                                # print(f"【调试】：切换到主窗口{self.hwnd}")
-                            else:
-                                # print(f"【调试】：当前窗口{self.hwnd}为主窗口，无需切换")
-                                pass
-
-                            sub_windows = self.synchronizer.get_sub_windows()
-                            # print(f"【调试】：发现{len(sub_windows)}个副窗口")
-                            # print(f"【调试】：副窗口列表：{sub_windows}")
-                            # 给主窗口发送点击消息
-                            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
-                            # print(f"【调试】：给主窗口{self.hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
-                            # 给副窗口发送点击消息
-                            for sub_hwnd, _ in sub_windows:
-                                self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=relative_x, relative_y=relative_y)
-                                # print(f"【调试】：给副窗口{sub_hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
-                        elif sync_mode and not self.synchronizer.sync_enabled:
-                            # 同步模式已被禁用，只给主窗口发送点击消息
-                            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
-                            # print(f"【调试】：同步已禁用，只给主窗口{self.hwnd}发送点击消息，坐标：({relative_x}, {relative_y})")
-                        else:
-                            self.send_click_message(relative_x=relative_x, relative_y=relative_y)
-                        time.sleep(random.uniform(1.5, 3.0))
-                        return True
-                    else:
-                        return False
-                except Exception as e:
-                    print(f"隐藏窗口捕获发生错误: {str(e)}")
-                    return self.perform_action(logo, hidden_window=False, threshold=threshold)
-                 
-            # 常规方法
-            found = self.find_img(logo)
-            if not found:
-                return False
-
-            with self.lock:  # 只在执行关键操作时持有锁
-                # 计算相对坐标
-                relative_x, relative_y = self.calc_relative_position(self.x1, self.y1)
-                if "MuMu" in self.window_title or "模拟器" in self.window_title:
-                    pyautogui.moveTo(self.x1, self.y1)
-                    pyautogui.doubleClick(self.x1, self.y1)
-                    time.sleep(random.uniform(1.5, 3.0))
-                    return True
-                # 发送点击消息
-                else:
-                    self.send_click_message(relative_x, relative_y)
-                    time.sleep(random.uniform(1.5, 3.0))
-                    return True
+                return self._perform_action_hidden_window(logo, threshold, sync_mode)
+            else:
+                return self._perform_action_normal(logo, threshold, sync_mode)
         except pyautogui.FailSafeException:
             print("警告：触发了PyAutoGUI的安全模式，操作已停止")
             return False
         except Exception as e:
             print(f"警告：执行操作时发生错误：{str(e)}")
             return False
+
+    def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+        """使用隐藏窗口捕获模式执行操作"""
+        try:
+            wc = WindowCapture(hwnd=self.hwnd)
+            position = wc.find_image_precise(logo, threshold=threshold)
+            if position:
+                # 从区域范围中计算中心点坐标
+                (x1, x2), (y1, y2) = position
+                # 使用随机偏移点击
+                relative_x = random.randint(x1, x2)
+                relative_y = random.randint(y1, y2)
+                
+                self._send_click_messages(relative_x, relative_y, sync_mode)
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"隐藏窗口捕获发生错误: {str(e)}")
+            # 降级到常规模式
+            return self._perform_action_normal(logo, threshold, sync_mode)
+
+    def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+        """使用常规模式执行操作"""
+        found = self.find_img(logo)
+        if not found:
+            return False
+    
+        with self.lock:  # 只在执行关键操作时持有锁
+            # 计算相对坐标
+            relative_x, relative_y = self.calc_relative_position(self.x1, self.y1)
+            
+            # 模拟器特殊处理
+            if "MuMu" in self.window_title or "模拟器" in self.window_title:
+                pyautogui.moveTo(self.x1, self.y1)
+                pyautogui.doubleClick(self.x1, self.y1)
+                time.sleep(random.uniform(1.5, 3.0))
+                return True
+            
+            # 常规点击处理
+            self._send_click_messages(relative_x, relative_y, sync_mode)
+            return True
+
+    def _send_click_messages(self, relative_x: int, relative_y: int, sync_mode: bool) -> None:
+        """发送点击消息，根据同步模式决定是否同步到多个窗口"""
+        if sync_mode and self.synchronizer.sync_enabled:
+            # 确保使用主窗口句柄
+            if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
+                self.hwnd = self.synchronizer.main_window[0]
+            
+            # 给主窗口发送点击消息
+            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
+            
+            # 给所有副窗口发送点击消息
+            for sub_hwnd, _ in self.synchronizer.get_sub_windows():
+                self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=relative_x, relative_y=relative_y)
+        elif sync_mode and not self.synchronizer.sync_enabled:
+            # 同步模式已被禁用，只给当前窗口发送点击消息
+            self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
+        else:
+            # 非同步模式，使用普通点击方法
+            self.send_click_message(relative_x, relative_y)
+        
+        # 等待点击操作完成
+        time.sleep(random.uniform(1.5, 3.0))
 
     def clear_cache(self):
         """清除识别缓存"""
