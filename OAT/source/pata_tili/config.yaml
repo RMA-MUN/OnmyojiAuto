@@ -1,8 +1,0 @@
-# 体力爬塔配置文件
-image_paths:
-  shouwei: 'shouwei.png'
-  tiaozhan: 'tiaozhan.png'
-  xiezhu: 'xiezhu.png'
-  zuihou: 'zuihou.png'
-  baocang: 'baocang.png'
-  img_1: 'img_1.png'

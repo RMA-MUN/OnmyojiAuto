@@ -1,0 +1,10 @@
+{
+  "image_paths": {
+    "jieshu": "jieshu.png",
+    "tiaozhan": "tiaozhan.png",
+    "xiezhu": "xiezhu.png",
+    "zuihou": "zuihou.png",
+    "xueyuqian": "xueyuqian.png",
+    "tianzhao": "tianzhao.png"
+  }
+}

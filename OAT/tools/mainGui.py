@@ -1,5 +1,6 @@
 import builtins
 import datetime
+import json
 import sys
 import threading
 import traceback
@@ -16,7 +17,7 @@ from .startMore import multi_open_app
 from .WindowSynchronizer import WindowSynchronizer
 from ..source import *
 from ..tools import *
-from .config_mannager import ConfigReader
+from .config_manager import ConfigReader
 
 # 创建 logs 文件夹
 LOGS_DIR = 'logs'
@@ -353,7 +354,7 @@ class MainWindow(QtWidgets.QDialog):
                     folder_name = folder_info.get(sub_mode, folder_info['default'])
                 else:
                     folder_name = folder_info
-                sub_config_path = os.path.join('source', folder_name, 'config.yaml')
+                sub_config_path = os.path.join('source', folder_name, 'config.json')
                 sub_config_reader = ConfigReader(sub_config_path)
                 sub_config = sub_config_reader.read_config()
                 if sub_config:
@@ -452,13 +453,13 @@ class MainWindow(QtWidgets.QDialog):
         """
         刷新窗口表格，从 WindowSynchronizer 获取窗口信息并更新到表格中。
         """
-        # 读取client.yaml文件并获取value的值存储到列表内
+        # 读取client.json文件并获取value的值存储到列表内
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        client_path = os.path.join(script_dir, 'client.yaml')
+        client_path = os.path.join(script_dir, 'client.json')  # 改为client.json
         title_list = []
-        # 读取client.yaml文件
+        # 读取client.json文件
         with open(client_path, 'r', encoding='utf-8') as file:
-            titles_get = yaml.safe_load(file)
+            titles_get = json.load(file)  # 改为json.load
             for key, value in titles_get['title'].items():
                 title_list.append(value)
         # 使用WindowSynchronizer类中的方法获取窗口信息
@@ -636,7 +637,7 @@ class MainWindow(QtWidgets.QDialog):
         instruction_text = """
         同步器使用步骤：
 
-    1. 刷新窗口：点击"刷新窗口"按钮获取当前所有符合条件的窗口列表，如果需要自定义窗口标题，可以在client.yaml文件里配置
+    1. 刷新窗口：点击"刷新窗口"按钮获取当前所有符合条件的窗口列表，如果需要自定义窗口标题，可以在client.json文件里配置
     2. 选择窗口：在表格中勾选需要参与同步的窗口
     3. 设置主窗口：选择一个窗口并点击"设置主窗口"，主窗口将作为操作源
     4. 设置副窗口：选择一个或多个窗口并点击"设置副窗口"，这些窗口将跟随主窗口操作
