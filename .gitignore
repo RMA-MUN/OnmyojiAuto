@@ -48,9 +48,7 @@ test/
 *.temp
 *.bak
 *.old
-
-# 单独排除update.txt文件
-update.txt
+update/
 
 # 排除venv虚拟环境文件夹
 .venv
