@@ -5,7 +5,6 @@ import win32api
 import win32con
 import pyautogui
 import random
-
 from PIL import Image
 from functools import lru_cache
 from .get_DC import WindowCapture
@@ -19,7 +18,18 @@ class OnmyjiAutomation:
         self.hwnd = win32gui.FindWindow(None, window_title)
         if not self.hwnd:
             print(f"无法找到窗口 {window_title}")
-            raise Exception('无法获取游戏窗口尺寸')
+            # 设置默认窗口信息
+            self.area = (0, 0, 1920, 1080)  # 默认屏幕尺寸
+            self.x1, self.y1, self.width, self.height = self.area
+            self.x2, self.y2 = self.x1 + self.width, self.y1 + self.height
+            # 设置同步器为None
+            if synchronizer is None:
+                self.synchronizer = None
+            else:
+                self.synchronizer = synchronizer
+            # 跳过后续窗口初始化
+            self._init_common_params()
+            return
 
         # 窗口同步器 - 如果没有提供则创建新实例
         if synchronizer is None:
@@ -31,6 +41,11 @@ class OnmyjiAutomation:
         self.x1, self.y1, self.width, self.height = self.area
         self.x2, self.y2 = self.x1 + self.width, self.y1 + self.height
 
+        # 初始化公共参数
+        self._init_common_params()
+    
+    def _init_common_params(self):
+        """初始化公共参数"""
         # 线程与控制变量
         self.lock = threading.Lock()
         self.shutdown_flag = False
@@ -40,6 +55,11 @@ class OnmyjiAutomation:
         self.cache_timeout = 1.0
         self.default_confidence = 0.85  # 默认置信度
         self.image_templates = {}
+
+        # 模拟鼠标移动的参数
+        self.move_duration_range = (0.3, 0.8)  # 移动时长范围（秒）
+        self.jitter_amplitude = 0.5  # 鼠标抖动幅度
+        self.curve_intensity = 5  # 曲线弯曲程度
 
     def print_window_info(self) -> None:
         """输出窗口信息"""
@@ -62,7 +82,6 @@ class OnmyjiAutomation:
                 # 转换为RGB模式（如果不是）
                 if image.mode != 'RGB':
                     image = image.convert('RGB')
-                # 可以在这里添加缩放、增强对比度等预处理
                 self.image_templates[logo_path] = image
             except Exception as e:
                 print(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
@@ -74,7 +93,6 @@ class OnmyjiAutomation:
         """缓存并返回缩放后的图像模板"""
         # 确保先预加载图像
         self.preload_image(logo)
-        # 这里可以添加图像预处理逻辑，如缩放、灰度化
         return logo
 
     def find_img(self, logo: str, use_cache=True) -> bool:
@@ -87,8 +105,8 @@ class OnmyjiAutomation:
             if current_time - cache_time < self.cache_timeout:
                 if cached_result:
                     x, y, width, height = cached_result
-                    self.x1 = random.randint(x, x + width)
-                    self.y1 = random.randint(y, y + height)
+                    self.target_x = random.randint(x, x + width)
+                    self.target_y = random.randint(y, y + height)
                 return cached_result is not None
 
         # 预加载图像
@@ -105,26 +123,27 @@ class OnmyjiAutomation:
         except pyautogui.ImageNotFoundException:
             # 未找到图像时设置target为None
             target = None
-            print(f"查找图片{logo}的可信度低于预期")
-        except OSError as e:
+        except OSError:
             # 处理文件读取错误
-           pass
-        except Exception as e:
-            # 处理其他未预期的错误
             pass
+        except Exception:
+            # 处理其他未预期的错误
+            import traceback
+            traceback.print_exc()
 
         # 更新缓存
         self.recognition_cache[logo] = (target, current_time)
 
         if target:
             x, y, width, height = target
-            self.x1 = random.randint(x, x + width)
-            self.y1 = random.randint(y, y + height)
+            self.target_x = random.randint(x, x + width)
+            self.target_y = random.randint(y, y + height)
             return True
+        
         return False
 
     def _move_mouse(self, x: int, y: int) -> None:
-        """鼠标移动"""
+        """鼠标移动（基础方法）"""
         # 使用绝对坐标移动，更高效
         win32api.SetCursorPos((x, y))
 
@@ -136,7 +155,7 @@ class OnmyjiAutomation:
         # 更短的双击间隔
         time.sleep(0.03)
         win32api.mouse_event(flags, 0, 0, 0, 0)
-        
+
     def _calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
         """
         计算绝对坐标在窗口内的相对位置
@@ -149,7 +168,7 @@ class OnmyjiAutomation:
         relative_x = absolute_x - window_left
         relative_y = absolute_y - window_top
         return relative_x, relative_y
-        
+
     def send_click_message(self, relative_x: int, relative_y: int) -> None:
         """
         向指定窗口发送点击消息
@@ -203,7 +222,7 @@ class OnmyjiAutomation:
                 # 使用随机偏移点击
                 relative_x = random.randint(x1, x2)
                 relative_y = random.randint(y1, y2)
-                
+
                 self._send_click_messages(relative_x, relative_y, sync_mode)
                 return True
             else:
@@ -218,20 +237,11 @@ class OnmyjiAutomation:
         found = self.find_img(logo)
         if not found:
             return False
-    
+
         with self.lock:  # 只在执行关键操作时持有锁
-            # 计算相对坐标
-            relative_x, relative_y = self.calc_relative_position(self.x1, self.y1)
-            
-            # 模拟器特殊处理
-            if "MuMu" in self.window_title or "模拟器" in self.window_title:
-                pyautogui.moveTo(self.x1, self.y1)
-                pyautogui.doubleClick(self.x1, self.y1)
-                time.sleep(random.uniform(1.5, 3.0))
-                return True
-            
-            # 常规点击处理
-            self._send_click_messages(relative_x, relative_y, sync_mode)
+            self._complex_move(target_x=self.target_x, target_y=self.target_y)
+            self._win32_double_click()
+            time.sleep(random.uniform(1.5, 3.0))
             return True
 
     def _send_click_messages(self, relative_x: int, relative_y: int, sync_mode: bool) -> None:
@@ -240,10 +250,10 @@ class OnmyjiAutomation:
             # 确保使用主窗口句柄
             if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
                 self.hwnd = self.synchronizer.main_window[0]
-            
+
             # 给主窗口发送点击消息
             self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
-            
+
             # 给所有副窗口发送点击消息
             for sub_hwnd, _ in self.synchronizer.get_sub_windows():
                 self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=relative_x, relative_y=relative_y)
@@ -253,9 +263,83 @@ class OnmyjiAutomation:
         else:
             # 非同步模式，使用普通点击方法
             self.send_click_message(relative_x, relative_y)
-        
+
         # 等待点击操作完成
         time.sleep(random.uniform(1.5, 3.0))
+
+    def _ease_in_out_cubic(self, t: float) -> float:
+        """
+        缓动函数：模拟移动鼠标的加速/减速过程
+        :param t: 0~1之间的数值，表示移动进度
+        :return: 0~1之间的数值，表示当前进度对应的速度权重
+        """
+        return t * t * (3 - 2 * t) if t <= 1 else 1
+
+    def _generate_bezier_path(self, start: tuple, end: tuple, num_points: int = 50) -> list:
+        """
+        生成简单的曲线路径点（模拟移动鼠标的弯曲轨迹）
+        :param start: 起点坐标 (x, y)
+        :param end: 终点坐标 (x, y)
+        :param num_points: 路径点数量
+        :return: 按顺序排列的路径点列表 [(x,y), (x,y), ...]
+        """
+        path_points = []
+        sx, sy = start
+        ex, ey = end
+        dx, dy = ex - sx, ey - sy
+        
+        # 使用简单的抛物线轨迹
+        for i in range(num_points):
+            t = i / (num_points - 1)
+            # 应用缓动函数
+            eased_t = self._ease_in_out_cubic(t)
+            
+            # 计算当前点坐标
+            x = sx + dx * eased_t
+            y = sy + dy * eased_t
+            
+            # 添加随机偏移，模拟人手抖动
+            x += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
+            y += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
+            
+            path_points.append((round(x), round(y)))
+        
+        return path_points
+
+    def _human_like_move(self, target_x: int, target_y: int) -> None:
+        """
+        核心方法：实现模拟人为的鼠标移动
+        :param target_x: 目标X坐标（屏幕绝对坐标）
+        :param target_y: 目标Y坐标（屏幕绝对坐标）
+        """
+        try:
+            # 获取当前鼠标位置
+            start_x, start_y = pyautogui.position()
+            
+            # 如果已经在目标位置，直接返回
+            if abs(start_x - target_x) < 5 and abs(start_y - target_y) < 5:
+                return
+
+            pyautogui.moveTo(target_x, target_y, duration=0.3)
+            
+            # 最后确保精确到达目标位置
+            win32api.SetCursorPos((target_x, target_y))
+        except Exception as e:
+            pass
+
+    def _complex_move(self, target_x: int, target_y: int) -> None:
+        """
+        :param target_x: 目标X坐标
+        :param target_y: 目标Y坐标
+        """
+        try:
+            self._human_like_move(target_x, target_y)
+        except Exception as e:
+            with self.lock:
+                try:
+                    win32api.SetCursorPos((target_x, target_y))
+                except:
+                    pyautogui.moveTo(target_x, target_y, duration=0.2)
 
     def clear_cache(self):
         """清除识别缓存"""
