@@ -39,6 +39,7 @@ def get_script_dir(mode: str, sub_mode: Optional[str] = None) -> str:
 def mode_choice(
         mode: str, sub_mode: str, times: int, config: dict,
         window_title: str, hidden_window: bool=False, sync_mode: bool=False,
+        sync_type: str="完全同步",
         synchronizer=None
 ):
     try:
@@ -54,4 +55,4 @@ def mode_choice(
 
     # 执行通用挑战函数
     from .common_challenge import common_challenge
-    common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer)
+    common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, sync_type, synchronizer)

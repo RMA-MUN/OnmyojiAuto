@@ -346,6 +346,8 @@ class MainWindow(QtWidgets.QDialog):
 
             # 更新window_title
             window_title = self.window_title
+            # 获取同步模式类型
+            sync_type = getattr(self, 'sync_type', '完全同步')
 
             # 读取模式对应的子配置文件
             folder_info = MODE_MAPPING.get(mode)
@@ -361,7 +363,7 @@ class MainWindow(QtWidgets.QDialog):
                     # 获取synchronizer实例，如果存在的话
                     synchronizer = self.sync if hasattr(self, 'sync') else None
                     mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
-                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer)
+                                hidden_window=hidden_window, sync_mode=sync_mode, sync_type=sync_type, synchronizer=synchronizer)
                 else:
                     print(f"读取 {sub_config_path} 配置文件失败。")
             else:
@@ -575,60 +577,103 @@ class MainWindow(QtWidgets.QDialog):
         if not hasattr(self, 'main_window') or not hasattr(self, 'sub_windows'):
             return
 
-        wc = WindowChecker()
-        # 将所有相关窗口句柄收集起来
-        window_handles = self.sub_windows + [self.main_window]
-        for hwnd in window_handles:
+        # 创建线程来执行窗口调整和同步启动操作，避免阻塞UI线程
+        def sync_thread_func():
             try:
-                # 直接使用句柄调整窗口大小
-                target_width = 1404
-                target_height = 834
-                wc.set_window_handle(hwnd)
-                current_size = wc.get_window_info()
-                if current_size:
-                    current_width, current_height = current_size[2]
-                    if current_width != target_width or current_height != target_height:
-                        wc.resize_window(target_width, target_height, hwnd=hwnd)
-                        # 添加区域尺寸校验
+                wc = WindowChecker()
+                # 将所有相关窗口句柄收集起来
+                window_handles = self.sub_windows + [self.main_window]
+                for hwnd in window_handles:
+                    try:
+                        # 直接使用句柄调整窗口大小
+                        target_width = 1404
+                        target_height = 834
                         wc.set_window_handle(hwnd)
-                        updated_size = wc.get_window_info()
-                        if updated_size[2] != (target_width, target_height):
-                            raise ValueError(f"窗口(句柄:{hwnd})尺寸调整失败，当前尺寸：{updated_size[2]}")
+                        current_size = wc.get_window_info()
+                        if current_size:
+                            current_width, current_height = current_size[2]
+                            if current_width != target_width or current_height != target_height:
+                                wc.resize_window(target_width, target_height, hwnd=hwnd)
+                                # 添加区域尺寸校验
+                                wc.set_window_handle(hwnd)
+                                updated_size = wc.get_window_info()
+                                if updated_size[2] != (target_width, target_height):
+                                    raise ValueError(f"窗口(句柄:{hwnd})尺寸调整失败，当前尺寸：{updated_size[2]}")
+                    except Exception as e:
+                        print(e)
+
+                self.sync = WindowSynchronizer()
+                # 将句柄转换为整数类型并传递
+                main_hwnd = int(self.main_window)
+                sub_hwnds = [int(hwnd) for hwnd in self.sub_windows]
+                self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
+                self.sync.set_true_enable()
+                # 启动鼠标和键盘监听器
+                self.sync.sync_controller()
+                self.sync_mode = True
+
+                print("窗口同步已启动")
+                
             except Exception as e:
-                print(e)
+                print(f"同步失败: {str(e)}")
+                self.log_redirect.log_to_file(f"同步异常: {traceback.format_exc()}")
+            finally:
+                # 将主窗口通过句柄激活到前台
+                if hasattr(self, 'main_window'):
+                    try:
+                        win32gui.SetForegroundWindow(int(self.main_window))
+                    except:
+                        pass
 
-        try:
-            self.sync = WindowSynchronizer()
-            # 将句柄转换为整数类型并传递
-            main_hwnd = int(self.main_window)
-            sub_hwnds = [int(hwnd) for hwnd in self.sub_windows]
-            self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
-            self.sync.set_true_enable()
-            self.sync_mode = True
-            print("窗口同步已启动")
-            return True
-
-        except Exception as e:
-            print(f"同步失败: {str(e)}")
-            self.log_redirect.log_to_file(f"同步异常: {traceback.format_exc()}")
-        # 将主窗口通过句柄激活到前台
-        win32gui.SetForegroundWindow(self.main_window)
+        # 启动同步线程
+        sync_thread = threading.Thread(target=sync_thread_func)
+        sync_thread.daemon = True
+        sync_thread.start()
+        
+        # 将线程添加到管理列表
+        with self.lock:
+            self.active_threads.append(sync_thread)
+            
+        return True
 
     # 停止同步方法
     def stop_sync(self):
         if self.sync_mode:
-            self.sync.set_false_enable()
+            self.sync.stop_all_sync()
             self.sync_mode = False
             print("窗口同步已停止")
 
     def arrange_connect(self):
-        # 获取主窗口的句柄
-        main_window_hwnd = int(self.main_window)
-        # 获取副窗口的句柄
-        sub_window_hwnd = [int(hwnd) for hwnd in self.sub_windows]
+        # 创建线程来执行窗口排列操作，避免阻塞UI线程
+        def arrange_thread_func():
+            try:
+                # 获取主窗口的句柄
+                main_window_hwnd = int(self.main_window)
+                # 获取副窗口的句柄
+                sub_window_hwnd = [int(hwnd) for hwnd in self.sub_windows]
 
-        # 调用WindowSynchronizer的arrange_windows方法
-        self.sync.arrange_windows(main_window_hwnd, sub_window_hwnd)
+                # 调用WindowSynchronizer的arrange_windows方法
+                if hasattr(self, 'sync') and self.sync:
+                    self.sync.arrange_windows(main_window_hwnd, sub_window_hwnd)
+                else:
+                    # 如果sync对象不存在，先创建它
+                    self.sync = WindowSynchronizer()
+                    main_hwnd = int(self.main_window)
+                    sub_hwnds = [int(hwnd) for hwnd in self.sub_windows]
+                    self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
+                    self.sync.arrange_windows(main_window_hwnd, sub_window_hwnd)
+            except Exception as e:
+                print(f"窗口排列失败: {str(e)}")
+                self.log_redirect.log_to_file(f"窗口排列异常: {traceback.format_exc()}")
+
+        # 启动窗口排列线程
+        arrange_thread = threading.Thread(target=arrange_thread_func)
+        arrange_thread.daemon = True
+        arrange_thread.start()
+        
+        # 将线程添加到管理列表
+        with self.lock:
+            self.active_threads.append(arrange_thread)
 
     def sync_instruction(self):
         """
@@ -648,9 +693,8 @@ class MainWindow(QtWidgets.QDialog):
     注意事项：
     - 主窗口只能设置一个
     - 副窗口至少设置一个
-    - 开始同步前请确保已正确设置主窗口和副窗口
-    - 同步过程中请勿关闭主窗口
     - 如需调整同步窗口，建议先停止同步
+    - 窗口同步会同步对主窗口的鼠标、键盘和本程序执行挑战时的操作
     """
 
         msg_box = QMessageBox(self)

@@ -1,10 +1,9 @@
 import win32gui
 import win32con
+import win32api
 import threading
-
-from pynput import mouse
-from typing import List, Tuple
-
+from pynput import mouse, keyboard
+from typing import List, Tuple, Optional
 from OAT.tools.WindowChecker import WindowChecker
 
 class WindowSynchronizer:
@@ -19,6 +18,10 @@ class WindowSynchronizer:
         self.sub_window_hwnd = []
         self.sync_enabled = False
 
+        # 键盘监听器相关属性
+        self.keyboard_listener = None  # 键盘监听器实例
+        self.keyboard_listener_thread = None  # 键盘监听器线程
+
     def get_all_windows(self, window_titles: List[str]) -> List[Tuple[int, str]]:
         """
         获取所有相关窗口的句柄和标题
@@ -28,7 +31,7 @@ class WindowSynchronizer:
             # 使用集合快速检查窗口是否已存在
             if hwnd in existing_windows:
                 return True
-            
+
             # 检查窗口是否匹配任何标题
             for title in window_titles:
                 if title in window_text:
@@ -56,17 +59,12 @@ class WindowSynchronizer:
             self.sub_windows = []
 
             if main_hwnd and sub_hwnds:
-                # 如果提供了明确的窗口句柄，直接使用
+                # 如果提供了窗口句柄，直接使用
                 self.main_window = (main_hwnd, main_title)
-                # print(f"【调试】：直接设置主窗口 hwnd={main_hwnd}, title={main_title}")
-                
+
                 for hwnd, title in zip(sub_hwnds, sub_titles):
                     if hwnd != main_hwnd:
                         self.sub_windows.append((hwnd, title))
-                        # print(f"【调试】：直接添加副窗口 hwnd={hwnd}, title={title}")
-                    else:
-                        #  print(f"【调试】：跳过主窗口 hwnd={hwnd}, title={title}")
-                        pass
             else:
                 # 否则使用标题识别的方式
                 # 获取所有相关窗口
@@ -74,26 +72,20 @@ class WindowSynchronizer:
 
                 # 识别主窗口
                 for hwnd, title in all_windows:
-                    print(f"【调试】：检查窗口 hwnd={hwnd}, title={title}")
                     if main_title in title:
                         self.main_window = (hwnd, title)
                         break
 
                 # 识别副窗口
                 for hwnd, title in all_windows:
-                    print(f"【调试】：检查窗口 hwnd={hwnd}, title={title}")
                     # 确保不是主窗口，并且标题匹配副窗口标题
                     if self.main_window and hwnd != self.main_window[0]:
                         for sub_title in sub_titles:
                             if sub_title in title:
                                 self.sub_windows.append((hwnd, title))
-                                print(f"【调试】：添加副窗口 hwnd={hwnd}, title={title}")
                                 break
-                    elif self.main_window and hwnd == self.main_window[0]:
-                        print(f"【调试】：跳过主窗口 hwnd={hwnd}, title={title}")
                     else:
-                        print(f"【调试】：跳过窗口 hwnd={hwnd}, title={title}")
-
+                        pass
     def calc_the_position(self, main_window_title: str, sub_window_titles: List[str], screen_x: int, screen_y: int) -> List[Tuple[int, int]]:
         """
         计算出在主窗口内的相对位置，然后映射到副窗口中
@@ -126,7 +118,7 @@ class WindowSynchronizer:
                 # 使用已识别的副窗口列表
                 for hwnd, title in self.sub_windows:
                     sub_checker = WindowChecker()
-                    sub_checker.set_window_handle(hwnd)  # 保持不变
+                    sub_checker.set_window_handle(hwnd)
                     sub_window_info = sub_checker.get_window_info()
 
                     if sub_window_info:
@@ -136,7 +128,6 @@ class WindowSynchronizer:
                         print(f"未找到句柄为 {hwnd} 的副窗口")
             return sub_relative_positions
         else:
-            # print("点击位置不在主窗口内")
             return []
 
     def send_click_message(self, hwnd: int, relative_x: int, relative_y: int) -> None:
@@ -145,49 +136,264 @@ class WindowSynchronizer:
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
         """
+        # 检查窗口是否有效
+        if not win32gui.IsWindow(hwnd):
+            return
+            
         # 将相对坐标转换为LPARAM格式
         l_param = relative_x | (relative_y << 16)
-        # 发送鼠标移动过去的信息
+        # 发送鼠标移动、按下和释放消息
         win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, l_param)
-        # 发送鼠标左键按下消息
         win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param)
-        # 发送鼠标左键释放消息
         win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, l_param)
-        # 输出点击信息
-        # print(f"已发送点击消息给句柄 {hwnd}，相对坐标 ({relative_x}, {relative_y})")
 
     def send_click_message_to_all(self, relative_x: int, relative_y: int) -> None:
         """
         发送点击消息给所有副窗口
         :param relative_x, relative_y: 相对坐标
         """
-        for hwnd, _ in self.sub_windows:
-            self.send_click_message(hwnd, relative_x, relative_y)
-            # 输出点击信息
-            # print(f"已发送点击消息给句柄 {hwnd}，相对坐标 ({relative_x}, {relative_y})")
+        with self.lock:
+            for hwnd, title in self.sub_windows:
+                self.send_click_message(hwnd, relative_x, relative_y)
 
-    def start_listening(self):
+    def send_key_message(self, hwnd: int, key_code: int, is_pressed: bool = True) -> None:
+        """
+        发送键盘按键消息到指定窗口（兼容普通字符/特殊键）
+        :param hwnd: 目标窗口句柄
+        :param key_code: 按键虚拟键码（VK_CODE）
+        :param is_pressed: True=按下，False=松开
+        """
+        if not win32gui.IsWindow(hwnd):
+            return
+
+        # 构造键盘消息参数（扫描码+扩展键标志）
+        scan_code = win32api.MapVirtualKey(key_code, 0)
+        l_param = (scan_code << 16) | (0 if is_pressed else 0xC000)  # 松开时加0xC000标志
+
+        # 发送按键消息
+        if is_pressed:
+            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, key_code, l_param)
+        else:
+            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, key_code, l_param)
+
+    def send_key_message_to_all(self, key_code: int, is_pressed: bool = True) -> None:
+        """
+        发送键盘消息到所有副窗口
+        :param key_code: 按键虚拟键码
+        :param is_pressed: True=按下，False=松开
+        """
+        with self.lock:
+            for hwnd, title in self.sub_windows:
+                self.send_key_message(hwnd, key_code, is_pressed)
+
+    def sync_controller(self):
+        """
+        整体控制同步：作为总控入口，统一启动/管理鼠标+键盘同步
+        """
+        with self.lock:
+            # 重置关闭标志
+            self.shutdown_flag = False
+            
+            # 确保同步开关开启
+            self.sync_enabled = True
+
+            # 启动同步
+            mouse_started = self.mouse_sync()
+            keyboard_started = self.keyboard_sync()
+
+            if mouse_started and keyboard_started:
+                return True
+            elif mouse_started:
+                return True
+            elif keyboard_started:
+                return True
+            else:
+                return False
+
+    def keyboard_sync(self):
+        """
+        启动键盘监听器（线程安全）
+        """
+        
+        # 检查是否已经在锁的保护下（通过检查调用栈）
+        import inspect
+        caller_frame = inspect.currentframe().f_back
+        caller_method = caller_frame.f_code.co_name if caller_frame else ""
+        
+        if caller_method != "sync_controller":
+            # 如果不是从 sync_controller 调用的，需要加锁保护
+            with self.lock:
+                return self._keyboard_sync_impl()
+        else:
+            # 如果是从 sync_controller 调用的，已经在锁保护下，直接执行
+            return self._keyboard_sync_impl()
+    
+    def _keyboard_sync_impl(self):
+        """
+        键盘同步的实际实现
+        """
+        if self.shutdown_flag:
+            return False
+
+        if self.keyboard_listener and self.keyboard_listener.is_alive():
+            return False
+
+        # 启动键盘监听器（设置为守护线程，避免阻塞主线程）
+        self.keyboard_listener = keyboard.Listener(
+            on_press=self.on_key_press,
+            on_release=self.on_key_release,
+            daemon=True
+        )
+        self.keyboard_listener.start()
+        self.keyboard_listener_thread = None  # 不再需要单独的join线程
+
+        self.sync_enabled = True
+        return True
+
+    def keyboard_listener(self):
+        """
+        兼容原有命名的键盘监听器入口（实际逻辑在on_key_press/on_key_release）
+        """
+        return self.keyboard_sync()
+
+    def on_key_press(self, key: keyboard.Key | keyboard.KeyCode) -> None:
+        """
+        键盘按下事件处理：仅同步主窗口的按键到副窗口
+        """
+        # 调试信息
+        key_str = f"'{key.char}'" if hasattr(key, 'char') and key.char else str(key)
+        # print(f"[调试] 检测到键盘按下事件: 按键={key_str}")
+        
+        if not self.sync_enabled or not self.main_window or not self.sub_windows:
+            return
+
+        # 检查当前激活窗口是否为主窗口（确保只同步主窗口的按键）
+        foreground_hwnd = win32gui.GetForegroundWindow()
+
+        if foreground_hwnd != self.main_window[0]:
+            return
+
+        try:
+            # 转换按键为虚拟键码
+            key_code = self._get_vk_code(key)
+            if key_code is not None:
+                # 发送按键按下消息到所有副窗口
+                self.send_key_message_to_all(key_code, is_pressed=True)
+        except Exception as e:
+            print(f"处理键盘按下事件时出错: {e}")
+
+    def on_key_release(self, key: keyboard.Key | keyboard.KeyCode) -> None:
+        """
+        键盘松开事件处理：同步按键松开到副窗口
+        """
+        # 详细调试信息
+        key_str = f"'{key.char}'" if hasattr(key, 'char') and key.char else str(key)
+        
+        if not self.sync_enabled or not self.main_window or not self.sub_windows:
+            return
+
+        # 检查当前激活窗口是否为主窗口
+        foreground_hwnd = win32gui.GetForegroundWindow()
+
+        if foreground_hwnd != self.main_window[0]:
+            return
+
+        try:
+            # 转换按键为虚拟键码
+            key_code = self._get_vk_code(key)
+
+            if key_code is not None:
+                # 发送按键松开消息到所有副窗口
+                self.send_key_message_to_all(key_code, is_pressed=False)
+        except Exception as e:
+            print(f"处理键盘松开事件时出错: {e}")
+
+    def _get_vk_code(self, key: keyboard.Key | keyboard.KeyCode) -> Optional[int]:
+        """
+        转换pynput按键对象为Windows虚拟键码（VK_CODE）
+        :return: 虚拟键码，无法转换返回None
+        """
+        try:
+            # 处理普通字符键
+            if isinstance(key, keyboard.KeyCode) and key.char is not None:
+                return win32api.VkKeyScan(key.char) & 0xFF
+            # 处理特殊键
+            elif isinstance(key, keyboard.Key):
+                return key.value.vk if hasattr(key, 'value') else None
+        except Exception as e:
+            print(f"转换按键 {key} 为虚拟键码失败：{e}")
+            return None
+        return None
+
+    def stop_keyboard_sync(self):
+        """
+        停止键盘监听器并释放资源
+        """
+        with self.lock:
+            if self.keyboard_listener and self.keyboard_listener.is_alive():
+                self.keyboard_listener.stop()
+                self.keyboard_listener = None
+                self.keyboard_listener_thread = None
+                print("键盘监听器已停止")
+            else:
+                print("键盘监听器未启动")
+
+    def stop_all_sync(self):
+        """
+        停止所有同步（鼠标+键盘）
+        """
+        self.shutdown_flag = True
+        self.sync_enabled = False
+        self.stop_mouse_sync()
+        self.stop_keyboard_sync()
+        print("所有同步已停止")
+
+    def mouse_sync(self):
         """
         启动鼠标监听器
         """
-        if not self.mouse_listener or not self.mouse_listener.is_alive():
-            self.mouse_listener = mouse.Listener(on_click=self.where_click)
-            self.mouse_listener.start()
-            self.sync_enabled = True
-            print("鼠标监听器已启动")
+        # 检查是否已经在锁的保护下（通过检查调用栈）
+        import inspect
+        caller_frame = inspect.currentframe().f_back
+        caller_method = caller_frame.f_code.co_name if caller_frame else ""
+        
+        if caller_method != "sync_controller":
+            # 如果不是从 sync_controller 调用的，需要加锁保护
+            with self.lock:
+                return self._mouse_sync_impl()
+        else:
+            # 如果是从 sync_controller 调用的，已经在锁保护下，直接执行
+            return self._mouse_sync_impl()
+    
+    def _mouse_sync_impl(self):
+        """
+        鼠标同步的实际实现
+        """
+        if self.shutdown_flag:
+            return False
+            
+        if self.mouse_listener and self.mouse_listener.is_alive():
+            return False
 
-    def stop_listening(self):
+        # 启动鼠标监听器（设置为守护线程，避免阻塞主线程）
+        self.mouse_listener = mouse.Listener(on_click=self.where_click, daemon=True)
+        self.mouse_listener.start()
+        self.sync_enabled = True
+
+        return True
+
+    def stop_mouse_sync(self):
         """
         停止鼠标监听器并释放资源
         """
-        self.mouse_listener.stop()
-        self.mouse_listener.join()
-        self.mouse_listener = None
-        # 停止所有和副窗口的通信
-        self.sub_windows = []
-        self.shutdown_flag = True
-        self.sync_enabled = False
-        print("鼠标监听器已停止")
+        if self.mouse_listener and self.mouse_listener.is_alive():
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+            # 仅设置同步禁用标志，不设置全局关闭标志
+            self.sync_enabled = False
+            print("鼠标监听器已停止")
+        else:
+            print("鼠标监听器未启动")
 
     def set_true_enable(self):
         """设置同步启用"""
@@ -204,23 +410,31 @@ class WindowSynchronizer:
         :param button: 点击的按钮
         :param pressed: 是否按下
         """
-        if pressed and button == mouse.Button.left:
-            if self.main_window and self.sub_windows:
-                # 从类属性中获取主窗口和副窗口标题
-                main_window_title = self.main_window[1]
-                sub_window_titles = [title for hwnd, title in self.sub_windows]
+        # 详细调试信息
+        # print(f"[调试] 检测到鼠标点击事件: 坐标=({x}, {y}), 按钮={button}, 状态={'按下' if pressed else '释放'}")
 
-                # 计算相对位置
-                relative_positions = self.calc_the_position(main_window_title, sub_window_titles, x, y)
+        if not self.sync_enabled or not pressed or button != mouse.Button.left or not self.main_window or not self.sub_windows:
+            return
 
-                # 发送点击消息给所有副窗口
-                if relative_positions:
-                    for rel_x, rel_y in relative_positions:
-                        self.send_click_message_to_all(rel_x, rel_y)
-            # print(f"鼠标左键在坐标 ({x}, {y}) 处被按下")
-        elif pressed and button == mouse.Button.right:
-            pass
-            # print(f"鼠标右键在坐标 ({x}, {y}) 处被按下")
+        # 检测主窗口是否在最前端
+        clicked_window_hwnd = win32gui.WindowFromPoint((x, y))
+
+        # 检查点击的窗口是否为主窗口
+        if clicked_window_hwnd != self.main_window[0]:
+            return
+
+        try:
+            # 从类属性中获取主窗口和副窗口信息
+            main_window_title = self.main_window[1]
+            # 计算相对位置
+            relative_positions = self.calc_the_position(main_window_title, [], x, y)  # 副窗口标题列表不再需要
+
+            # 发送点击消息给所有副窗口
+            if relative_positions:
+                for rel_x, rel_y in relative_positions:
+                    self.send_click_message_to_all(rel_x, rel_y)
+        except Exception as e:
+            print(f"处理鼠标点击事件时出错: {e}")
 
     def arrange_windows(self, main_window_hwnd: int, sub_window_hwnd: List[int]):
         """

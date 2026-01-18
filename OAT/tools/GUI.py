@@ -1,6 +1,5 @@
 import json
 
-import yaml
 import os
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -102,6 +101,7 @@ class Ui_Dialog(object):
 
         # 隐藏窗口捕获复选框
         self.hidden_window_checkbox = QtWidgets.QCheckBox("启用后台模式")
+        self.hidden_window_checkbox.setChecked(True)
         self.hidden_window_checkbox.setObjectName("hidden_window_checkbox")
         self.hidden_window_checkbox.setToolTip("勾选此项后，游戏窗口可以被其他程序遮挡，程序依然可以正常执行任务")
 
@@ -305,7 +305,6 @@ class Ui_Dialog(object):
         self.window_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)  # 第二列拉伸
         self.window_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.window_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-
 
         # 组装同步器布局
         sync_layout.addWidget(sync_buttons_widget)  # 按钮在上

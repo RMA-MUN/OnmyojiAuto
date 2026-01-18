@@ -10,6 +10,7 @@ def common_challenge(
         times: int, config: dict,
         script_dir: str, window_title: str,
         hidden_window: bool=False, sync_mode: bool=False,
+        sync_type: str="完全同步",
         synchronizer=None # 同步器实例
 ) -> bool:
     try:
@@ -38,7 +39,7 @@ def common_challenge(
                 # print(f"正在识别图片：{key}")
                 try:
                     # 尝试识别并执行操作，启用低置信度重试
-                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode):
+                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode, sync_type=sync_type):
                         # print(f"已成功识别并执行操作：{key}")
                         # 执行开始操作后，i来充当计数器
                         if key == 'tiaozhan' or key == 'kaishi':

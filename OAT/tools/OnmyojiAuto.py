@@ -189,7 +189,8 @@ class OnmyjiAutomation:
                        logo: str,
                        hidden_window: bool = False,
                        threshold: float = 0.85,
-                       sync_mode: bool = False
+                       sync_mode: bool = False,
+                       sync_type: str = "完全同步"
                        ) -> bool:
         """
         执行操作：根据是否隐藏窗口选择不同的执行模式
@@ -197,13 +198,14 @@ class OnmyjiAutomation:
         :param hidden_window: 是否使用隐藏窗口模式
         :param threshold: 识别阈值
         :param sync_mode: 是否同步执行
+        :param sync_type: 同步类型，可选值："完全同步"、"点击同步"
         :return: 是否成功执行操作
         """
         try:
             if hidden_window:
-                return self._perform_action_hidden_window(logo, threshold, sync_mode)
+                return self._perform_action_hidden_window(logo, threshold, sync_mode, sync_type)
             else:
-                return self._perform_action_normal(logo, threshold, sync_mode)
+                return self._perform_action_normal(logo, threshold, sync_mode, sync_type)
         except pyautogui.FailSafeException:
             print("警告：触发了PyAutoGUI的安全模式，操作已停止")
             return False
@@ -211,7 +213,7 @@ class OnmyjiAutomation:
             print(f"警告：执行操作时发生错误：{str(e)}")
             return False
 
-    def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+    def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool, sync_type: str) -> bool:
         """使用隐藏窗口捕获模式执行操作"""
         try:
             wc = WindowCapture(hwnd=self.hwnd)
@@ -223,16 +225,16 @@ class OnmyjiAutomation:
                 relative_x = random.randint(x1, x2)
                 relative_y = random.randint(y1, y2)
 
-                self._send_click_messages(relative_x, relative_y, sync_mode)
+                self._send_click_messages(relative_x, relative_y, sync_mode, sync_type)
                 return True
             else:
                 return False
         except Exception as e:
             print(f"隐藏窗口捕获发生错误: {str(e)}")
             # 降级到常规模式
-            return self._perform_action_normal(logo, threshold, sync_mode)
+            return self._perform_action_normal(logo, threshold, sync_mode, sync_type)
 
-    def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+    def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool, sync_type: str) -> bool:
         """使用常规模式执行操作"""
         found = self.find_img(logo)
         if not found:
@@ -241,11 +243,28 @@ class OnmyjiAutomation:
         with self.lock:  # 只在执行关键操作时持有锁
             self._complex_move(target_x=self.target_x, target_y=self.target_y)
             self._win32_double_click()
+            
+            # 如果启用同步模式，根据同步类型执行相应操作
+            if sync_mode and self.synchronizer.sync_enabled:
+                print(f"[调试] 同步模式启用，同步类型: {sync_type}")
+                # 对于完全同步，确保键盘和鼠标同步都已启动
+                if sync_type == "完全同步":
+                    print("[调试] 启用完全同步模式，启动鼠标+键盘同步")
+                    self.synchronizer.sync_controller()  # 启动鼠标+键盘同步
+                # 对于点击同步，确保鼠标同步已启动
+                elif sync_type == "点击同步":
+                    print("[调试] 启用点击同步模式，仅启动鼠标同步")
+                    self.synchronizer.mouse_sync()  # 仅启动鼠标同步
+            
             time.sleep(random.uniform(1.5, 3.0))
             return True
 
-    def _send_click_messages(self, relative_x: int, relative_y: int, sync_mode: bool) -> None:
-        """发送点击消息，根据同步模式决定是否同步到多个窗口"""
+    def _send_click_messages(self, relative_x: int, relative_y: int, sync_mode: bool, sync_type: str = "完全同步") -> None:
+        """发送点击消息，根据同步模式决定是否同步到多个窗口
+        :param relative_x, relative_y: 相对坐标
+        :param sync_mode: 是否启用同步
+        :param sync_type: 同步类型，可选值："完全同步"、"点击同步"
+        """
         if sync_mode and self.synchronizer.sync_enabled:
             # 确保使用主窗口句柄
             if self.synchronizer.main_window and self.hwnd != self.synchronizer.main_window[0]:
@@ -257,6 +276,11 @@ class OnmyjiAutomation:
             # 给所有副窗口发送点击消息
             for sub_hwnd, _ in self.synchronizer.get_sub_windows():
                 self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=relative_x, relative_y=relative_y)
+                
+            # 根据同步类型决定是否启动鼠标同步
+            if sync_type == "点击同步":
+                # 确保鼠标同步已启动
+                self.synchronizer.mouse_sync()
         elif sync_mode and not self.synchronizer.sync_enabled:
             # 同步模式已被禁用，只给当前窗口发送点击消息
             self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
