@@ -1,7 +1,7 @@
 # OnmyojiAuto - 阴阳师自动化工具
 
 ### 直接下载exe程序的压缩包
-[下载最新版本](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.3/OAT-v1.5.3.zip)
+[下载最新版本](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.4/OAT-v1.5.4.zip)
 
 程序背景图片
 ![阴阳师主题背景图](background.png)  
@@ -99,6 +99,7 @@ pip install -r requirements.txt
 
 ## 📞 联系作者
 - 邮箱：n3032747608@163.com
+
 
 
 
