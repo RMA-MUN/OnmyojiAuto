@@ -376,17 +376,22 @@ class Ui_Dialog(object):
     def open_link(self, url):
         QDesktopServices.openUrl(QUrl(url))
 
-    def get_text(self):
-        text = (
-            "本程序免费开源，禁止任何形式的倒卖行为！！！""<br>"
-            "更新日志：""<br>"
-            "1.新增后台运行模式，勾选后，窗口可以被完全遮挡，但是不能最小化""<br>"
-            "2.新增窗口同步器的功能，可以同步主窗口的操作到其他游戏窗口""<br>"
-            " <a href='https://github.com/RMA-MUN/OnmyoujiAuto'>"
-            "点击跳转至仓库！"
-            "</a>"
-        )
-        return text
+    def get_text(self): 
+         text = '''
+            <div style="line-height: 1.0; margin: 0; padding: 0;">
+                本程序免费开源，源代码托管在GitHub。
+                <a href="https://github.com/RMA-MUN/OnmyoujiAuto" style="margin: 0 4px;">点击跳转</a>
+                <br style="margin: 0;"/>
+                <span style="font-weight: bold; margin: 0;">更新日志：</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">1.桌面版窗口同步器功能优化，增加了对键鼠同步的支持</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">2.优化前台和后台运行模式的切换，前台操作更具安全性、后台模式则不占用鼠标和屏幕</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">3.使用json替换yaml配置文件，减少乱码的问题</span>
+            </div>
+         '''
+         return text
 
     def on_mode_selected(self, index):
         """处理模式选择事件，根据mode.json动态显示子选项"""

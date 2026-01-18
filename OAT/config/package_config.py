@@ -1,5 +1,5 @@
 PACKAGE_CONFIG = {
-    "version": "1.3.1",
+    "version": "1.5.4",
     "author": "RMA-MUN",
     "email": "n3032747608@163.com",
     "icon_path": "icon.ico",
