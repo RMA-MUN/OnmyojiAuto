@@ -14,18 +14,18 @@
 
 | 功能                | 链接                                                         |
 | ------------------- | :----------------------------------------------------------- |
-| 下载最新版exe压缩包 | [![Download Latest](https://img.shields.io/badge/Download-OATv1.5.4-blue)](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.4/OAT-v1.5.4.zip) |
+| 下载最新版exe压缩包 | [![Download Latest](https://img.shields.io/badge/Download-立即下载-blue)](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.4/OAT-v1.5.4.zip) |
 | 查看版本更新内容    | [![Release Notes](https://img.shields.io/badge/Changelog-更新日志-orange)](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
 
 ---
 
 ## 📸 程序截图
 
-| 背景图片 |
-| :------: |
-| ![背景图](background.png) |
 | 运行截图 |
+| :------: |
 | ![运行图片](home.png) |
+| 背景图片 |
+| ![背景图](background.png) |
 
 （可自行替换背景图片：将替换后的png图片命名为`background.png`即可覆盖）
 
@@ -175,4 +175,5 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
 
 <div align="center">
     <p>✨ 如有问题或建议，欢迎提交 Issue ✨</p>
+
 </div>
