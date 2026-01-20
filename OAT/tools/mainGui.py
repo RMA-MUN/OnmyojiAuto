@@ -213,18 +213,7 @@ class MainWindow(QtWidgets.QDialog):
     def update_window_title(self):
         # 根据下拉菜单的选择更新 window_title
         selected_client = self.ui.client_choose.currentText()
-        if selected_client == '阴阳师桌面版':
-            self.window_title = '阴阳师-MuMu模拟器特供版'
-        elif selected_client == '阴阳师':
-            self.window_title = '阴阳师-MuMu模拟器特供版'
-        elif selected_client == 'MuMu模拟器5':
-            print("PS:MuMu模拟器5的窗口默认为MuMu安卓设备，如需修改，可自行修改client.yaml文件")
-            self.window_title = 'MuMu安卓设备'
-        elif selected_client == '雷电模拟器':
-            self.window_title = '雷电模拟器'
-        else:
-            self.window_title = selected_client
-
+        self.window_title = selected_client
         print(f"选择客户端为:{self.window_title}")
 
     # 刷新窗口按钮
@@ -363,7 +352,7 @@ class MainWindow(QtWidgets.QDialog):
                     # 获取synchronizer实例，如果存在的话
                     synchronizer = self.sync if hasattr(self, 'sync') else None
                     mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
-                                hidden_window=hidden_window, sync_mode=sync_mode, sync_type=sync_type, synchronizer=synchronizer)
+                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer)
                 else:
                     print(f"读取 {sub_config_path} 配置文件失败。")
             else:

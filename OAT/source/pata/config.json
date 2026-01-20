@@ -1,11 +1,28 @@
 {
   "image_paths": {
-    "shouwei": "shouwei.png",
-    "tiaozhan": "tiaozhan.png",
-    "xiezhu": "xiezhu.png",
-    "zuihou": "zuihou.png",
-    "baocang": "baocang.png",
-    "img": "img.png",
-    "img_1": "img_1.png"
+    "shouwei": {
+      "path": "shouwei.png"
+    },
+    "tiaozhan": {
+      "path": "tiaozhan.png",
+      "is_challenge_start": true
+    },
+    "xiezhu": {
+      "path": "xiezhu.png",
+      "message": "已拒绝好友协助"
+    },
+    "zuihou": {
+      "path": "zuihou.png"
+    },
+    "baocang": {
+      "path": "baocang.png",
+      "message": "御魂已爆仓，请及时清理"
+    },
+    "img": {
+      "path": "img.png"
+    },
+    "img_1": {
+      "path": "img_1.png"
+    }
   }
 }

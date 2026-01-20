@@ -1,9 +1,23 @@
 {
   "image_paths": {
-    "jieshu": "jieshu.png",
-    "tiaozhan": "tiaozhan.png",
-    "xiezhu": "xiezhu.png",
-    "zuihou": "zuihou.png",
-    "kaishi": "kaishi.png"
+    "jieshu": {
+      "path": "jieshu.png"
+    },
+    "tiaozhan": {
+      "path": "tiaozhan.png",
+      "is_challenge_start": true
+    },
+    "xiezhu": {
+      "path": "xiezhu.png",
+      "message": "已拒绝好友协助"
+    },
+    "zuihou": {
+      "path": "zuihou.png"
+    },
+    "kaishi": {
+      "path": "kaishi.png",
+      "message": "已开始挑战",
+      "is_challenge_start": true
+    }
   }
 }

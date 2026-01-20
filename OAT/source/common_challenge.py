@@ -10,7 +10,6 @@ def common_challenge(
         times: int, config: dict,
         script_dir: str, window_title: str,
         hidden_window: bool=False, sync_mode: bool=False,
-        sync_type: str="完全同步",
         synchronizer=None # 同步器实例
 ) -> bool:
     try:
@@ -18,8 +17,26 @@ def common_challenge(
 
         # 预先构建好所有图片路径并预加载
         image_paths = {}
+        image_info = {}
+        
         for k, v in config['image_paths'].items():
-            path = os.path.join(script_dir, v)
+            # 支持两种配置格式：
+            # 1. 旧格式：v 是字符串路径
+            # 2. 新格式：v 是包含 path、message、is_challenge_start 等信息的字典
+            if isinstance(v, dict):
+                path = os.path.join(script_dir, v['path'])
+                image_info[k] = {
+                    'message': v.get('message', ''),
+                    'is_challenge_start': v.get('is_challenge_start', False)
+                }
+            else:
+                # 兼容旧格式
+                path = os.path.join(script_dir, v)
+                image_info[k] = {
+                    'message': '',
+                    'is_challenge_start': k in ['tiaozhan', 'kaishi']
+                }
+            
             image_paths[k] = path
             # 预加载图像以提高后续识别速度
             automation_obj.preload_image(path)
@@ -39,17 +56,21 @@ def common_challenge(
                 # print(f"正在识别图片：{key}")
                 try:
                     # 尝试识别并执行操作，启用低置信度重试
-                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode, sync_type=sync_type):
+                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode):
                         # print(f"已成功识别并执行操作：{key}")
-                        # 执行开始操作后，i来充当计数器
-                        if key == 'tiaozhan' or key == 'kaishi':
+                        
+                        # 获取图片的扩展信息
+                        info = image_info[key]
+                        
+                        # 检查是否需要打印消息
+                        if info['message']:
+                            print(info['message'])
+                        
+                        # 检查是否是开始挑战的图片
+                        if info['is_challenge_start']:
                             i += 1
                             retry_count = 0  # 成功后重置重试计数
                             print(f"还剩{times - i}次挑战")
-                        elif key == 'xiezhu':
-                            print("注意！！！已自动为您拒绝好友的协助！！！")
-                        elif key == 'baocang':
-                            print("Warning: 您的御魂已爆仓，请注意清理御魂！！！")
                     else:
                         pass
                 except Exception as e:
