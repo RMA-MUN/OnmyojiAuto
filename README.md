@@ -14,7 +14,7 @@
 
 | 功能                | 链接                                                         |
 | ------------------- | :----------------------------------------------------------- |
-| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.4/OAT-v1.5.4.zip) |
+| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.5/OAT-v1.5.5.zip) |
 | 查看版本更新内容    | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
 
 ---
@@ -177,4 +177,5 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
     <p>✨ 如有问题或建议，欢迎提交 Issue ✨</p>
 
 </div>
+
 
