@@ -28,3 +28,21 @@ class ConfigReader:
             error_msg = f"读取配置文件 {self.file_path} 时出现异常: {e}"
             print(error_msg)
             return None
+
+    def write_config(self, config_data):
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                # 根据文件扩展名选择合适的写入方式
+                if self.file_path.endswith('.yaml') or self.file_path.endswith('.yml'):
+                    yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
+                elif self.file_path.endswith('.json'):
+                    json.dump(config_data, f, ensure_ascii=False, indent=2)
+                else:
+                    # 默认使用yaml写入
+                    yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
+            print(f"已成功写入配置文件: {self.file_path}")
+            return True
+        except Exception as e:
+            error_msg = f"写入配置文件 {self.file_path} 时出现异常: {e}"
+            print(error_msg)
+            return False

@@ -338,7 +338,7 @@ class OnmyjiAutomation:
             
             # 最后确保精确到达目标位置
             win32api.SetCursorPos((target_x, target_y))
-        except Exception as e:
+        except Exception:
             pass
 
     def _complex_move(self, target_x: int, target_y: int) -> None:
@@ -348,7 +348,7 @@ class OnmyjiAutomation:
         """
         try:
             self._human_like_move(target_x, target_y)
-        except Exception as e:
+        except Exception:
             with self.lock:
                 try:
                     win32api.SetCursorPos((target_x, target_y))
