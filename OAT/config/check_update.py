@@ -95,9 +95,9 @@ class UpdateChecker:
 
     def latest_version(self) -> str | None:
         """
-        获取最新版本号。
+        无参获取最新版本号。
 
-        :return: 最新版本号字符串，如果获取失败则返回None
+        :return: 最新版本号字符串，如果获取失败则返回None， 如"OAT-v1.5.4"
         """
         info = self.get_latest_release_info()
         if info:
