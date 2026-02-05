@@ -5,7 +5,7 @@ import os
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import QPushButton, QLineEdit, QSizePolicy, QAbstractItemView
+from PyQt6.QtWidgets import QPushButton, QAbstractItemView, QSizePolicy
 
 from OAT.source.mode_config import mode_choice, mode_config
 
@@ -38,19 +38,23 @@ class Ui_Dialog(object):
         # 导航栏
         self.nav_bar = QtWidgets.QWidget()
         self.nav_bar.setObjectName("nav_bar")
-        self.nav_bar.setFixedHeight(20)
+        self.nav_bar.setFixedHeight(36)
         nav_layout = QtWidgets.QHBoxLayout(self.nav_bar)
         nav_layout.setContentsMargins(0, 0, 0, 0)
-        nav_layout.setSpacing(2)
+        nav_layout.setSpacing(0)
 
-        # 导航按钮（保持原有两个按钮）
+        # 导航按钮
         self.btn_main = QtWidgets.QPushButton('首页')
-        self.btn_subprocess = QtWidgets.QPushButton('多开')
-        for btn in [self.btn_main, self.btn_subprocess]:
-            btn.setFixedSize(50, 24)
+        self.btn_window = QtWidgets.QPushButton('同步器')
+        self.btn_settings = QtWidgets.QPushButton('设置')
+        
+        # 设置所有导航按钮
+        nav_buttons = [self.btn_main, self.btn_window, self.btn_settings]
+        for i, btn in enumerate(nav_buttons):
+            btn.setFixedHeight(36)
+            btn.setMinimumWidth(80)
             btn.setObjectName("nav_button")
-        nav_layout.addWidget(self.btn_main)
-        nav_layout.addWidget(self.btn_subprocess)
+            nav_layout.addWidget(btn)
         nav_layout.addStretch()
 
         # 页面容器
@@ -207,95 +211,55 @@ class Ui_Dialog(object):
         main_page_layout.addWidget(function_and_instruction_widget)
         main_page_layout.addWidget(self.groupBox_2)
 
-        # 创建设置页面（多开+同步器在同一页面）
-        settings_page = QtWidgets.QWidget()
-        settings_layout = QtWidgets.QVBoxLayout(settings_page)
+        # 创建窗口管理页面（仅包含同步器功能）
+        sync_page = QtWidgets.QWidget()
+        settings_layout = QtWidgets.QVBoxLayout(sync_page)
 
-        # 多开设置区域
-        self.settings_group = QtWidgets.QGroupBox('多开设置')
-        settings_form = QtWidgets.QFormLayout()
-
-        # 创建文件路径输入框
-        self.file_path_edit = QLineEdit()
-        self.file_path_edit.setReadOnly(True)
-        self.file_path_edit.setPlaceholderText("未选择文件")
-        self.file_path_edit.setObjectName("file_path_edit")
-        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.file_path_edit.setSizePolicy(size_policy)
-
-        # 创建文件选择按钮
-        self.select_button = QPushButton("选择文件")
-        self.select_button.setFixedSize(80, 26)
-        self.select_button.setObjectName("select_button")
-
-        # 创建清除按钮
-        self.clear_button = QPushButton("清除")
-        self.clear_button.setFixedSize(60, 26)
-        self.clear_button.setObjectName("clear_button")
-
-        settings_form.addRow("程序路径:", self.file_path_edit)
-
-        # 按钮容器
-        btn_container = QtWidgets.QWidget()
-        btn_layout = QtWidgets.QHBoxLayout(btn_container)
-        btn_layout.setContentsMargins(0, 0, 0, 0)
-        btn_layout.setSpacing(5)
-        btn_layout.addWidget(self.select_button)
-        btn_layout.addWidget(self.clear_button)
-
-        # 执行多开按钮
-        self.start_button = QPushButton("执行多开")
-        self.start_button.setFixedSize(80, 26)
-        self.start_button.setObjectName("start_button")
-        btn_layout.addWidget(self.start_button)
-        btn_layout.addStretch()
-
-        # 多开数量输入框
-        self.number_input = QLineEdit()
-        self.number_input.setPlaceholderText("多开数量")
-        self.number_input.setObjectName("number_input")
-        self.number_input.setFixedSize(60, 26)
-        self.number_input.setValidator(QtGui.QIntValidator())
-        self.number_input.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        settings_form.addRow("多开数量:", self.number_input)
-
-        # 延迟时间输入框
-        self.delay_input = QLineEdit()
-        self.delay_input.setPlaceholderText("延迟时间")
-        self.delay_input.setObjectName("delay_input")
-        self.delay_input.setFixedSize(60, 26)
-        self.delay_input.setValidator(QtGui.QIntValidator())
-        self.delay_input.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        settings_form.addRow("多开延迟:", self.delay_input)
-
-        settings_form.addRow("", btn_container)
-        settings_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
-        self.settings_group.setLayout(settings_form)
-
-        # 同步器设置区域（独立groupBox，放在多开设置下方）
+        # 同步器设置区域
         self.sync_group = QtWidgets.QGroupBox('同步器设置')
         sync_layout = QtWidgets.QVBoxLayout(self.sync_group)  # 垂直布局
+        sync_layout.setContentsMargins(15, 15, 15, 15)  # 增加内边距
+        sync_layout.setSpacing(15)  # 增加组件间距
 
-        # 同步操作按钮区域
+        # 同步操作按钮区域 - 使用网格布局将按钮分为两行
         sync_buttons_widget = QtWidgets.QWidget()
-        sync_buttons_layout = QtWidgets.QHBoxLayout(sync_buttons_widget)
-        sync_buttons_layout.setSpacing(10)  # 按钮间距
+        sync_buttons_layout = QtWidgets.QGridLayout(sync_buttons_widget)
+        sync_buttons_layout.setSpacing(12)  # 按钮间距
+        sync_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
+        # 第一行按钮：窗口管理相关
         self.sync_instruction_btn = QtWidgets.QPushButton("使用说明")
         self.refresh_windows_btn = QPushButton("刷新窗口")
         self.select_all_btn = QPushButton("全选")
         self.invert_selection_btn = QPushButton("反选")
-        self.set_main_window_btn = QPushButton("设置为主窗口")
-        self.set_sub_windows_btn = QPushButton("设置为副窗口")
+        
+        # 第二行按钮：同步控制相关
+        self.set_main_window_btn = QPushButton("设为主窗口")
+        self.set_sub_windows_btn = QPushButton("设为副窗口")
         self.start_sync_btn = QPushButton("开始同步")
         self.stop_sync_btn = QPushButton("停止同步")
         self.arrange_btn = QPushButton("窗口排列")
 
+        # 设置按钮固定大小，统一风格
+        button_size = (100, 28)
         for btn in [self.sync_instruction_btn, self.refresh_windows_btn, self.select_all_btn, self.invert_selection_btn,
-                    self.set_main_window_btn, self.set_sub_windows_btn, self.arrange_btn,
-                    self.start_sync_btn, self.stop_sync_btn]:
-            sync_buttons_layout.addWidget(btn)
-        sync_buttons_layout.addStretch()  # 右侧留白
+                    self.set_main_window_btn, self.set_sub_windows_btn, self.start_sync_btn, self.stop_sync_btn, self.arrange_btn]:
+            btn.setFixedSize(*button_size)
+
+        # 将按钮添加到网格布局
+        sync_buttons_layout.addWidget(self.sync_instruction_btn, 0, 0)
+        sync_buttons_layout.addWidget(self.refresh_windows_btn, 0, 1)
+        sync_buttons_layout.addWidget(self.select_all_btn, 0, 2)
+        sync_buttons_layout.addWidget(self.invert_selection_btn, 0, 3)
+        sync_buttons_layout.addWidget(self.arrange_btn, 0, 4)
+        
+        sync_buttons_layout.addWidget(self.set_main_window_btn, 1, 0)
+        sync_buttons_layout.addWidget(self.set_sub_windows_btn, 1, 1)
+        sync_buttons_layout.addWidget(self.start_sync_btn, 1, 2)
+        sync_buttons_layout.addWidget(self.stop_sync_btn, 1, 3)
+        
+        # 添加拉伸项，使按钮靠左排列
+        sync_buttons_layout.setColumnStretch(5, 1)
 
         # 窗口列表表格
         self.window_table = QtWidgets.QTableWidget()
@@ -305,23 +269,168 @@ class Ui_Dialog(object):
         self.window_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)  # 第二列拉伸
         self.window_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.window_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        
+        # 设置表格高度策略，使其能够自适应窗口大小
+        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.window_table.setSizePolicy(size_policy)
+        self.window_table.setMinimumHeight(300)  # 设置最小高度
 
         # 组装同步器布局
         sync_layout.addWidget(sync_buttons_widget)  # 按钮在上
         sync_layout.addWidget(self.window_table)    # 表格在中
 
-        # 将两个groupBox加入多开页面布局（上下排列）
-        settings_layout.addWidget(self.settings_group)  # 多开设置在上
-        settings_layout.addWidget(self.sync_group)      # 同步器设置在下
+        # 将同步器设置加入页面布局
+        settings_layout.addWidget(self.sync_group)      # 同步器设置
         settings_layout.addStretch()  # 底部留白
 
         # 添加页面到堆叠容器
-        self.stacked_widget.addWidget(main_page)
-        self.stacked_widget.addWidget(settings_page)
+        self.stacked_widget.addWidget(main_page)  # 首页 - 索引0
+        
+        # 窗口管理页面（原设置页面重命名）
+        self.stacked_widget.addWidget(sync_page)  # 窗口管理 - 索引1
+        
+        # 设置页面
+        settings_page_new = QtWidgets.QWidget()
+        settings_page_new.setObjectName("sync_page")
+        settings_layout_new = QtWidgets.QHBoxLayout(settings_page_new)
+        settings_layout_new.setContentsMargins(0, 0, 0, 0)
+        settings_layout_new.setSpacing(0)
+
+        # 左侧菜单栏
+        self.settings_menu = QtWidgets.QWidget()
+        self.settings_menu.setObjectName("settings_menu")
+        self.settings_menu.setFixedWidth(160)
+        menu_layout = QtWidgets.QVBoxLayout(self.settings_menu)
+        menu_layout.setContentsMargins(0, 0, 0, 0)
+        menu_layout.setSpacing(0)
+
+        # 菜单项
+        self.menu_general = QtWidgets.QPushButton("常规设置")
+        self.menu_general.setObjectName("settings_menu_item")
+        self.menu_general.setCheckable(True)
+        self.menu_general.setChecked(True)
+        
+        self.menu_display = QtWidgets.QPushButton("显示设置")
+        self.menu_display.setObjectName("settings_menu_item")
+        self.menu_display.setCheckable(True)
+        
+        self.menu_synchronizer = QtWidgets.QPushButton("同步器设置")
+        self.menu_synchronizer.setObjectName("settings_menu_item")
+        self.menu_synchronizer.setCheckable(True)
+        
+        self.menu_about = QtWidgets.QPushButton("关于")
+        self.menu_about.setObjectName("settings_menu_item")
+        self.menu_about.setCheckable(True)
+
+        # 添加菜单项到布局
+        menu_layout.addWidget(self.menu_general)
+        menu_layout.addWidget(self.menu_display)
+        menu_layout.addWidget(self.menu_synchronizer)
+        menu_layout.addWidget(self.menu_about)
+        menu_layout.addStretch()
+
+        # 右侧内容区域
+        self.settings_content = QtWidgets.QStackedWidget()
+        self.settings_content.setObjectName("settings_content")
+
+        # 常规设置页面
+        general_page = QtWidgets.QWidget()
+        general_layout = QtWidgets.QVBoxLayout(general_page)
+        general_layout.setContentsMargins(20, 20, 20, 20)
+        
+        general_group = QtWidgets.QGroupBox("常规设置")
+        general_form = QtWidgets.QFormLayout()
+        
+        self.auto_start_check = QtWidgets.QCheckBox("启动时自动检测窗口")
+        self.auto_start_check.setObjectName("settings_checkbox")
+        general_form.addRow(self.auto_start_check)
+        
+        self.log_level_label = QtWidgets.QLabel("日志级别:")
+        self.log_level_combo = QtWidgets.QComboBox()
+        self.log_level_combo.setObjectName("settings_combo")
+        self.log_level_combo.addItems(["调试", "信息", "警告", "错误"])
+        general_form.addRow(self.log_level_label, self.log_level_combo)
+        
+        self.language_label = QtWidgets.QLabel("语言:")
+        self.language_combo = QtWidgets.QComboBox()
+        self.language_combo.setObjectName("settings_combo")
+        self.language_combo.addItems(["中文", "English"])
+        general_form.addRow(self.language_label, self.language_combo)
+        
+        general_group.setLayout(general_form)
+        general_layout.addWidget(general_group)
+        general_layout.addStretch()
+
+        # 显示设置页面
+        display_page = QtWidgets.QWidget()
+        display_layout = QtWidgets.QVBoxLayout(display_page)
+        display_layout.setContentsMargins(20, 20, 20, 20)
+        
+        display_group = QtWidgets.QGroupBox("显示设置")
+        display_form = QtWidgets.QFormLayout()
+        
+        self.theme_label = QtWidgets.QLabel("主题:")
+        self.theme_combo = QtWidgets.QComboBox()
+        self.theme_combo.setObjectName("settings_combo")
+        self.theme_combo.addItems(["默认", "深色"])
+        display_form.addRow(self.theme_label, self.theme_combo)
+        
+        self.font_size_label = QtWidgets.QLabel("字体大小:")
+        self.font_size_spin = QtWidgets.QSpinBox()
+        self.font_size_spin.setObjectName("settings_spin")
+        self.font_size_spin.setRange(10, 20)
+        self.font_size_spin.setValue(12)
+        display_form.addRow(self.font_size_label, self.font_size_spin)
+        
+        display_group.setLayout(display_form)
+        display_layout.addWidget(display_group)
+        display_layout.addStretch()
+
+        # 同步器设置页面
+        sync_settings_page = QtWidgets.QWidget()
+        sync_settings_layout = QtWidgets.QVBoxLayout(sync_settings_page)
+        sync_settings_layout.setContentsMargins(20, 20, 20, 20)
+
+        # 关于页面
+        about_page = QtWidgets.QWidget()
+        about_layout = QtWidgets.QVBoxLayout(about_page)
+        about_layout.setContentsMargins(20, 20, 20, 20)
+        about_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        
+        about_label = QtWidgets.QLabel("OAT 阴阳师自动化工具")
+        about_label.setObjectName("about_title")
+        about_layout.addWidget(about_label)
+        
+        version_label = QtWidgets.QLabel("版本: 1.5.5")
+        version_label.setObjectName("about_text")
+        about_layout.addWidget(version_label)
+        
+        author_label = QtWidgets.QLabel("作者: RMA-MUN")
+        author_label.setObjectName("about_text")
+        about_layout.addWidget(author_label)
+        
+        link_label = QtWidgets.QLabel("<a href='https://github.com/RMA-MUN/OnmyoujiAuto'>GitHub 仓库</a>")
+        link_label.setObjectName("about_link")
+        link_label.setOpenExternalLinks(True)
+        about_layout.addWidget(link_label)
+
+        # 添加所有页面到内容区域
+        self.settings_content.addWidget(general_page)      # 索引0
+        self.settings_content.addWidget(display_page)      # 索引1
+        self.settings_content.addWidget(sync_settings_page)# 索引2
+        self.settings_content.addWidget(about_page)        # 索引3
+
+        # 添加左侧菜单和右侧内容到设置页面
+        settings_layout_new.addWidget(self.settings_menu)
+        settings_layout_new.addWidget(self.settings_content)
+
+        # 添加页面到堆叠容器
+        self.stacked_widget.addWidget(settings_page_new)  # 设置 - 索引2
 
         # 连接导航按钮
         self.btn_main.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-        self.btn_subprocess.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        self.btn_window.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        self.btn_settings.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
 
         # 初始化文本翻译
         self.retranslateUi(Dialog)
@@ -331,12 +440,42 @@ class Ui_Dialog(object):
         # 加载元对象
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
-        # 连接信号
+        # 连接设置页面菜单信号
+        self.menu_general.clicked.connect(lambda: self.switch_settings_page(0))
+        self.menu_display.clicked.connect(lambda: self.switch_settings_page(1))
+        self.menu_synchronizer.clicked.connect(lambda: self.switch_settings_page(2))
+        self.menu_about.clicked.connect(lambda: self.switch_settings_page(3))
+
+        # 连接其他信号
         self.textBrowser_2.anchorClicked.connect(self.open_link)
         self.comboBox.currentIndexChanged.connect(self.on_mode_selected)
 
         # 初始化窗口列表
         self.initialize_window_list()
+
+    def switch_settings_page(self, page_index: int):
+        """
+        切换设置页面的内容
+        
+        Args:
+            page_index: 要切换的页面索引
+        """
+        # 取消所有菜单项的选中状态
+        for btn in [self.menu_general, self.menu_display, self.menu_synchronizer, self.menu_about]:
+            btn.setChecked(False)
+        
+        # 选中当前点击的菜单项
+        if page_index == 0:
+            self.menu_general.setChecked(True)
+        elif page_index == 1:
+            self.menu_display.setChecked(True)
+        elif page_index == 2:
+            self.menu_synchronizer.setChecked(True)
+        elif page_index == 3:
+            self.menu_about.setChecked(True)
+        
+        # 切换内容页面
+        self.settings_content.setCurrentIndex(page_index)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
@@ -349,7 +488,7 @@ class Ui_Dialog(object):
         self.pushButton_2.setText(_translate("Dialog", "开始挑战"))
         self.pushButton_3.setText(_translate("Dialog", "紧急停止"))
         self.groupBox_2.setTitle(_translate("Dialog", "日志"))
-        self.groupBox_4.setTitle(_translate("Dialog", "说明"))
+        self.groupBox_4.setTitle(_translate("Dialog", "更新日志"))
 
         # 同步器文本
         self.sync_group.setTitle(_translate("Dialog", "同步器"))
@@ -379,16 +518,16 @@ class Ui_Dialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                本程序免费开源，源代码托管在GitHub。
-                <a href="https://github.com/RMA-MUN/OnmyoujiAuto" style="margin: 0 4px;">点击跳转</a>
                 <br style="margin: 0;"/>
-                <span style="font-weight: bold; margin: 0;">更新日志：</span>
+                <span style="margin: 0;">1.优化界面布局</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">1.桌面版窗口同步器功能优化，增加了对键鼠同步的支持</span>
+                <span style="margin: 0;">2.优化同步器功能，减少便宜</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.优化前台和后台运行模式的切换，前台操作更具安全性、后台模式则不占用鼠标和屏幕</span>
+                <span style="margin: 0;">3.增加检查更新功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.使用json替换yaml配置文件，减少乱码的问题</span>
+                <span style="margin: 0;">4.重构布局代码</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">5.修复一些bug</span>
             </div>
          '''
          return text

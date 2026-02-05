@@ -6,14 +6,12 @@ import threading
 import traceback
 import os
 import win32gui
-import yaml
 
 from typing import TextIO
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QMessageBox
 
 from ..source import MODE_MAPPING
-from .startMore import multi_open_app
 from .WindowSynchronizer import WindowSynchronizer
 from ..source import *
 from ..tools import *
@@ -155,9 +153,6 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.pushButton.clicked.connect(self.window_detection)
         self.ui.pushButton_2.clicked.connect(self.start_challenge)
         self.ui.pushButton_3.clicked.connect(self.emergency_stop)
-        self.ui.select_button.clicked.connect(self.select_file)
-        self.ui.clear_button.clicked.connect(self.clear_file)
-        self.ui.start_button.clicked.connect(self.get_info)
         self.ui.sync_instruction_btn.clicked.connect(self.sync_instruction)
         self.ui.refresh_windows_btn.clicked.connect(self.update_window_table)
         self.ui.select_all_btn.clicked.connect(self.select_all)
@@ -374,33 +369,6 @@ class MainWindow(QtWidgets.QDialog):
                 if current_thread in self.active_threads:
                     self.active_threads.remove(current_thread)
 
-    def select_file(self):
-        """
-        弹出文件选择对话框，让用户选择文件，并将选择的文件路径打印到日志中。
-        """
-        # 设置文件过滤器，这里允许选择所有文件，你可按需修改
-        file_filter = "所有文件 (*.*)"
-        # 弹出文件选择对话框
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "选择文件",
-            "",  # 初始目录，空字符串表示默认目录
-            file_filter
-        )
-
-        if file_path:
-            print(f"已选择文件: {file_path}")
-            self.ui.file_path_edit.setText(file_path)  # 将文件路径显示在文本框中
-        else:
-            print("未选择文件")
-
-    def clear_file(self):
-        """
-        清空文件路径输入框。
-        """
-        self.ui.file_path_edit.clear()
-        print('已清空文件路径')
-
     # 紧急停止函数
     def emergency_stop(self):
         for thread in self.active_threads[:]:
@@ -422,23 +390,6 @@ class MainWindow(QtWidgets.QDialog):
 
         # 关闭窗口
         QtWidgets.QApplication.quit()
-
-    def get_info(self):
-        """
-        从file_path_edit获取文件路径
-        从number_input获取多开数量
-        从delay_input获取延迟时间
-        """
-        file_path = self.ui.file_path_edit.text()
-        try:
-            number = int(self.ui.number_input.text())
-            delay = int(self.ui.delay_input.text())
-            print(f"即将多开文件路径: {file_path}\n多开数量: {number}\n多开间隔时间: {delay}")
-        except ValueError:
-            # 处理无效输入
-            print("错误：请输入有效的数字")
-            return
-        multi_open_app(file_path, number, delay, verbose=True)
 
     def update_window_table(self):
         """
