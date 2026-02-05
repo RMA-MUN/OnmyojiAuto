@@ -162,7 +162,7 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
 
 ## 📜 许可证
 
-本项目采用 [GNU General Public License v3.0](LICENSE) 开源，允许自由使用、修改和分发，但衍生作品必须以相同许可证开源。
+本项目采用 [GNU General Public License v3.0](LISCENSE) 开源，允许自由使用、修改和分发，但衍生作品必须以相同许可证开源。
 
 ---
 
