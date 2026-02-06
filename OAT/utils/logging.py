@@ -80,4 +80,13 @@ class LogRedirect(QtCore.QObject):
         self.info(' '.join(map(str, args)))
 
     def log_to_file(self, log_data):
-        import json
+        """
+        将日志数据写入文件
+        :param log_data: 日志数据字典
+        """
+        try:
+            with open(LOG_FILE, 'a', encoding='utf-8') as f:
+                json.dump(log_data, f, ensure_ascii=False)
+                f.write('\n')
+        except Exception as e:
+            print(f"写入日志文件失败: {e}")
