@@ -8,6 +8,7 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QPushButton, QAbstractItemView, QSizePolicy
 
 from OAT.source.mode_config import mode_choice, mode_config
+from OAT.tools.settings import APP_VERSION
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -15,6 +16,17 @@ source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
 mode_json_path = os.path.join(source_dir, 'mode.json')
 # 加载模式配置
 mode_config_data = mode_config(mode_json_path) or {}
+
+# 获取当前目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 加载设置配置
+settings_file_path = os.path.join(current_dir, 'settings.json')
+with open(settings_file_path, 'r', encoding='utf-8') as f:
+    settings_data = json.load(f)
+
+# 当前主题设置
+current_theme = settings_data.get('theme', 'light')
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
@@ -45,6 +57,9 @@ class Ui_Dialog(object):
         Dialog.setLayout(QtWidgets.QVBoxLayout())
         Dialog.layout().addWidget(main_container)
 
+        # 保存dialog引用
+        self.dialog = Dialog
+
         # 创建各个页面
         main_page = self._create_main_page()
         sync_page = self._create_sync_page()
@@ -64,6 +79,11 @@ class Ui_Dialog(object):
         self.retranslateUi(Dialog)
         # 加载样式表
         self.load_stylesheet(Dialog)
+
+        # 连接主题选择信号
+        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
+        # 设置默认主题选择
+        self.theme_combo.setCurrentIndex(0 if current_theme == "light" else 1)
 
         # 加载元对象
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -101,8 +121,15 @@ class Ui_Dialog(object):
             btn.setFixedHeight(36)
             btn.setMinimumWidth(80)
             btn.setObjectName("nav_button")
+            
+            # 设置按钮大小策略为可扩展
+            size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setSizePolicy(size_policy)
+            
             nav_layout.addWidget(btn)
-        nav_layout.addStretch()
+        
+        # 移除最后一个拉伸项，使按钮能够均匀分配整个导航栏宽度
+        # nav_layout.addStretch()
 
         main_layout.addWidget(self.nav_bar)
 
@@ -286,7 +313,7 @@ class Ui_Dialog(object):
         self.refresh_windows_btn = QPushButton(_translate("Dialog", "刷新窗口"))
         self.select_all_btn = QPushButton(_translate("Dialog", "全选"))
         self.invert_selection_btn = QPushButton(_translate("Dialog", "反选"))
-        self.capture_btn = QPushButton(_translate("Dialog", "窗口截图"))
+        self.capture_btn = QPushButton(_translate("Dialog", "没什么用的按钮"))
         
         # 第二行按钮：同步控制相关
         self.set_main_window_btn = QPushButton(_translate("Dialog", "设为主窗口"))
@@ -295,11 +322,14 @@ class Ui_Dialog(object):
         self.stop_sync_btn = QPushButton(_translate("Dialog", "停止同步"))
         self.arrange_btn = QPushButton(_translate("Dialog", "窗口排列"))
 
-        # 设置按钮固定大小，统一风格
-        button_size = (100, 28)
+        # 设置按钮大小策略，使其能够适应窗口大小变化
         for btn in [self.sync_instruction_btn, self.refresh_windows_btn, self.select_all_btn, self.invert_selection_btn,
                     self.set_main_window_btn, self.set_sub_windows_btn, self.start_sync_btn, self.stop_sync_btn, self.arrange_btn, self.capture_btn]:
-            btn.setFixedSize(*button_size)
+            # 设置按钮大小策略为可扩展
+            size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setSizePolicy(size_policy)
+            # 设置按钮最小大小
+            btn.setMinimumSize(100, 28)
 
         # 将按钮添加到网格布局
         sync_buttons_layout.addWidget(self.sync_instruction_btn, 0, 0)
@@ -314,18 +344,21 @@ class Ui_Dialog(object):
         sync_buttons_layout.addWidget(self.stop_sync_btn, 1, 3)
         sync_buttons_layout.addWidget(self.capture_btn, 1, 4)
         
-        # 添加拉伸项，使按钮靠左排列
-        sync_buttons_layout.setColumnStretch(5, 1)
+        # 为每个按钮所在的列设置相同的拉伸因子，使按钮能够均匀分配可用空间
+        for i in range(5):
+            sync_buttons_layout.setColumnStretch(i, 1)
 
         # 窗口列表表格
         self.window_table = QtWidgets.QTableWidget()
-        self.window_table.setColumnCount(2)  # 两列
-        self.window_table.setHorizontalHeaderLabels([_translate("Dialog", "选择"), _translate("Dialog", "窗口信息")])
+        self.window_table.setColumnCount(4)  # 四列
+        self.window_table.setHorizontalHeaderLabels([_translate("Dialog", "选择"), _translate("Dialog", "窗口信息"), _translate("Dialog", "窗口句柄"), _translate("Dialog", "预览")])
         self.window_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)  # 第一列自适应
         self.window_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)  # 第二列拉伸
+        self.window_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)  # 第三列自适应
         self.window_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.window_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        
+        self.window_table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Interactive) # 第四列较大，但不会拉伸其他列
+
         # 设置表格高度策略，使其能够自适应窗口大小
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.window_table.setSizePolicy(size_policy)
@@ -366,7 +399,7 @@ class Ui_Dialog(object):
         self.menu_display = QtWidgets.QPushButton("显示设置")
         self.menu_display.setObjectName("settings_menu_item")
         self.menu_display.setCheckable(True)
-        
+
         self.menu_synchronizer = QtWidgets.QPushButton("同步器设置")
         self.menu_synchronizer.setObjectName("settings_menu_item")
         self.menu_synchronizer.setCheckable(True)
@@ -410,26 +443,13 @@ class Ui_Dialog(object):
         general_page.setStyleSheet("background-color: transparent;")
         general_layout = QtWidgets.QVBoxLayout(general_page)
         general_layout.setContentsMargins(20, 20, 20, 20)
-        
+
         general_group = QtWidgets.QGroupBox("常规设置")
-        general_group.setStyleSheet("background-color: rgba(255, 255, 255, 0.8);")
         general_form = QtWidgets.QFormLayout()
-        
-        self.auto_start_check = QtWidgets.QCheckBox("启动时自动检测窗口")
-        self.auto_start_check.setObjectName("settings_checkbox")
-        general_form.addRow(self.auto_start_check)
-        
-        self.log_level_label = QtWidgets.QLabel("日志级别:")
-        self.log_level_combo = QtWidgets.QComboBox()
-        self.log_level_combo.setObjectName("settings_combo")
-        self.log_level_combo.addItems(["调试", "信息", "警告", "错误"])
-        general_form.addRow(self.log_level_label, self.log_level_combo)
-        
-        self.language_label = QtWidgets.QLabel("语言:")
-        self.language_combo = QtWidgets.QComboBox()
-        self.language_combo.setObjectName("settings_combo")
-        self.language_combo.addItems(["中文", "English"])
-        general_form.addRow(self.language_label, self.language_combo)
+
+        self.check_update_check = QtWidgets.QPushButton("检查更新")
+        self.check_update_check.setObjectName("settings_button")
+        general_form.addRow(self.check_update_check)
         
         general_group.setLayout(general_form)
         general_layout.addWidget(general_group)
@@ -445,22 +465,14 @@ class Ui_Dialog(object):
         display_layout.setContentsMargins(20, 20, 20, 20)
         
         display_group = QtWidgets.QGroupBox("显示设置")
-        display_group.setStyleSheet("background-color: rgba(255, 255, 255, 0.8);")
         display_form = QtWidgets.QFormLayout()
         
         self.theme_label = QtWidgets.QLabel("主题:")
         self.theme_combo = QtWidgets.QComboBox()
         self.theme_combo.setObjectName("settings_combo")
-        self.theme_combo.addItems(["默认", "深色"])
+        self.theme_combo.addItems(["亮色", "深色"])
         display_form.addRow(self.theme_label, self.theme_combo)
-        
-        self.font_size_label = QtWidgets.QLabel("字体大小:")
-        self.font_size_spin = QtWidgets.QSpinBox()
-        self.font_size_spin.setObjectName("settings_spin")
-        self.font_size_spin.setRange(10, 20)
-        self.font_size_spin.setValue(12)
-        display_form.addRow(self.font_size_label, self.font_size_spin)
-        
+
         display_group.setLayout(display_form)
         display_layout.addWidget(display_group)
         display_layout.addStretch()
@@ -473,6 +485,11 @@ class Ui_Dialog(object):
         sync_settings_page.setStyleSheet("background-color: transparent;")
         sync_settings_layout = QtWidgets.QVBoxLayout(sync_settings_page)
         sync_settings_layout.setContentsMargins(20, 20, 20, 20)
+        sync_settings_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        sync_label = QtWidgets.QLabel("同步器设置敬请期待")
+        sync_label.setObjectName("about_text")
+        sync_settings_layout.addWidget(sync_label)
 
         return sync_settings_page
 
@@ -487,15 +504,23 @@ class Ui_Dialog(object):
         about_label = QtWidgets.QLabel("OAT 阴阳师自动化工具")
         about_label.setObjectName("about_title")
         about_layout.addWidget(about_label)
-        
-        version_label = QtWidgets.QLabel("版本: 1.5.5")
+
+        version_label = QtWidgets.QLabel(f"版本: {APP_VERSION}")
         version_label.setObjectName("about_text")
         about_layout.addWidget(version_label)
         
         author_label = QtWidgets.QLabel("作者: RMA-MUN")
         author_label.setObjectName("about_text")
         about_layout.addWidget(author_label)
-        
+
+        connect_author_label = QtWidgets.QLabel("联系作者: n3032747608@163.com")
+        connect_author_label.setObjectName("about_text")
+        about_layout.addWidget(connect_author_label)
+
+        warning_text = QtWidgets.QLabel("免责声明:\n  1. 本工具仅供学习交流，禁止商用及违规使用；\n  2. 使用风险自负，开发者不承担任何责任；\n  3. 请勿违反游戏运营方相关规定。 ")
+        warning_text.setObjectName("about_text")
+        about_layout.addWidget(warning_text)
+
         link_label = QtWidgets.QLabel("<a href='https://github.com/RMA-MUN/OnmyoujiAuto'>GitHub 仓库</a>")
         link_label.setObjectName("about_link")
         link_label.setOpenExternalLinks(True)
@@ -533,14 +558,45 @@ class Ui_Dialog(object):
 
     def load_stylesheet(self, Dialog):
         try:
-            # 获取当前文件所在目录
-            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # 根据当前主题选择样式表文件
+            theme_file = "QtSS.qss" if current_theme == "light" else "QtSS_dark.qss"
             # 构建样式表文件的绝对路径
-            qss_path = os.path.join(current_dir, "QtSS.qss")
+            qss_path = os.path.join(current_dir, theme_file)
             with open(qss_path, "r", encoding="utf-8") as f:
                 Dialog.setStyleSheet(f.read())
         except Exception as e:
             print(f"样式表加载失败: {str(e)}")
+
+    def save_theme_setting(self, theme: str):
+        """
+        保存主题设置到配置文件
+        
+        Args:
+            theme: 主题名称 (light/dark)
+        """
+        global current_theme
+        current_theme = theme
+        
+        # 更新设置数据
+        settings_data['theme'] = theme
+        
+        # 保存到文件
+        with open(settings_file_path, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
+    def on_theme_changed(self, index: int):
+        """
+        处理主题选择变化事件
+        
+        Args:
+            index: 主题组合框的索引
+        """
+        theme = "light" if index == 0 else "dark"
+        self.save_theme_setting(theme)
+        
+        # 重新加载样式表
+        if hasattr(self, 'dialog'):
+            self.load_stylesheet(self.dialog)
 
 
     def open_link(self, url):
@@ -549,15 +605,13 @@ class Ui_Dialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.优化界面布局</span>
+                <span style="margin: 0;">1.同步器增加窗口预览功能,可以预览窗口内容</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.优化同步器功能，减少便宜</span>
+                <span style="margin: 0;">2.优化界面,重构布局代码</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">3.增加检查更新功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.重构布局代码</span>
-                <br style="margin: 0;"/>
-                <span style="margin: 0;">5.修复一些bug</span>
+                <span style="margin: 0;">4.修复已知bug</span>
             </div>
          '''
          return text

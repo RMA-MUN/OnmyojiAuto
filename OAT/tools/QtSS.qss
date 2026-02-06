@@ -191,6 +191,7 @@ QComboBox#settings_combo {
     border-radius: 4px;
     font-size: 12px;
     background-color: #ffffff;
+    margin-top: 10px;
 }
 
 QComboBox#settings_combo:hover {
@@ -213,7 +214,8 @@ QSpinBox#settings_spin:hover {
 QCheckBox#settings_checkbox {
     font-size: 12px;
     color: #333333;
-    spacing: 8px;
+    spacing: 10px;
+    margin-top: 5px;
 }
 
 /* 关于页面样式 */
@@ -221,7 +223,7 @@ QLabel#about_title {
     font-size: 20px;
     font-weight: 600;
     color: #2F4F4F;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 QLabel#about_text {

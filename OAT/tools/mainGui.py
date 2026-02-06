@@ -1,35 +1,38 @@
 import builtins
-import datetime
 import json
-import sys
-import threading
 import os
-import win32gui
+import threading
+import traceback
 
+import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6.QtCore import QUrl, Qt
+from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import QMessageBox
 
-from ..source import MODE_MAPPING
 from .WindowSynchronizer import WindowSynchronizer
-from ..source import *
-from ..tools import *
 from .config_manager import ConfigReader
+from .thread_manager import UpdateCheckThread
+from ..config.check_update import UpdateChecker
+from ..config.update_manager import UpdateManager
+from ..source import *
+from ..source import MODE_MAPPING
+from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
 from ..utils.logging import LogRedirect
 
 # 设置全局异常处理程序
 setup_global_exception_handler()
 
-
-
 class MainWindow(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-        # 设置表格列数为 3
-        self.ui.window_table.setColumnCount(3)
-        self.ui.window_table.setHorizontalHeaderLabels(["选择", "窗口信息", "窗口句柄"])
+        # 设置表格列数为 4
+        self.ui.window_table.setColumnCount(4)
+        self.ui.window_table.setHorizontalHeaderLabels(["选择", "窗口信息", "窗口句柄", "预览"])
+        # 预览列显示的是一个链接，点击可以预览窗口截图
         self.main_config_reader = ConfigReader('config/config.yaml')
         self.main_config = self.main_config_reader.read_config()
 
@@ -66,6 +69,7 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.stop_sync_btn.clicked.connect(self.stop_sync)
         self.ui.arrange_btn.clicked.connect(self.arrange_connect)
         self.ui.client_choose.currentTextChanged.connect(self.update_window_title)
+        self.ui.check_update_check.clicked.connect(self.check_is_update)
 
         # 给按钮绑定快捷键
         self.ui.pushButton.setShortcut("Ctrl+W")
@@ -94,12 +98,8 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.pushButton4.clicked.connect(self.refresh_window)
 
         # 设置界面样式
-        # 加载外部样式表
-        qss_file = QtCore.QFile("./QtSS.qss")
-        if qss_file.open(QtCore.QFile.OpenModeFlag.ReadOnly | QtCore.QFile.OpenModeFlag.Text):
-            style_sheet = QtCore.QTextStream(qss_file).readAll()
-            self.setStyleSheet(style_sheet)
-            qss_file.close()
+        # 加载外部样式表 - 由UI类统一管理主题样式
+        pass
 
         # 信号连接，使用 clicked 信号
         # self.ui.checkBox.clicked.connect(self.update_window_title)
@@ -332,13 +332,122 @@ class MainWindow(QtWidgets.QDialog):
             self.ui.window_table.setItem(row, 0, checkbox_item)
             self.ui.window_table.setItem(row, 1, QtWidgets.QTableWidgetItem(title))
             self.ui.window_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(hwnd)))
+            # 第四列：预览按钮
+            preview_button = QtWidgets.QPushButton("预览")
+            preview_button.setObjectName(f"preview_btn_{hwnd}")
+            # 连接点击事件，传递窗口句柄
+            preview_button.clicked.connect(lambda checked, h=hwnd, t=title: self.preview_window(h, t))
+            # 设置按钮样式
+            preview_button.setStyleSheet("padding: 2px 8px;")
+            # 将按钮添加到单元格
+            self.ui.window_table.setCellWidget(row, 3, preview_button)
 
         # 设置表格列宽
-        self.ui.window_table.setColumnWidth(0, 150)  # 句柄列
-        self.ui.window_table.setColumnWidth(1, 200)  # 标题列
+        self.ui.window_table.setColumnWidth(0, 80)   # 选择列
+        self.ui.window_table.setColumnWidth(1, 250)  # 窗口信息列
+        self.ui.window_table.setColumnWidth(2, 150)  # 窗口句柄列
+        self.ui.window_table.setColumnWidth(3, 100)  # 预览列
         # 显示表格
         self.ui.window_table.show()
         print("表格已刷新")
+    
+    def preview_window(self, hwnd: int, title: str):
+        """
+        预览窗口截图
+        
+        Args:
+            hwnd: 窗口句柄
+            title: 窗口标题
+        """
+        from OAT.tools.get_DC import WindowCapture
+        import os
+        import tempfile
+        import cv2
+        
+        try:
+            # 创建临时目录存储截图
+            temp_dir = tempfile.gettempdir()
+            
+            # 创建窗口捕获对象
+            window_capture = WindowCapture(hwnd=hwnd)
+            
+            # 捕获窗口图像
+            img = window_capture.capture_window()
+            
+            if img is not None:
+                # 保存截图
+                temp_file_path = os.path.join(temp_dir, f"window_preview_{hwnd}.png")
+                cv2.imwrite(temp_file_path, img)
+                
+                # 创建预览窗口
+                self.show_preview_dialog(title, temp_file_path)
+                
+                print(f"窗口截图已保存: {temp_file_path}")
+            else:
+                print(f"无法捕获窗口 {title} ({hwnd}) 的图像")
+                self.show_error_message("截图失败", "无法捕获窗口图像")
+        except Exception as e:
+            print(f"预览窗口时出错: {str(e)}")
+            self.show_error_message("预览错误", f"发生错误: {str(e)}")
+    
+    def show_preview_dialog(self, title: str, image_path: str):
+        """
+        显示窗口截图预览
+        
+        Args:
+            title: 窗口标题
+            image_path: 截图文件路径
+        """
+        
+        # 创建对话框
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"窗口预览 - {title}")
+        dialog.setModal(True)
+        
+        # 设置布局
+        layout = QtWidgets.QVBoxLayout(dialog)
+        
+        # 创建图像标签
+        label = QtWidgets.QLabel(dialog)
+        pixmap = QPixmap(image_path)
+        
+        if not pixmap.isNull():
+            # 调整图像大小，保持比例
+            max_size = 800
+            scaled_pixmap = pixmap.scaled(max_size, max_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            label.setPixmap(scaled_pixmap)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        else:
+            label.setText("无法加载图像")
+        
+        layout.addWidget(label)
+        
+        # 创建按钮
+        button_layout = QtWidgets.QHBoxLayout()
+        close_button = QtWidgets.QPushButton("关闭")
+        close_button.clicked.connect(dialog.close)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(close_button)
+        
+        layout.addLayout(button_layout)
+        
+        # 显示对话框
+        dialog.exec()
+    
+    def show_error_message(self, title: str, message: str):
+        """
+        显示错误消息
+        
+        Args:
+            title: 对话框标题
+            message: 错误消息
+        """
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(message)
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg_box.exec()
 
     # 全选方法
     def select_all(self):
@@ -518,6 +627,107 @@ class MainWindow(QtWidgets.QDialog):
         with self.lock:
             self.active_threads.append(arrange_thread)
 
+    def check_is_update(self):
+        """检查是否存在更新"""
+        # 创建更新检查线程
+        self.update_thread = UpdateCheckThread()
+        
+        # 连接信号槽
+        self.update_thread.update_available.connect(self.on_update_available)
+        self.update_thread.update_not_available.connect(self.on_update_not_available)
+        self.update_thread.update_error.connect(self.on_update_error)
+        
+        # 启动线程
+        self.update_thread.start()
+        
+        # 显示正在检查的提示
+        self.checking_msg = QMessageBox(self)
+        self.checking_msg.setWindowTitle("检查更新")
+        self.checking_msg.setText("正在检查更新...")
+        self.checking_msg.setIcon(QMessageBox.Icon.Information)
+        self.checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        self.checking_msg.show()
+    
+    def on_update_available(self, latest_version: str, latest_info: dict):
+        """
+        处理发现更新的信号
+        
+        Args:
+            latest_version: 最新版本号
+            latest_info: 最新版本信息
+        """
+        # 关闭检查提示
+        if hasattr(self, 'checking_msg') and self.checking_msg and self.checking_msg.isVisible():
+            self.checking_msg.close()
+            self.checking_msg.deleteLater()
+            self.checking_msg = None
+        
+        try:
+            update_checker = UpdateChecker()
+            update_info = update_checker.get_update_info(latest_info) or "暂无更新日志"
+            
+            # 创建并配置消息框
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("发现新的版本")
+            msg_box.setText(f"最新版本：{latest_version}\n\n更新日志：\n{update_info.replace('# 更新日志', '').strip()}\n\n自动更新功能敬请期待")
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            
+            # 添加自定义按钮
+            btn_update = msg_box.addButton("前往更新", QMessageBox.ButtonRole.AcceptRole)
+            btn_later = msg_box.addButton("下次再说", QMessageBox.ButtonRole.RejectRole)
+            btn_ignore = msg_box.addButton("忽略本版本", QMessageBox.ButtonRole.ActionRole)
+            
+            # 执行消息框
+            msg_box.exec()
+            
+            # 处理用户选择
+            clicked_button = msg_box.clickedButton()
+            if clicked_button == btn_update:
+                # 前往更新页面
+                if 'html_url' in latest_info:
+                    QDesktopServices.openUrl(QUrl(latest_info['html_url']))
+            elif clicked_button == btn_ignore:
+                # 忽略此版本
+                update_manager = UpdateManager()
+                update_manager.ignore_update(latest_version)
+        except Exception as e:
+            self.on_update_error(str(e))
+    
+    def on_update_not_available(self):
+        """处理没有更新的信号"""
+        # 关闭检查提示
+        if hasattr(self, 'checking_msg') and self.checking_msg and self.checking_msg.isVisible():
+            self.checking_msg.close()
+            self.checking_msg.deleteLater()
+            self.checking_msg = None
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("当前无新的版本")
+        msg_box.setText("当前版本已是最新版本")
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.exec()
+    
+    def on_update_error(self, error_msg: str):
+        """
+        处理更新检查错误的信号
+        
+        Args:
+            error_msg: 错误信息
+        """
+        # 关闭检查提示
+        if hasattr(self, 'checking_msg') and self.checking_msg and self.checking_msg.isVisible():
+            self.checking_msg.close()
+            self.checking_msg.deleteLater()
+            self.checking_msg = None
+        
+        # 记录错误并显示友好提示
+        print(f"检查更新时出错: {error_msg}")
+        error_msg_box = QMessageBox(self)
+        error_msg_box.setWindowTitle("检查更新失败")
+        error_msg_box.setText("检查更新时发生错误，请稍后重试")
+        error_msg_box.setIcon(QMessageBox.Icon.Warning)
+        error_msg_box.exec()
+
     def sync_instruction(self):
         """
         显示同步器使用说明的对话框
@@ -527,11 +737,12 @@ class MainWindow(QtWidgets.QDialog):
 
     1. 刷新窗口：点击"刷新窗口"按钮获取当前所有符合条件的窗口列表，如果需要自定义窗口标题，可以在client.json文件里配置
     2. 选择窗口：在表格中勾选需要参与同步的窗口
-    3. 设置主窗口：选择一个窗口并点击"设置主窗口"，主窗口将作为操作源
-    4. 设置副窗口：选择一个或多个窗口并点击"设置副窗口"，这些窗口将跟随主窗口操作
-    5. 排列窗口：点击"窗口排列"按钮，系统会自动排列所有选择的窗口
-    6. 开始同步：点击"开始同步"按钮启动同步功能
-    7. 停止同步：点击"停止同步"按钮停止同步功能
+    3. 预览窗口：表格内点击"预览"按钮，会在新的窗口内显示该行窗口的图像，用于确认同步范围
+    4. 设置主窗口：选择一个窗口并点击"设置主窗口"，主窗口将作为操作源
+    5. 设置副窗口：选择一个或多个窗口并点击"设置副窗口"，这些窗口将跟随主窗口操作
+    6. 排列窗口：点击"窗口排列"按钮，系统会自动排列所有选择的窗口
+    7. 开始同步：点击"开始同步"按钮启动同步功能
+    8. 停止同步：点击"停止同步"按钮停止同步功能
     
     注意事项：
     - 主窗口只能设置一个
