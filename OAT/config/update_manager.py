@@ -7,6 +7,8 @@ import time
 from urllib3.exceptions import InsecureRequestWarning
 from tqdm import tqdm
 
+from OAT.tools.settings import APP_VERSION
+
 # 禁用不安全请求警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -27,7 +29,7 @@ class UpdateManager:
             print(f"警告：配置文件不存在: {update_json_path}")
             # 创建默认配置
             default_config = {
-                "current_version": "1.5.3",
+                "current_version": f"{APP_VERSION}",
                 "ignore_versions": []
             }
             # 保存默认配置
@@ -43,7 +45,7 @@ class UpdateManager:
         if self.config_data is None:
             print("警告：配置文件读取失败，使用默认配置")
             self.config_data = {
-                "current_version": "1.5.3",
+                "current_version": f"{APP_VERSION}",
                 "ignore_versions": []
             }
 
@@ -54,8 +56,13 @@ class UpdateManager:
     def get_update(self) -> str | None:
         """
         检查是否有新的版本
-        :return: 最新版本号字符串或None，如"1.5.4"
+        :return: 最新版本号字符串或None，如"OAT-v1.5.4"
         """
+        # 首先检查是否真的需要更新（版本号比较）
+        if not self.checker.check_update():
+            print("当前版本已是最新版本")
+            return None
+            
         # 获取最新版本
         latest_version_tag = self.checker.latest_version() # 如OAT-v1.5.4
 
@@ -64,16 +71,14 @@ class UpdateManager:
             print("无法获取最新版本信息")
             return None
 
-        latest_version_split = UpdateChecker.split_version(latest_version_tag) # 如"1.5.4"
-
         # 确保ignore_versions是列表
         if "ignore_versions" not in self.config_data:
             self.config_data["ignore_versions"] = []
 
         # 如果新版本不在忽略列表里， 则返回最新版本
-        if latest_version_split not in self.config_data["ignore_versions"]:
-            print(f"最新版本为{latest_version_tag}, {latest_version_split}")
-            return latest_version_split
+        if latest_version_tag not in self.config_data["ignore_versions"]:
+            print(f"最新版本为{latest_version_tag}")
+            return latest_version_tag
         else:
             print("当前无新的版本")
             return None
@@ -81,7 +86,7 @@ class UpdateManager:
     def ignore_update(self, version: str) -> bool:
         """
         忽略指定版本的更新
-        :param version: 版本号字符串，如"1.5.4"
+        :param version: 版本号字符串，如"OAT-v1.5.4"
         :return: 是否成功忽略更新
         """
         try:

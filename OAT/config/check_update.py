@@ -1,6 +1,8 @@
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 
+from OAT.tools.settings import APP_VERSION
+
 
 class UpdateChecker:
     """
@@ -12,11 +14,11 @@ class UpdateChecker:
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # 版本相关常量
-    CURRENT_VERSION = "1.5.3"  # 当前版本，不允许修改，用于检查是否更新
+    CURRENT_VERSION = f"{APP_VERSION}"  # 当前版本，不允许修改，用于检查是否更新
     GITHUB_OWNER = "RMA-MUN"  # 仓库所有人
     GITHUB_REPO = "OnmyojiAuto"  # 仓库名
 
-    def __init__(self, owner: str = None, repo: str = None, current_version: str = None):
+    def __init__(self, owner: str = None, repo: str = None, current_version: str = CURRENT_VERSION):
         """
         初始化更新检查器
 
@@ -82,16 +84,16 @@ class UpdateChecker:
     @staticmethod
     def split_version(version: str):
         """
-        分割版本字符串，返回版本号的列表。
+        分割版本字符串，返回版本号的数字列表。
 
         :param version: 版本字符串，例如 "OAT-v1.5.4"
-        :return: 版本号字符串，例如 "1.5.4"
+        :return: 版本号数字列表，例如 [1, 5, 4]
         """
         # 处理带前缀的版本字符串
         if "-v" in version:
             version = version.split("-v")[-1]
-        # 按点分割版本号，返回字符串类型
-        return version
+        # 按点分割版本号，转换为整数列表
+        return [int(part) for part in version.split(".")]
 
     def latest_version(self) -> str | None:
         """
@@ -116,6 +118,7 @@ class UpdateChecker:
             if latest_tag:
                 latest_version = self.split_version(latest_tag)  # ["1", "5", "4"]
                 current_version = self.split_version(self.current_version)  # ["1", "5", "3"]
+                # print(f"【调试】最新版本: {latest_version}, 当前版本: {current_version}")
                 if latest_version > current_version:
                     return True
         return False
