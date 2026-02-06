@@ -1,7 +1,7 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v1.5.4-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.6.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
@@ -14,7 +14,7 @@
 
 | 功能                | 链接                                                         |
 | ------------------- | :----------------------------------------------------------- |
-| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.5/OAT-v1.5.5.zip) |
+| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.0/OAT-v1.6.0.zip) |
 | 查看版本更新内容    | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
 
 ---
@@ -176,3 +176,4 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
 <div align="center">
     <p>✨ 如有问题或建议，欢迎提交 Issue ✨</p>
 </div>
+
