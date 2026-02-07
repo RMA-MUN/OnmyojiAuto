@@ -4,12 +4,14 @@ import os
 import threading
 import traceback
 
+import cv2
 import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtCore import QUrl, Qt
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import QMessageBox
 
+from OAT.tools.get_DC import WindowCapture
 from .WindowSynchronizer import WindowSynchronizer
 from .config_manager import ConfigReader
 from .thread_manager import UpdateCheckThread
@@ -350,39 +352,36 @@ class MainWindow(QtWidgets.QDialog):
         # 显示表格
         self.ui.window_table.show()
         print("表格已刷新")
-    
+
     def preview_window(self, hwnd: int, title: str):
         """
         预览窗口截图
-        
+
         Args:
             hwnd: 窗口句柄
             title: 窗口标题
         """
-        from OAT.tools.get_DC import WindowCapture
-        import os
-        import tempfile
-        import cv2
-        
         try:
-            # 创建临时目录存储截图
-            temp_dir = tempfile.gettempdir()
-            
+            # 创建截图保存目录
+            screenshot_dir = os.path.join('logs', 'screen_shot')
+            if not os.path.exists(screenshot_dir):
+                os.makedirs(screenshot_dir)
+
             # 创建窗口捕获对象
             window_capture = WindowCapture(hwnd=hwnd)
-            
+
             # 捕获窗口图像
             img = window_capture.capture_window()
-            
+
             if img is not None:
-                # 保存截图
-                temp_file_path = os.path.join(temp_dir, f"window_preview_{hwnd}.png")
+                # 保存截图到logs/screen_shot目录
+                temp_file_path = os.path.join(screenshot_dir, f"window_preview_{hwnd}.png")
                 cv2.imwrite(temp_file_path, img)
-                
+
                 # 创建预览窗口
                 self.show_preview_dialog(title, temp_file_path)
-                
-                print(f"窗口截图已保存: {temp_file_path}")
+
+                # print(f"窗口截图已保存: {temp_file_path}")
             else:
                 print(f"无法捕获窗口 {title} ({hwnd}) 的图像")
                 self.show_error_message("截图失败", "无法捕获窗口图像")
