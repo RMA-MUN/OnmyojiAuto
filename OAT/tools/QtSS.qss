@@ -6,7 +6,7 @@ QDialog {
 /* 导航栏样式 */
 QWidget#nav_bar {
     background-color: transparent;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid #ced4da;
 }
 
 /* 导航按钮样式 */
@@ -46,6 +46,8 @@ QComboBox {
     padding: 3px;
     border: 1px solid #ccc;
     border-radius: 3px;
+    background-color: #ffffff;
+    color: #333333;
 }
 
 QSpinBox {
@@ -53,6 +55,8 @@ QSpinBox {
     padding: 3px;
     border: 1px solid #ccc;
     border-radius: 3px;
+    background-color: #ffffff;
+    color: #333333;
 }
 
 /* 普通按钮样式 */
@@ -170,6 +174,7 @@ QGroupBox {
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     margin-top: 10px;
+    background-color: #ffffff;
 }
 
 QGroupBox::title {
@@ -191,6 +196,7 @@ QComboBox#settings_combo {
     border-radius: 4px;
     font-size: 12px;
     background-color: #ffffff;
+    color: #333333;
     margin-top: 10px;
 }
 
@@ -204,6 +210,7 @@ QSpinBox#settings_spin {
     border-radius: 4px;
     font-size: 12px;
     background-color: #ffffff;
+    color: #333333;
     width: 100px;
 }
 
@@ -216,6 +223,14 @@ QCheckBox#settings_checkbox {
     color: #333333;
     spacing: 10px;
     margin-top: 5px;
+    background-color: #ffffff;
+}
+
+QCheckBox {
+    font-size: 12px;
+    color: #333333;
+    spacing: 10px;
+    background-color: #ffffff;
 }
 
 /* 关于页面样式 */
@@ -246,6 +261,8 @@ QTextBrowser {
     font-size: 14px;
     border: 1px solid #ccc;
     border-radius: 2px;
+    background-color: #ffffff;
+    color: #333333;
 }
 
 QTextBrowser QScrollBar {
@@ -253,7 +270,21 @@ QTextBrowser QScrollBar {
 }
 
 QTextBrowser::viewport {
-    background-color: transparent;
+    background-color: #ffffff;
+}
+
+QTextBrowser QScrollBar:vertical {
+    width: 10px;
+    background: #f0f0f0;
+}
+
+QTextBrowser QScrollBar::handle:vertical {
+    background: #c0c0c0;
+    border-radius: 5px;
+}
+
+QTextBrowser QScrollBar::add-line:vertical, QTextBrowser QScrollBar::sub-line:vertical {
+    background: none;
 }
 
 QPushButton#clearButton, QPushButton#selctButton, QPushButton#startButton{

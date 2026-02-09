@@ -5,8 +5,8 @@ QDialog {
 
 /* 导航栏样式 */
 QWidget#nav_bar {
-    background-color: #333333;
-    border-bottom: 1px solid #444444;
+    background-color: transparent;
+    border-bottom: 1px solid #555555;
 }
 
 /* 导航按钮样式 */

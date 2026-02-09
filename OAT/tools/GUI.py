@@ -122,14 +122,14 @@ class Ui_Dialog(object):
             btn.setMinimumWidth(80)
             btn.setObjectName("nav_button")
             
-            # 设置按钮大小策略为可扩展
+            # 设置按钮大小策略为可扩展，随窗口变化而变化
             size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn.setSizePolicy(size_policy)
             
             nav_layout.addWidget(btn)
         
-        # 移除最后一个拉伸项，使按钮能够均匀分配整个导航栏宽度
-        # nav_layout.addStretch()
+        # 添加拉伸项，使按钮左对齐，不填满整个导航栏
+        nav_layout.addStretch()
 
         main_layout.addWidget(self.nav_bar)
 
