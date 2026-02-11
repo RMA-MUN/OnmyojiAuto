@@ -1,14 +1,19 @@
+import random
 import threading
 import time
-import win32gui
+import traceback
+from functools import lru_cache
+
+import cv2
+import numpy as np
+import pyautogui
 import win32api
 import win32con
-import pyautogui
-import random
+import win32gui
 from PIL import Image
-from functools import lru_cache
-from .get_DC import WindowCapture
+
 from .WindowSynchronizer import WindowSynchronizer
+from .get_DC import WindowCapture
 
 
 class OnmyjiAutomation:
@@ -115,11 +120,20 @@ class OnmyjiAutomation:
         # 执行图像识别
         target = None
         try:
-            target = pyautogui.locateOnScreen(
-                logo,
-                confidence=self.default_confidence,
-                region=self.area
-            )
+            # 使用预加载的图像模板而不是文件路径
+            if logo in self.image_templates:
+                target = pyautogui.locateOnScreen(
+                    self.image_templates[logo],
+                    confidence=self.default_confidence,
+                    region=self.area
+                )
+            else:
+                # 降级到文件路径方式
+                target = pyautogui.locateOnScreen(
+                    logo,
+                    confidence=self.default_confidence,
+                    region=self.area
+                )
         except pyautogui.ImageNotFoundException:
             # 未找到图像时设置target为None
             target = None
@@ -128,7 +142,6 @@ class OnmyjiAutomation:
             pass
         except Exception:
             # 处理其他未预期的错误
-            import traceback
             traceback.print_exc()
 
         # 更新缓存
@@ -217,7 +230,20 @@ class OnmyjiAutomation:
         """使用隐藏窗口捕获模式执行操作"""
         try:
             wc = WindowCapture(hwnd=self.hwnd)
-            position = wc.find_image_precise(logo, threshold=threshold)
+            
+            # 准备目标图像：优先使用预加载的图像
+            target_image = logo
+            if logo in self.image_templates:
+                # 将PIL图像转换为OpenCV格式（NumPy数组）
+                pil_image = self.image_templates[logo]
+                # 转换为RGB模式
+                if pil_image.mode != 'RGB':
+                    pil_image = pil_image.convert('RGB')
+                # 转换为NumPy数组并调整通道顺序（PIL是RGB，OpenCV是BGR）
+
+                target_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            
+            position = wc.find_image_precise(target_image, threshold=threshold)
             if position:
                 # 从区域范围中计算中心点坐标
                 (x1, x2), (y1, y2) = position
