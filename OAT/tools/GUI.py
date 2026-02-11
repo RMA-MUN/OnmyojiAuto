@@ -459,6 +459,24 @@ class Ui_Dialog(object):
         self.check_update_check.setObjectName("settings_button")
         general_form.addRow(self.check_update_check)
         
+        # 添加挑战执行完毕后关闭程序的复选框
+        self.close_program_checkbox = QtWidgets.QCheckBox("挑战执行完毕后关闭程序")
+        self.close_program_checkbox.setObjectName("close_program_checkbox")
+        # 加载设置值
+        self.close_program_checkbox.setChecked(settings_data.get('close_program_after_challenge', False))
+        # 连接信号
+        self.close_program_checkbox.stateChanged.connect(self.on_close_program_setting_changed)
+        general_form.addRow(self.close_program_checkbox)
+        
+        # 添加挑战执行完毕后关闭游戏的复选框
+        self.close_game_checkbox = QtWidgets.QCheckBox("挑战执行完毕后关闭游戏")
+        self.close_game_checkbox.setObjectName("close_game_checkbox")
+        # 加载设置值
+        self.close_game_checkbox.setChecked(settings_data.get('close_game_after_challenge', False))
+        # 连接信号
+        self.close_game_checkbox.stateChanged.connect(self.on_close_game_setting_changed)
+        general_form.addRow(self.close_game_checkbox)
+        
         general_group.setLayout(general_form)
         general_layout.addWidget(general_group)
         general_layout.addStretch()
@@ -631,6 +649,54 @@ class Ui_Dialog(object):
         # 保存到文件
         with open(settings_file_path, 'w', encoding='utf-8') as f:
             json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
+    def save_close_program_setting(self, close_program: bool):
+        """
+        保存挑战执行完毕后关闭程序的设置到配置文件
+        
+        Args:
+            close_program: 是否关闭程序
+        """
+        # 更新设置数据
+        settings_data['close_program_after_challenge'] = close_program
+        
+        # 保存到文件
+        with open(settings_file_path, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
+    def save_close_game_setting(self, close_game: bool):
+        """
+        保存挑战执行完毕后关闭游戏的设置到配置文件
+        
+        Args:
+            close_game: 是否关闭游戏
+        """
+        # 更新设置数据
+        settings_data['close_game_after_challenge'] = close_game
+        
+        # 保存到文件
+        with open(settings_file_path, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
+    def on_close_program_setting_changed(self, state: int):
+        """
+        处理挑战执行完毕后关闭程序的设置变化事件
+        
+        Args:
+            state: 复选框状态 (2表示选中, 0表示未选中)
+        """
+        close_program = bool(state)
+        self.save_close_program_setting(close_program)
+
+    def on_close_game_setting_changed(self, state: int):
+        """
+        处理挑战执行完毕后关闭游戏的设置变化事件
+        
+        Args:
+            state: 复选框状态 (2表示选中, 0表示未选中)
+        """
+        close_game = bool(state)
+        self.save_close_game_setting(close_game)
 
     def on_theme_changed(self, index: int):
         """

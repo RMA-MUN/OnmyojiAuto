@@ -1,4 +1,6 @@
 {
   "theme": "light",
-  "transparency": 53
+  "transparency": 53,
+  "close_program_after_challenge": true,
+  "close_game_after_challenge": true
 }
