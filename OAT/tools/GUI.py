@@ -84,6 +84,14 @@ class Ui_Dialog(object):
         self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
         # 设置默认主题选择
         self.theme_combo.setCurrentIndex(0 if current_theme == "light" else 1)
+        
+        # 连接透明度滑块信号
+        self.transparency_slider.valueChanged.connect(self.on_transparency_changed)
+        # 设置默认透明度值
+        current_transparency = settings_data.get('transparency', 50)
+        self.transparency_slider.setValue(current_transparency)
+        # 设置透明度值显示标签的初始值
+        self.transparency_value_label.setText(f"{current_transparency}%")
 
         # 加载元对象
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -473,6 +481,32 @@ class Ui_Dialog(object):
         self.theme_combo.addItems(["亮色", "深色"])
         display_form.addRow(self.theme_label, self.theme_combo)
 
+        # 添加透明度滑块和值显示标签
+        transparency_widget = QtWidgets.QWidget()
+        transparency_layout = QtWidgets.QHBoxLayout(transparency_widget)
+        transparency_layout.setContentsMargins(0, 0, 0, 0)
+        transparency_layout.setSpacing(10)
+        
+        self.transparency_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.transparency_slider.setObjectName("transparency_slider")
+        self.transparency_slider.setMinimum(20)  # 最小透明度20%
+        self.transparency_slider.setMaximum(100)  # 最大透明度100%
+        self.transparency_slider.setSingleStep(1)
+        # 设置默认值为50%
+        self.transparency_slider.setValue(50)
+        
+        # 添加透明度值显示标签
+        self.transparency_value_label = QtWidgets.QLabel("50%")
+        self.transparency_value_label.setObjectName("transparency_value_label")
+        self.transparency_value_label.setMinimumWidth(50)
+        self.transparency_value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        
+        transparency_layout.addWidget(self.transparency_slider)
+        transparency_layout.addWidget(self.transparency_value_label)
+        
+        self.transparency_label = QtWidgets.QLabel("透明度:")
+        display_form.addRow(self.transparency_label, transparency_widget)
+
         display_group.setLayout(display_form)
         display_layout.addWidget(display_group)
         display_layout.addStretch()
@@ -584,6 +618,20 @@ class Ui_Dialog(object):
         with open(settings_file_path, 'w', encoding='utf-8') as f:
             json.dump(settings_data, f, ensure_ascii=False, indent=2)
 
+    def save_transparency_setting(self, transparency: int):
+        """
+        保存透明度设置到配置文件
+        
+        Args:
+            transparency: 透明度值 (50-100)
+        """
+        # 更新设置数据
+        settings_data['transparency'] = transparency
+        
+        # 保存到文件
+        with open(settings_file_path, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
     def on_theme_changed(self, index: int):
         """
         处理主题选择变化事件
@@ -597,6 +645,65 @@ class Ui_Dialog(object):
         # 重新加载样式表
         if hasattr(self, 'dialog'):
             self.load_stylesheet(self.dialog)
+
+    def on_transparency_changed(self, value: int):
+        """
+        处理透明度滑块变化事件
+        
+        Args:
+            value: 透明度值 (20-100)
+        """
+        # 保存透明度设置
+        self.save_transparency_setting(value)
+        
+        # 更新透明度值显示标签
+        self.transparency_value_label.setText(f"{value}%")
+        
+        # 计算透明度因子 (0.2-1.0)
+        opacity = value / 100.0
+        
+        # 更新组件透明度
+        if hasattr(self, 'dialog'):
+            try:
+                # 读取原始样式表
+                theme_file = "QtSS.qss" if current_theme == "light" else "QtSS_dark.qss"
+                qss_path = os.path.join(current_dir, theme_file)
+                
+                with open(qss_path, "r", encoding="utf-8") as f:
+                    original_stylesheet = f.read()
+                
+                # 构建新的样式表，只修改组件的透明度
+                new_stylesheet = ""
+                lines = original_stylesheet.split('\n')
+                
+                for line in lines:
+                    # 处理包含 rgba 的行
+                    if 'rgba(' in line:
+                        # 查找 rgba(...) 模式
+                        import re
+                        rgba_pattern = r'rgba\((\d+,\s*\d+,\s*\d+),\s*[^)]*\)'
+                        
+                        def replace_opacity(match):
+                            color_part = match.group(1)
+                            return f'rgba({color_part}, {opacity})'
+                        
+                        # 替换透明度值
+                        modified_line = re.sub(rgba_pattern, replace_opacity, line)
+                        new_stylesheet += modified_line + '\n'
+                    else:
+                        new_stylesheet += line + '\n'
+                
+                # 应用新的样式表
+                self.dialog.setStyleSheet(new_stylesheet)
+                
+                # 强制刷新界面
+                self.dialog.repaint()
+            except Exception as e:
+                # 仅在开发时启用错误输出
+                # print(f"透明度设置失败: {str(e)}")
+                # import traceback
+                # traceback.print_exc()
+                pass
 
 
     def open_link(self, url):

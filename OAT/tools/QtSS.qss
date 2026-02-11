@@ -115,14 +115,14 @@ QPushButton#stop_sync_btn:hover {
 
 QPushButton#pushButton4, QPushButton#refresh_windows_btn, QPushButton#arrange_btn,
 QPushButton#pushButton, QPushButton#pushButton_2, QPushButton#pushButton_3 {
-    background-color: #f8f9fa;
+    background-color: rgba(248, 249, 250, 0.7);
     color: #333333;
     border-color: #d0d0d0;
 }
 
 QPushButton#pushButton4:hover, QPushButton#refresh_windows_btn:hover, QPushButton#arrange_btn:hover,
 QPushButton#pushButton:hover, QPushButton#pushButton_2:hover, QPushButton#pushButton_3:hover {
-    background-color: #e8eaed;
+    background-color: rgba(232, 234, 237, 0.7);
     border-color: #a0a0a0;
     color: #1a73e8;
 }
@@ -134,13 +134,13 @@ QWidget#settings_page {
 
 /* 左侧菜单栏样式 */
 QWidget#settings_menu {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.7);
     border-right: 1px solid rgba(224, 224, 224, 0.8);
 }
 
 /* 设置页面菜单项样式 */
 QPushButton#settings_menu_item {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.7);
     color: #333333;
     border: none;
     border-right: 3px solid transparent;
@@ -151,19 +151,19 @@ QPushButton#settings_menu_item {
 }
 
 QPushButton#settings_menu_item:hover {
-    background-color: rgba(245, 245, 245, 0.9);
+    background-color: rgba(245, 245, 245, 0.7);
     color: #1a73e8;
 }
 
 QPushButton#settings_menu_item:checked {
-    background-color: rgba(232, 240, 254, 0.9);
+    background-color: rgba(232, 240, 254, 0.7);
     color: #1a73e8;
     border-right-color: #1a73e8;
 }
 
 /* 右侧内容区域样式 */
 QStackedWidget#settings_content {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.7);
 }
 
 /* 设置页面表单元素样式 */
@@ -171,10 +171,10 @@ QGroupBox {
     font-size: 14px;
     font-weight: 600;
     color: #333333;
-    border: 1px solid #e0e0e0;
+    border: 1px solid rgba(224, 224, 224, 0.8);
     border-radius: 4px;
     margin-top: 10px;
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.7);
 }
 
 QGroupBox::title {
@@ -195,7 +195,7 @@ QComboBox#settings_combo {
     border: 1px solid #d0d0d0;
     border-radius: 4px;
     font-size: 12px;
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.7);
     color: #333333;
     margin-top: 10px;
 }
@@ -204,12 +204,21 @@ QComboBox#settings_combo:hover {
     border-color: #a0a0a0;
 }
 
+QComboBox {
+    font-size: 14px;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.7);
+    color: #333333;
+}
+
 QSpinBox#settings_spin {
     padding: 6px 12px;
     border: 1px solid #d0d0d0;
     border-radius: 4px;
     font-size: 12px;
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.7);
     color: #333333;
     width: 100px;
 }
@@ -218,19 +227,28 @@ QSpinBox#settings_spin:hover {
     border-color: #a0a0a0;
 }
 
+QSpinBox {
+    font-size: 12px;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.7);
+    color: #333333;
+}
+
 QCheckBox#settings_checkbox {
     font-size: 12px;
     color: #333333;
     spacing: 10px;
     margin-top: 5px;
-    background-color: #ffffff;
+    background-color: transparent;
 }
 
 QCheckBox {
     font-size: 12px;
     color: #333333;
     spacing: 10px;
-    background-color: #ffffff;
+    background-color: transparent;
 }
 
 /* 关于页面样式 */
@@ -259,9 +277,9 @@ QLabel#about_link:hover {
 
 QTextBrowser {
     font-size: 14px;
-    border: 1px solid #ccc;
+    border: 1px solid rgba(204, 204, 204, 0.7);
     border-radius: 2px;
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.7);
     color: #333333;
 }
 
@@ -270,16 +288,16 @@ QTextBrowser QScrollBar {
 }
 
 QTextBrowser::viewport {
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.7);
 }
 
 QTextBrowser QScrollBar:vertical {
     width: 10px;
-    background: #f0f0f0;
+    background: rgba(240, 240, 240, 0.7);
 }
 
 QTextBrowser QScrollBar::handle:vertical {
-    background: #c0c0c0;
+    background: rgba(192, 192, 192, 0.7);
     border-radius: 5px;
 }
 
@@ -287,9 +305,43 @@ QTextBrowser QScrollBar::add-line:vertical, QTextBrowser QScrollBar::sub-line:ve
     background: none;
 }
 
-QPushButton#clearButton, QPushButton#selctButton, QPushButton#startButton{
-    background-color: rgba(245, 245, 232, 180);
+QPushButton#clearButton, QPushButton#selctButton, QPushButton#startButton {
+    background-color: rgba(245, 245, 232, 0.7);
     color: black;
     border: none;
-    align: left;
+    text-align: left;
+}
+
+/* 功能区域样式 */
+QWidget#system {
+    background-color: transparent;
+}
+
+QWidget#soul_land_options {
+    background-color: transparent;
+}
+
+/* 表格样式 */
+QTableWidget {
+    background-color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(204, 204, 204, 0.7);
+}
+
+QTableWidget::item {
+    background-color: transparent;
+}
+
+QTableWidget QHeaderView::section {
+    background-color: rgba(240, 240, 240, 0.7);
+    border: 1px solid rgba(204, 204, 204, 0.7);
+}
+
+/* 工具提示样式 */
+QToolTip {
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #333333;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
 }
