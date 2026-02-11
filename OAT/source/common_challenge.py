@@ -5,6 +5,7 @@
 import os
 
 from ..tools.OnmyojiAuto import OnmyjiAutomation
+from ..utils.do_after_challenge import do_after_challenge
 
 def common_challenge(
         times: int, config: dict,
@@ -77,6 +78,10 @@ def common_challenge(
                     pass
 
         print(f"挑战完成！共执行{times}次挑战")
+        
+        # 挑战完成后执行后续操作
+        do_after_challenge(automation_obj.hwnd, synchronizer, sync_mode)
+        
         return True
     except Exception as e:
         print(f"错误：挑战过程中发生致命错误：{str(e)}")
