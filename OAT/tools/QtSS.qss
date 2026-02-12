@@ -331,6 +331,18 @@ QTableWidget::item {
     background-color: transparent;
 }
 
+/* 选中的表格单元格 */
+QTableWidget::item:selected {
+    background-color: #2196F3;
+    color: white;
+}
+
+/* 选中但失去焦点的表格单元格 */
+QTableWidget::item:selected:!active {
+    background-color: #1976D2;
+    color: white;
+}
+
 QTableWidget QHeaderView::section {
     background-color: rgba(240, 240, 240, 0.7);
     border: 1px solid rgba(204, 204, 204, 0.7);

@@ -408,23 +408,9 @@ QWidget#soul_land_options {
     background-color: transparent;
 }
 
-/* 复选框样式 */
+/* 复选框样式 - 使用默认系统样式 */
 QCheckBox {
     color: #cccccc;
-}
-
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border: 1px solid #555555;
-    border-radius: 3px;
-    background-color: #333333;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #1a73e8;
-    border-color: #1a73e8;
-    image: url(:/icons/checkmark.png);
 }
 
 /* 单选按钮样式 */
