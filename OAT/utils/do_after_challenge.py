@@ -224,7 +224,7 @@ def do_after_challenge(window_hwnds: list[int] | int, synchronizer=None, is_sync
     """
     挑战完成后执行的操作
     根据设置决定是否关闭游戏或程序
-    
+
     Args:
         window_hwnds: 游戏窗口句柄或句柄列表
         synchronizer: 同步器实例
