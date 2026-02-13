@@ -560,17 +560,30 @@ class MainWindow(QtWidgets.QDialog):
                                 # 添加区域尺寸校验
                                 wc.set_window_handle(hwnd)
                                 updated_size = wc.get_window_info()
-                                if updated_size[2] != (target_width, target_height):
+                                if updated_size and updated_size[2] != (target_width, target_height):
                                     raise ValueError(f"窗口(句柄:{hwnd})尺寸调整失败，当前尺寸：{updated_size[2]}")
                     except Exception as e:
                         print(e)
 
-                self.sync = WindowSynchronizer()
+                # 重新从设置中读取同步模式，确保使用最新的设置
+                settings_file_path = os.path.join(os.path.dirname(__file__), 'settings.json')
+                try:
+                    with open(settings_file_path, 'r', encoding='utf-8') as f:
+                        settings_data = json.load(f)
+                        latest_sync_mode = settings_data.get('sync_mode', 'exactly_sync')
+                except Exception as e:
+                    print(f"读取设置文件失败：{e}")
+                    latest_sync_mode = 'exactly_sync'
+                
+                self.sync = WindowSynchronizer(sync_mode=latest_sync_mode)
                 # 将句柄转换为整数类型并传递
                 main_hwnd = int(self.main_window)
                 sub_hwnds = [int(hwnd) for hwnd in self.sub_windows]
                 self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
                 self.sync.set_true_enable()
+                # 输出当前同步模式
+                current_mode = self.sync.get_sync_mode()
+                print(f"当前同步模式: {current_mode}")
                 # 启动鼠标和键盘监听器
                 self.sync.sync_controller()
                 self.sync_mode = True
