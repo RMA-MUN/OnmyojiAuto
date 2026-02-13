@@ -12,6 +12,7 @@ from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import QMessageBox
 
 from OAT.tools.get_DC import WindowCapture
+from .GUI import UiDialog
 from .WindowSynchronizer import WindowSynchronizer
 from .config_manager import ConfigReader
 from .thread_manager import UpdateCheckThread
@@ -29,8 +30,8 @@ setup_global_exception_handler()
 class MainWindow(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
-        self.ui = Ui_Dialog()
-        self.ui.setupUi(self)
+        self.ui = UiDialog()
+        self.ui.setup_ui(self)
         # 设置表格列数为 4
         self.ui.window_table.setColumnCount(4)
         self.ui.window_table.setHorizontalHeaderLabels(["选择", "窗口信息", "窗口句柄", "预览"])
@@ -726,6 +727,7 @@ class MainWindow(QtWidgets.QDialog):
         error_msg_box.setText("检查更新时发生错误，请稍后重试")
         error_msg_box.setIcon(QMessageBox.Icon.Warning)
         error_msg_box.exec()
+
 
     def sync_instruction(self):
         """

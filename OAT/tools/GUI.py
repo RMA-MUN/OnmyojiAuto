@@ -28,18 +28,23 @@ with open(settings_file_path, 'r', encoding='utf-8') as f:
 # 当前主题设置
 current_theme = settings_data.get('theme', 'light')
 
-class Ui_Dialog(object):
-    def setupUi(self, Dialog):
+class UiDialog(object):
+    def setup_ui(self, dialog):
         """界面初始化"""
         # 主窗口基础设置
-        Dialog.setObjectName("Dialog")
+        dialog.setObjectName("dialog")
         # 获取屏幕分辨率
         screen = QtWidgets.QApplication.primaryScreen()
-        screen_geometry = screen.geometry()
-        # 计算窗口大小
-        width = (screen_geometry.width() // 3) + (screen_geometry.width() // 10)
-        height = (screen_geometry.height() // 2) + (screen_geometry.height() // 10)
-        Dialog.resize(width, height)
+        if screen is not None:
+            screen_geometry = screen.geometry()
+            # 计算窗口大小
+            width = (screen_geometry.width() // 3) + (screen_geometry.width() // 10)
+            height = (screen_geometry.height() // 2) + (screen_geometry.height() // 10)
+        else:
+            # 如果获取不到屏幕信息，使用默认值
+            width = 800
+            height = 600
+        dialog.resize(width, height)
 
         # 主布局容器
         main_container = QtWidgets.QWidget()
@@ -54,11 +59,11 @@ class Ui_Dialog(object):
         self.stacked_widget = QtWidgets.QStackedWidget()
         main_layout.addWidget(self.stacked_widget)
         
-        Dialog.setLayout(QtWidgets.QVBoxLayout())
-        Dialog.layout().addWidget(main_container)
+        dialog.setLayout(QtWidgets.QVBoxLayout())
+        dialog.layout().addWidget(main_container)
 
         # 保存dialog引用
-        self.dialog = Dialog
+        self.dialog = dialog
 
         # 创建各个页面
         main_page = self._create_main_page()
@@ -76,9 +81,9 @@ class Ui_Dialog(object):
         self.btn_settings.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
 
         # 初始化文本翻译
-        self.retranslateUi(Dialog)
+        self.retranslateUi(dialog)
         # 加载样式表
-        self.load_stylesheet(Dialog)
+        self.load_stylesheet(dialog)
 
         # 连接主题选择信号
         self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
@@ -94,7 +99,7 @@ class Ui_Dialog(object):
         self.transparency_value_label.setText(f"{current_transparency}%")
 
         # 加载元对象
-        QtCore.QMetaObject.connectSlotsByName(Dialog)
+        QtCore.QMetaObject.connectSlotsByName(dialog)
 
         # 连接设置页面菜单信号
         self.menu_general.clicked.connect(lambda: self.switch_settings_page(0))
@@ -151,7 +156,7 @@ class Ui_Dialog(object):
         # 模式选择组合框
         self.groupBox = QtWidgets.QGroupBox()
         self.groupBox.setObjectName("groupBox")
-        self.groupBox.setTitle(_translate("Dialog", "功能"))
+        self.groupBox.setTitle(_translate("dialog", "功能"))
         group_box_layout = QtWidgets.QVBoxLayout(self.groupBox)
 
         # 模式选择下拉菜单
@@ -170,7 +175,7 @@ class Ui_Dialog(object):
         self.spinBox.setObjectName("spinBox")
         self.label = QtWidgets.QLabel()
         self.label.setObjectName("label")
-        self.label.setText(_translate("Dialog", "请输入要挑战的次数"))
+        self.label.setText(_translate("dialog", "请输入要挑战的次数"))
         group_box_layout.addWidget(self.label)
         group_box_layout.addWidget(self.spinBox)
 
@@ -241,16 +246,16 @@ class Ui_Dialog(object):
         button_layout = QtWidgets.QGridLayout()
         self.pushButton4 = QtWidgets.QPushButton()
         self.pushButton4.setObjectName("pushButton4")
-        self.pushButton4.setText(_translate("Dialog", "刷新窗口"))
+        self.pushButton4.setText(_translate("dialog", "刷新窗口"))
         self.pushButton = QtWidgets.QPushButton()
         self.pushButton.setObjectName("pushButton")
-        self.pushButton.setText(_translate("Dialog", "窗口检测"))
+        self.pushButton.setText(_translate("dialog", "窗口检测"))
         self.pushButton_2 = QtWidgets.QPushButton()
         self.pushButton_2.setObjectName("pushButton_2")
-        self.pushButton_2.setText(_translate("Dialog", "开始挑战"))
+        self.pushButton_2.setText(_translate("dialog", "开始挑战"))
         self.pushButton_3 = QtWidgets.QPushButton()
         self.pushButton_3.setObjectName("pushButton_3")
-        self.pushButton_3.setText(_translate("Dialog", "紧急停止"))
+        self.pushButton_3.setText(_translate("dialog", "紧急停止"))
         button_layout.addWidget(self.pushButton4, 0, 0)
         button_layout.addWidget(self.pushButton, 0, 1)
         button_layout.addWidget(self.pushButton_3, 1, 0)
@@ -262,7 +267,7 @@ class Ui_Dialog(object):
         # 日志区
         self.groupBox_2 = QtWidgets.QGroupBox()
         self.groupBox_2.setObjectName("groupBox_2")
-        self.groupBox_2.setTitle(_translate("Dialog", "日志"))
+        self.groupBox_2.setTitle(_translate("dialog", "日志"))
         log_layout = QtWidgets.QVBoxLayout(self.groupBox_2)
         self.textBrowser = QtWidgets.QTextBrowser()
         self.textBrowser.setObjectName("textBrowser")
@@ -271,7 +276,7 @@ class Ui_Dialog(object):
         # 说明区
         self.groupBox_4 = QtWidgets.QGroupBox()
         self.groupBox_4.setObjectName("groupBox_4")
-        self.groupBox_4.setTitle(_translate("Dialog", "更新日志"))
+        self.groupBox_4.setTitle(_translate("dialog", "更新日志"))
         instruction_layout = QtWidgets.QVBoxLayout(self.groupBox_4)
         self.textBrowser_2 = QtWidgets.QTextBrowser()
         font = QtGui.QFont()
@@ -305,7 +310,7 @@ class Ui_Dialog(object):
         # 同步器设置区域
         self.sync_group = QtWidgets.QGroupBox()
         self.sync_group.setObjectName("sync_group")
-        self.sync_group.setTitle(_translate("Dialog", "同步器"))
+        self.sync_group.setTitle(_translate("dialog", "同步器"))
         sync_layout = QtWidgets.QVBoxLayout(self.sync_group)  # 垂直布局
         sync_layout.setContentsMargins(15, 15, 15, 15)  # 增加内边距
         sync_layout.setSpacing(15)  # 增加组件间距
@@ -317,18 +322,18 @@ class Ui_Dialog(object):
         sync_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
         # 第一行按钮：窗口管理相关
-        self.sync_instruction_btn = QtWidgets.QPushButton(_translate("Dialog", "使用说明"))
-        self.refresh_windows_btn = QPushButton(_translate("Dialog", "刷新窗口"))
-        self.select_all_btn = QPushButton(_translate("Dialog", "全选"))
-        self.invert_selection_btn = QPushButton(_translate("Dialog", "反选"))
-        self.capture_btn = QPushButton(_translate("Dialog", "没什么用的按钮"))
+        self.sync_instruction_btn = QtWidgets.QPushButton(_translate("dialog", "使用说明"))
+        self.refresh_windows_btn = QPushButton(_translate("dialog", "刷新窗口"))
+        self.select_all_btn = QPushButton(_translate("dialog", "全选"))
+        self.invert_selection_btn = QPushButton(_translate("dialog", "反选"))
+        self.capture_btn = QPushButton(_translate("dialog", "没什么用的按钮"))
         
         # 第二行按钮：同步控制相关
-        self.set_main_window_btn = QPushButton(_translate("Dialog", "设为主窗口"))
-        self.set_sub_windows_btn = QPushButton(_translate("Dialog", "设为副窗口"))
-        self.start_sync_btn = QPushButton(_translate("Dialog", "开始同步"))
-        self.stop_sync_btn = QPushButton(_translate("Dialog", "停止同步"))
-        self.arrange_btn = QPushButton(_translate("Dialog", "窗口排列"))
+        self.set_main_window_btn = QPushButton(_translate("dialog", "设为主窗口"))
+        self.set_sub_windows_btn = QPushButton(_translate("dialog", "设为副窗口"))
+        self.start_sync_btn = QPushButton(_translate("dialog", "开始同步"))
+        self.stop_sync_btn = QPushButton(_translate("dialog", "停止同步"))
+        self.arrange_btn = QPushButton(_translate("dialog", "窗口排列"))
 
         # 设置按钮大小策略，使其能够适应窗口大小变化
         for btn in [self.sync_instruction_btn, self.refresh_windows_btn, self.select_all_btn, self.invert_selection_btn,
@@ -359,7 +364,7 @@ class Ui_Dialog(object):
         # 窗口列表表格
         self.window_table = QtWidgets.QTableWidget()
         self.window_table.setColumnCount(4)  # 四列
-        self.window_table.setHorizontalHeaderLabels([_translate("Dialog", "选择"), _translate("Dialog", "窗口信息"), _translate("Dialog", "窗口句柄"), _translate("Dialog", "预览")])
+        self.window_table.setHorizontalHeaderLabels([_translate("dialog", "选择"), _translate("dialog", "窗口信息"), _translate("dialog", "窗口句柄"), _translate("dialog", "预览")])
         self.window_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)  # 第一列自适应
         self.window_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)  # 第二列拉伸
         self.window_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)  # 第三列自适应
@@ -606,7 +611,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "OAT"))
+        Dialog.setWindowTitle(_translate("dialog", "OAT"))
 
     def load_stylesheet(self, Dialog):
         try:

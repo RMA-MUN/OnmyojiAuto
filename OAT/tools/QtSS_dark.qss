@@ -168,7 +168,7 @@ QPushButton#settings_menu_item:hover {
 }
 
 QPushButton#settings_menu_item:checked {
-    background-color: rgba(26, 115, 232, 0.2);
+    background-color: rgba(26, 115, 232, 0.3);
     color: #1a73e8;
     border-right-color: #1a73e8;
 }
@@ -369,16 +369,24 @@ QHeaderView::section {
     font-weight: bold;
 }
 
-/* 表格垂直网格线 */
+/* 表格垂直网格线（序号列） */
 QTableWidget::verticalHeader {
-    background-color: #333333;
+    background-color: #444444;
+    color: #ffffff;
+    border: 1px solid #555555;
     border-right: 1px solid #555555;
+    padding: 6px;
+    font-weight: bold;
 }
 
 /* 表格水平网格线 */
 QTableWidget::horizontalHeader {
-    background-color: #333333;
+    background-color: #444444;
+    color: #ffffff;
+    border: 1px solid #555555;
     border-bottom: 2px solid #555555;
+    padding: 6px;
+    font-weight: bold;
 }
 
 /* 表格边框 */
