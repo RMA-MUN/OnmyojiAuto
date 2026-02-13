@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional
 from OAT.tools.WindowChecker import WindowChecker
 
 class WindowSynchronizer:
-    def __init__(self):
+    def __init__(self, sync_mode: str = "exactly_sync"):
         self.windows = []
         self.main_window = None
         self.sub_windows = []
@@ -17,6 +17,8 @@ class WindowSynchronizer:
         self.main_window_hwnd = None
         self.sub_window_hwnd = []
         self.sync_enabled = False
+        # 同步模式：exactly_sync（完全同步）、program_sync（程序同步）、input_sync（键鼠同步）
+        self.sync_mode = sync_mode
 
         # 键盘监听器相关属性
         self.keyboard_listener = None  # 键盘监听器实例
@@ -197,9 +199,17 @@ class WindowSynchronizer:
             # 确保同步开关开启
             self.sync_enabled = True
 
-            # 启动同步
-            mouse_started = self.mouse_sync()
-            keyboard_started = self.keyboard_sync()
+            # 根据同步模式启动相应的同步
+            mouse_started = False
+            keyboard_started = False
+            
+            if self.sync_mode == "exactly_sync" or self.sync_mode == "input_sync":
+                # 完全同步或键鼠同步时，启动鼠标和键盘监听器
+                mouse_started = self.mouse_sync()
+                keyboard_started = self.keyboard_sync()
+            elif self.sync_mode == "program_sync":
+                # 程序同步时，不启动监听器（由程序操作触发同步）
+                pass
 
             if mouse_started and keyboard_started:
                 return True
@@ -207,8 +217,27 @@ class WindowSynchronizer:
                 return True
             elif keyboard_started:
                 return True
+            elif self.sync_mode == "program_sync":
+                # 程序同步模式下，虽然没有启动监听器，但同步功能是启用的
+                return True
             else:
                 return False
+    
+    def set_sync_mode(self, sync_mode: str):
+        """
+        设置同步模式
+        :param sync_mode: 同步模式，可选值：exactly_sync、program_sync、input_sync
+        """
+        with self.lock:
+            self.sync_mode = sync_mode
+    
+    def get_sync_mode(self) -> str:
+        """
+        获取当前同步模式
+        :return: 当前同步模式
+        """
+        with self.lock:
+            return self.sync_mode
 
     def keyboard_sync(self):
         """

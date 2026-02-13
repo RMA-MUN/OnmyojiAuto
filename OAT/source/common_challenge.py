@@ -4,17 +4,18 @@
 
 import os
 
-from ..tools.OnmyojiAuto import OnmyjiAutomation
-from ..utils.do_after_challenge import do_after_challenge
+from OAT.tools.OnmyojiAuto import OnmyojiAutomation
+from OAT.utils.do_after_challenge import do_after_challenge
 
 def common_challenge(
         times: int, config: dict,
         script_dir: str, window_title: str,
         hidden_window: bool=False, sync_mode: bool=False,
-        synchronizer=None # 同步器实例
+        synchronizer=None, # 同步器实例
+        sync_mode_value: str = "exactly_sync" # 同步模式值
 ) -> bool:
     try:
-        automation_obj = OnmyjiAutomation(window_title, synchronizer)
+        automation_obj = OnmyojiAutomation(window_title, synchronizer, sync_mode_value)
 
         # 预先构建好所有图片路径并预加载
         image_paths = {}
@@ -45,10 +46,6 @@ def common_challenge(
         print(f"已预加载 {len(image_paths)} 张图像模板")
 
         i = 0
-        retry_count = 0
-        max_retries = 3
-        last_error_time = 0
-        error_cooldown = 5  # 错误重试冷却时间（秒）
 
         while i < times:
             # 动态遍历配置文件中的所有图片键
@@ -70,7 +67,6 @@ def common_challenge(
                         # 检查是否是开始挑战的图片
                         if info['is_challenge_start']:
                             i += 1
-                            retry_count = 0  # 成功后重置重试计数
                             print(f"还剩{times - i}次挑战")
                     else:
                         pass

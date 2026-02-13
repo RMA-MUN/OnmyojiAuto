@@ -16,8 +16,8 @@ from .WindowSynchronizer import WindowSynchronizer
 from .get_DC import WindowCapture
 
 
-class OnmyjiAutomation:
-    def __init__(self, window_title: str, synchronizer=None):
+class OnmyojiAutomation:
+    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync"):
         self.window_title = window_title
         # 窗口信息获取与初始化
         self.hwnd = win32gui.FindWindow(None, window_title)
@@ -38,9 +38,12 @@ class OnmyjiAutomation:
 
         # 窗口同步器 - 如果没有提供则创建新实例
         if synchronizer is None:
-            self.synchronizer = WindowSynchronizer()
+            self.synchronizer = WindowSynchronizer(sync_mode=sync_mode)
         else:
             self.synchronizer = synchronizer
+            # 如果提供了同步器，设置其同步模式
+            if hasattr(self.synchronizer, 'set_sync_mode'):
+                self.synchronizer.set_sync_mode(sync_mode)
 
         self.area = self.get_window_rect()
         self.x1, self.y1, self.width, self.height = self.area
