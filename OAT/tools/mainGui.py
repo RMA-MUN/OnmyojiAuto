@@ -23,7 +23,6 @@ from ..source import MODE_MAPPING
 from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
 from ..utils.logging import LogRedirect
-
 # 设置全局异常处理程序
 setup_global_exception_handler()
 
@@ -583,6 +582,13 @@ class MainWindow(QtWidgets.QDialog):
                 self.sync.set_true_enable()
                 # 输出当前同步模式
                 current_mode = self.sync.get_sync_mode()
+                # 将英文同步模式转换为中文,使用GUI.py里的sync_mode_reverse_map
+                sync_mode_reverse_map = {
+                    "exactly_sync": "完全同步",
+                    "program_sync": "程序同步",
+                    "input_sync": "键鼠同步"
+                }
+                current_mode = sync_mode_reverse_map.get(current_mode, current_mode)
                 print(f"当前同步模式: {current_mode}")
                 # 启动鼠标和键盘监听器
                 self.sync.sync_controller()

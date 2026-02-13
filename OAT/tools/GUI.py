@@ -1,6 +1,7 @@
 import json
 
 import os
+import shutil
 from typing import Any
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -20,6 +21,9 @@ mode_config_data = mode_config(mode_json_path) or {}
 
 # 获取当前目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 构建项目根目录
+project_root = os.path.dirname(os.path.dirname(current_dir))
 
 # 加载设置配置
 settings_file_path = os.path.join(current_dir, 'settings.json')
@@ -514,7 +518,14 @@ class UiDialog(object):
         # 连接信号
         self.close_game_checkbox.stateChanged.connect(self.on_close_game_setting_changed)
         general_form.addRow(self.close_game_checkbox)
-        
+
+        # 添加清理缓存按钮
+        self.clear_cache_button = QtWidgets.QPushButton("清理缓存")
+        self.clear_cache_button.setObjectName("clear_cache_button")
+        general_form.addRow(self.clear_cache_button)
+        # 连接清理缓存按钮信号
+        self.clear_cache_button.clicked.connect(self.clean_cache)
+
         general_group.setLayout(general_form)
         general_layout.addWidget(general_group)
         general_layout.addStretch()
@@ -836,6 +847,30 @@ class UiDialog(object):
         sync_mode_value = self.sync_mode_map.get(sync_mode_text, 'exactly_sync')
         # 保存同步模式设置
         self.save_setting('sync_mode', sync_mode_value)
+
+    def clean_cache(self):
+        """清理缓存，删除logs/screen_shot文件夹，然后给log.log里的内容都替换为一个空字符串"""
+        print("cleaning cache")
+        try:
+            # 获取项目根目录的logs文件夹路径
+            logs_dir = os.path.join(project_root, "logs")
+            # 检查log文件夹是否存在，如果存在，则删除
+            if os.path.exists(logs_dir):
+                # 构建screen_shot文件夹路径
+                screen_shot_dir = os.path.join(logs_dir, "screen_shot")
+                # 检查screen_shot文件夹是否存在，如果存在，则删除
+                if os.path.exists(screen_shot_dir):
+                    shutil.rmtree(screen_shot_dir)
+                    print("screen_shot文件夹已清理")
+                # 构建log.log文件路径
+                log_file_path = os.path.join(logs_dir, "log.log")
+                # 检查log.log文件是否存在，如果存在，则清空内容
+                if os.path.exists(log_file_path):
+                    with open(log_file_path, "w", encoding="utf-8") as f:
+                        f.write("")
+                    print("log.log文件已清理")
+        except Exception as e:
+            print(f"清理缓存时出错: {e}")
 
 
     def open_link(self, url):
