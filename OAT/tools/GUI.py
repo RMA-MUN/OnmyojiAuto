@@ -1,6 +1,7 @@
 import json
 
 import os
+from typing import Any
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import QUrl
@@ -29,6 +30,18 @@ with open(settings_file_path, 'r', encoding='utf-8') as f:
 current_theme = settings_data.get('theme', 'light')
 
 class UiDialog(object):
+    # 同步模式映射：中文选项 -> 英文值
+    sync_mode_map = {
+        "完全同步": "exactly_sync",
+        "程序同步": "program_sync",
+        "键鼠同步": "input_sync"
+    }
+    # 反向映射：英文值 -> 中文选项
+    sync_mode_reverse_map = {
+        "exactly_sync": "完全同步",
+        "program_sync": "程序同步",
+        "input_sync": "键鼠同步"
+    }
     def setup_ui(self, dialog):
         """界面初始化"""
         # 主窗口基础设置
@@ -110,6 +123,26 @@ class UiDialog(object):
         # 连接其他信号
         self.textBrowser_2.anchorClicked.connect(self.open_link)
         self.comboBox.currentIndexChanged.connect(self.on_mode_selected)
+        
+        # 设置默认同步模式值
+        current_sync_mode = settings_data.get('sync_mode', 'exactly_sync')
+        # 验证同步模式值是否有效
+        if current_sync_mode not in self.sync_mode_reverse_map:
+            # 弹窗提示用户配置文件被意外修改
+            QtWidgets.QMessageBox.warning(
+                dialog, "配置错误", "同步模式配置被意外修改，将使用默认值（完全同步）"
+            )
+            # 使用默认值
+            current_sync_mode = 'exactly_sync'
+        # 根据英文值获取对应的中文选项
+        sync_mode_text = self.sync_mode_reverse_map.get(current_sync_mode, "完全同步")
+        # 获取对应的索引
+        sync_mode_index = self.sync_mode_combo.findText(sync_mode_text)
+        if sync_mode_index != -1:
+            self.sync_mode_combo.setCurrentIndex(sync_mode_index)
+        else:
+            # 如果找不到对应的选项，使用默认值（完全同步）
+            self.sync_mode_combo.setCurrentIndex(0)
 
         # 初始化窗口列表
         self.initialize_window_list()
@@ -542,11 +575,26 @@ class UiDialog(object):
         sync_settings_page.setStyleSheet("background-color: transparent;")
         sync_settings_layout = QtWidgets.QVBoxLayout(sync_settings_page)
         sync_settings_layout.setContentsMargins(20, 20, 20, 20)
-        sync_settings_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        sync_settings_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
-        sync_label = QtWidgets.QLabel("同步器设置敬请期待")
-        sync_label.setObjectName("about_text")
-        sync_settings_layout.addWidget(sync_label)
+        sync_group = QtWidgets.QGroupBox("同步器设置")
+        sync_form = QtWidgets.QFormLayout()
+
+        # 同步模式选择: 完全同步、程序同步、键鼠同步
+        # 完全同步: 自动同步所有操作
+        # 程序同步: 仅同步程序操作
+        # 键鼠同步: 仅同步键鼠操作
+        self.sync_mode_label = QtWidgets.QLabel("同步模式:")
+        self.sync_mode_combo = QtWidgets.QComboBox()
+        self.sync_mode_combo.setObjectName("settings_combo")
+        self.sync_mode_combo.addItems(["完全同步", "程序同步", "键鼠同步"])
+        sync_form.addRow(self.sync_mode_label, self.sync_mode_combo)
+        # 连接信号
+        self.sync_mode_combo.currentIndexChanged.connect(self.on_sync_mode_changed)
+
+        sync_group.setLayout(sync_form)
+        sync_settings_layout.addWidget(sync_group)
+        sync_settings_layout.addStretch()
 
         return sync_settings_page
 
@@ -624,6 +672,28 @@ class UiDialog(object):
         except Exception as e:
             print(f"样式表加载失败: {str(e)}")
 
+    def save_setting(self, key: str, value: Any, update_global: bool = False, global_var_name: str = None, global_var_value: Any = None):
+        """
+        保存设置到配置文件
+        
+        Args:
+            key: 设置的键名
+            value: 设置的值
+            update_global: 是否更新全局变量
+            global_var_name: 全局变量名
+            global_var_value: 全局变量值
+        """
+        # 更新全局变量（如果需要）
+        if update_global and global_var_name:
+            globals()[global_var_name] = global_var_value
+        
+        # 更新设置数据
+        settings_data[key] = value
+        
+        # 保存到文件
+        with open(settings_file_path, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
     def save_theme_setting(self, theme: str):
         """
         保存主题设置到配置文件
@@ -631,15 +701,7 @@ class UiDialog(object):
         Args:
             theme: 主题名称 (light/dark)
         """
-        global current_theme
-        current_theme = theme
-        
-        # 更新设置数据
-        settings_data['theme'] = theme
-        
-        # 保存到文件
-        with open(settings_file_path, 'w', encoding='utf-8') as f:
-            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+        self.save_setting('theme', theme, True, 'current_theme', theme)
 
     def save_transparency_setting(self, transparency: int):
         """
@@ -648,12 +710,7 @@ class UiDialog(object):
         Args:
             transparency: 透明度值 (50-100)
         """
-        # 更新设置数据
-        settings_data['transparency'] = transparency
-        
-        # 保存到文件
-        with open(settings_file_path, 'w', encoding='utf-8') as f:
-            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+        self.save_setting('transparency', transparency)
 
     def save_close_program_setting(self, close_program: bool):
         """
@@ -662,12 +719,7 @@ class UiDialog(object):
         Args:
             close_program: 是否关闭程序
         """
-        # 更新设置数据
-        settings_data['close_program_after_challenge'] = close_program
-        
-        # 保存到文件
-        with open(settings_file_path, 'w', encoding='utf-8') as f:
-            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+        self.save_setting('close_program_after_challenge', close_program)
 
     def save_close_game_setting(self, close_game: bool):
         """
@@ -676,12 +728,7 @@ class UiDialog(object):
         Args:
             close_game: 是否关闭游戏
         """
-        # 更新设置数据
-        settings_data['close_game_after_challenge'] = close_game
-        
-        # 保存到文件
-        with open(settings_file_path, 'w', encoding='utf-8') as f:
-            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+        self.save_setting('close_game_after_challenge', close_game)
 
     def on_close_program_setting_changed(self, state: int):
         """
@@ -775,6 +822,20 @@ class UiDialog(object):
                 # import traceback
                 # traceback.print_exc()
                 pass
+    
+    def on_sync_mode_changed(self, index: int):
+        """
+        处理同步模式选择变化事件
+        
+        Args:
+            index: 同步模式组合框的索引
+        """
+        # 获取选择的中文选项
+        sync_mode_text = self.sync_mode_combo.currentText()
+        # 获取对应的英文值
+        sync_mode_value = self.sync_mode_map.get(sync_mode_text, 'exactly_sync')
+        # 保存同步模式设置
+        self.save_setting('sync_mode', sync_mode_value)
 
 
     def open_link(self, url):

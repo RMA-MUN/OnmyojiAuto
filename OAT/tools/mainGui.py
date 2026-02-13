@@ -39,7 +39,17 @@ class MainWindow(QtWidgets.QDialog):
         self.main_config_reader = ConfigReader('config/config.yaml')
         self.main_config = self.main_config_reader.read_config()
 
-        self.sync = WindowSynchronizer()
+        # 从设置中读取同步模式
+        settings_file_path = os.path.join(os.path.dirname(__file__), 'settings.json')
+        try:
+            with open(settings_file_path, 'r', encoding='utf-8') as f:
+                settings_data = json.load(f)
+                self.sync_mode_value = settings_data.get('sync_mode', 'exactly_sync')
+        except Exception as e:
+            print(f"读取设置文件失败：{e}")
+            self.sync_mode_value = 'exactly_sync'
+
+        self.sync = WindowSynchronizer(sync_mode=self.sync_mode_value)
         self.sync_mode = False
 
         # 最大化和最小化按钮
@@ -149,7 +159,7 @@ class MainWindow(QtWidgets.QDialog):
     def window_detection(self, *args):
         print("客户端窗口检测：")
         # 使用更新后的 window_title
-        automation = OnmyjiAutomation(self.window_title)
+        automation = OnmyojiAutomation(self.window_title)
         automation.print_window_info()
 
         # 调用 get_window_size 函数获取窗口大小
@@ -253,7 +263,8 @@ class MainWindow(QtWidgets.QDialog):
                     # 获取synchronizer实例，如果存在的话
                     synchronizer = self.sync if hasattr(self, 'sync') else None
                     mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
-                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer)
+                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
+                                sync_mode_value=self.sync_mode_value)
                 else:
                     print(f"读取 {sub_config_path} 配置文件失败。")
             else:
