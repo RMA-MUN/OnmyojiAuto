@@ -1,10 +1,11 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v1.6.0-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v1.6.1-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
+
 
 
 
@@ -14,8 +15,9 @@
 
 | 功能                | 链接                                                         |
 | ------------------- | :----------------------------------------------------------- |
-| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.0/OAT-v1.6.0.zip) |
+| 下载最新exe安装程序 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.1/OAT-v1.6.1_setup.exe) |
 | 查看版本更新内容    | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
+| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.1/OAT-v1.6.1.zip) |
 
 ---
 
@@ -45,17 +47,17 @@ OnmyojiAuto是一款基于Python开发的阴阳师游戏自动化辅助工具，
 - **🎯 丰富副本覆盖**：支持魂土、魂王、业原火、觉醒、爬塔（门票/体力）、灵染试炼、御灵、契灵探查等多种副本
 - **🎨 便捷操作体验**：图形化界面（GUI）设计，支持模式选择、次数设置等可视化操作
 - **🔄 多窗口协同**：支持桌面版窗口同步功能，可实现主窗口操作同步至副窗口
-- **🎮 后台运行模式**：可选择后台运行，不占用鼠标和屏幕
+- **🎮 后台运行模式**：可选择后台运行，不占用鼠标和屏幕(后台运行仅支持桌面版)
 
 ---
 
-## 🛠️ 安装步骤
+## 🛠️ 源码运行步骤
 
 ### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/RMA-MUN/OnmyojiAuto.git
-cd OnmyojiAuto/OAT
+cd OnmyojiAuto
 ```
 
 ### 2. 安装依赖
@@ -81,19 +83,21 @@ pip install -r requirements.txt
 ### 基本操作
 
 1. **启动程序**：
+   
    ```bash
    python main.py
    ```
-
+   
 2. **配置客户端**：
     - 选择客户端类型（推荐阴阳师桌面版）
     - 如需自定义客户端，可在`client.json`中添加
 
 3. **选择副本模式**：
+    
     - 选择目标副本（如"魂土"、"爬塔"等）
     - 部分模式需选择子模式（如魂土的"队长"或"队员"）
     - 可在`OAT/source/mode.json`中添加和修改模式配置
-
+    
 4. **设置挑战参数**：
 
     - 设置挑战次数（1-10000次）
