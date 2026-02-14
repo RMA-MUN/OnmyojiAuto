@@ -496,10 +496,6 @@ class UiDialog(object):
 
         general_group = QtWidgets.QGroupBox("常规设置")
         general_form = QtWidgets.QFormLayout()
-
-        self.check_update_check = QtWidgets.QPushButton("检查更新")
-        self.check_update_check.setObjectName("settings_button")
-        general_form.addRow(self.check_update_check)
         
         # 添加挑战执行完毕后关闭程序的复选框
         self.close_program_checkbox = QtWidgets.QCheckBox("挑战执行完毕后关闭程序")
@@ -518,6 +514,10 @@ class UiDialog(object):
         # 连接信号
         self.close_game_checkbox.stateChanged.connect(self.on_close_game_setting_changed)
         general_form.addRow(self.close_game_checkbox)
+
+        self.check_update_check = QtWidgets.QPushButton("检查更新")
+        self.check_update_check.setObjectName("settings_button")
+        general_form.addRow(self.check_update_check)
 
         # 添加清理缓存按钮
         self.clear_cache_button = QtWidgets.QPushButton("清理缓存")
@@ -879,13 +879,15 @@ class UiDialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.同步器增加窗口预览功能,可以预览窗口内容</span>
+                <span style="margin: 0;">1.增加同步器模式自选,可在同步设置页面选择</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.优化界面,重构布局代码</span>
+                <span style="margin: 0;">2.增加挑战结束后自动关闭游戏和程序功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.增加检查更新功能</span>
+                <span style="margin: 0;">3.增加缓存清理功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.修复已知bug</span>
+                <span style="margin: 0;">4.增加组件透明度设置</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">5.修复已知bug</span>
             </div>
          '''
          return text
