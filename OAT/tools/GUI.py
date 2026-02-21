@@ -113,7 +113,7 @@ class UiDialog(object):
         current_transparency = settings_data.get('transparency', 50)
         self.transparency_slider.setValue(current_transparency)
         # 设置透明度值显示标签的初始值
-        self.transparency_value_label.setText(f"{current_transparency}%")
+        self.transparency_slider_value.setText(f"{current_transparency}%")
 
         # 加载元对象
         QtCore.QMetaObject.connectSlotsByName(dialog)
@@ -126,7 +126,7 @@ class UiDialog(object):
 
         # 连接其他信号
         self.textBrowser_2.anchorClicked.connect(self.open_link)
-        self.comboBox.currentIndexChanged.connect(self.on_mode_selected)
+        self.find_mode_combo.currentIndexChanged.connect(self.on_mode_selected)
         
         # 设置默认同步模式值
         current_sync_mode = settings_data.get('sync_mode', 'exactly_sync')
@@ -197,13 +197,13 @@ class UiDialog(object):
         group_box_layout = QtWidgets.QVBoxLayout(self.groupBox)
 
         # 模式选择下拉菜单
-        self.comboBox = QtWidgets.QComboBox()
-        self.comboBox.setObjectName("comboBox")
+        self.find_mode_combo = QtWidgets.QComboBox()
+        self.find_mode_combo.setObjectName("find_mode_combo")
         modes = mode_choice(mode_json_path)
         if modes:
             for mode in modes:
-                self.comboBox.addItem(mode)
-        group_box_layout.addWidget(self.comboBox)
+                self.find_mode_combo.addItem(mode)
+        group_box_layout.addWidget(self.find_mode_combo)
 
         # 挑战次数输入框
         self.spinBox = QtWidgets.QSpinBox()
@@ -496,7 +496,7 @@ class UiDialog(object):
 
         general_group = QtWidgets.QGroupBox("常规设置")
         general_form = QtWidgets.QFormLayout()
-        
+
         # 添加挑战执行完毕后关闭程序的复选框
         self.close_program_checkbox = QtWidgets.QCheckBox("挑战执行完毕后关闭程序")
         self.close_program_checkbox.setObjectName("close_program_checkbox")
@@ -505,7 +505,7 @@ class UiDialog(object):
         # 连接信号
         self.close_program_checkbox.stateChanged.connect(self.on_close_program_setting_changed)
         general_form.addRow(self.close_program_checkbox)
-        
+
         # 添加挑战执行完毕后关闭游戏的复选框
         self.close_game_checkbox = QtWidgets.QCheckBox("挑战执行完毕后关闭游戏")
         self.close_game_checkbox.setObjectName("close_game_checkbox")
@@ -514,6 +514,42 @@ class UiDialog(object):
         # 连接信号
         self.close_game_checkbox.stateChanged.connect(self.on_close_game_setting_changed)
         general_form.addRow(self.close_game_checkbox)
+
+        # 图像识别相关配置
+        self.find_mode_combo = QtWidgets.QComboBox()
+        self.find_mode_combo.setObjectName("find_mode")
+        self.find_mode_combo.addItem("opencv", "opencv")
+        self.find_mode_combo.addItem("pyscreeze", "pyscreeze")
+        general_form.addRow("识别模式:", self.find_mode_combo)
+        # 连接识别模式的信号
+        self.find_mode_combo.currentTextChanged.connect(self.save_find_img_mode_settings)
+
+        # 图像识别相似度阈值
+        self.img_find_threshold = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.img_find_threshold.setObjectName("img_find_threshold")
+        self.img_find_threshold.setMinimum(70)  # 最小识别阙值
+        self.img_find_threshold.setMaximum(100)  # 最大识别阙值
+        self.img_find_threshold.setSingleStep(1)
+        # 设置默认值为85
+        self.img_find_threshold.setValue(85)
+        self.find_value_label = QtWidgets.QLabel("识别阙值:")
+        self.find_value_label.setObjectName("find_value_label")
+        self.find_value_label_value = QtWidgets.QLabel("85%")
+        self.find_value_label_value.setObjectName("find_value_label_value")
+        self.find_value_label_value.setMinimumWidth(50)
+        self.find_value_label_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        # 当前阙值显示
+        find_threshold_widget = QtWidgets.QWidget()
+        find_threshold_layout = QtWidgets.QHBoxLayout(find_threshold_widget)
+        find_threshold_layout.setContentsMargins(0, 0, 0, 0)
+        find_threshold_layout.setSpacing(10)
+        find_threshold_layout.addWidget(self.img_find_threshold)
+        find_threshold_layout.addWidget(self.find_value_label_value)
+
+        general_form.addRow(self.find_value_label, find_threshold_widget)
+        # 连接相似度阈值滑块信号
+        self.img_find_threshold.valueChanged.connect(self.save_find_value_settings)
+        self.img_find_threshold.valueChanged.connect(lambda value: self.find_value_label_value.setText(f"{value}%"))
 
         self.check_update_check = QtWidgets.QPushButton("检查更新")
         self.check_update_check.setObjectName("settings_button")
@@ -563,13 +599,13 @@ class UiDialog(object):
         self.transparency_slider.setValue(50)
         
         # 添加透明度值显示标签
-        self.transparency_value_label = QtWidgets.QLabel("50%")
-        self.transparency_value_label.setObjectName("transparency_value_label")
-        self.transparency_value_label.setMinimumWidth(50)
-        self.transparency_value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.transparency_slider_value = QtWidgets.QLabel("50%")
+        self.transparency_slider_value.setObjectName("transparency_slider_value")
+        self.transparency_slider_value.setMinimumWidth(50)
+        self.transparency_slider_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         
         transparency_layout.addWidget(self.transparency_slider)
-        transparency_layout.addWidget(self.transparency_value_label)
+        transparency_layout.addWidget(self.transparency_slider_value)
         
         self.transparency_label = QtWidgets.QLabel("透明度:")
         display_form.addRow(self.transparency_label, transparency_widget)
@@ -741,6 +777,25 @@ class UiDialog(object):
         """
         self.save_setting('close_game_after_challenge', close_game)
 
+    def save_find_value_settings(self, find_value: int ):
+        """
+        保存识别阙值设置到配置文件
+
+        Args:
+            find_value: 识别阙值 (85-100)
+        """
+        self.save_setting('find_value', find_value)
+
+    def save_find_img_mode_settings(self, find_mode: str="opencv"):
+        """
+        保存识别模式设置到配置文件
+
+        Args:
+            find_mode: 识别模式(opencv/pyscreeze)
+        """
+        self.save_setting('find_mode', find_mode)
+
+
     def on_close_program_setting_changed(self, state: int):
         """
         处理挑战执行完毕后关闭程序的设置变化事件
@@ -786,7 +841,7 @@ class UiDialog(object):
         self.save_transparency_setting(value)
         
         # 更新透明度值显示标签
-        self.transparency_value_label.setText(f"{value}%")
+        self.transparency_slider_value.setText(f"{value}%")
         
         # 计算透明度因子 (0.2-1.0)
         opacity = value / 100.0
@@ -902,11 +957,11 @@ class UiDialog(object):
         self.soul_land_group.setExclusive(True)
         
         # 如果没有有效的模式配置，直接返回
-        if not mode_config_data or index < 0 or index >= self.comboBox.count():
+        if not mode_config_data or index < 0 or index >= self.find_mode_combo.count():
             return
         
         # 获取当前选择的模式名称
-        mode_name = self.comboBox.currentText()
+        mode_name = self.find_mode_combo.currentText()
         
         # 从配置中查找当前模式的配置
         mode_data = mode_config_data.get(mode_name)
