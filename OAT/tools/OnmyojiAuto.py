@@ -13,7 +13,7 @@ import win32gui
 from PIL import Image
 
 from .WindowSynchronizer import WindowSynchronizer
-from .get_DC import WindowCapture
+from .GetDC import WindowCapture
 
 
 class OnmyojiAutomation:

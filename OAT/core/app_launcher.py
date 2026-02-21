@@ -5,7 +5,7 @@ import time
 from PyQt6 import QtWidgets
 
 from OAT.utils.error_handler import handle_global_exception
-from OAT.tools.mainGui import MainWindow
+from OAT.tools.MainGui import MainWindow
 
 # 兼容性处理：为Python 3.2+版本添加setcheckinterval函数
 if not hasattr(sys, 'setcheckinterval'):

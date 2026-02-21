@@ -3,5 +3,7 @@
   "transparency": 55,
   "close_program_after_challenge": false,
   "close_game_after_challenge": false,
-  "sync_mode": "input_sync"
+  "sync_mode": "input_sync",
+  "find_value": 70,
+  "find_mode": "pyscreeze"
 }

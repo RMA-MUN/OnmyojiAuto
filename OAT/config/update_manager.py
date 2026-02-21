@@ -1,5 +1,5 @@
 from OAT.config.check_update import UpdateChecker
-from OAT.tools.config_manager import ConfigReader
+from OAT.tools.ConfigManager import ConfigReader
 import os
 import zipfile
 import requests

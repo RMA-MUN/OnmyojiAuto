@@ -11,11 +11,11 @@ from PyQt6.QtCore import QUrl, Qt
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import QMessageBox
 
-from OAT.tools.get_DC import WindowCapture
+from OAT.tools.GetDC import WindowCapture
 from .GUI import UiDialog
 from .WindowSynchronizer import WindowSynchronizer
-from .config_manager import ConfigReader
-from .thread_manager import UpdateCheckThread
+from .ConfigManager import ConfigReader
+from .ThreadManager import UpdateCheckThread
 from ..config.check_update import UpdateChecker
 from ..config.update_manager import UpdateManager
 from ..source import *
@@ -67,10 +67,10 @@ class MainWindow(QtWidgets.QDialog):
         self.window_title = "阴阳师-MuMu模拟器专版"
 
         # 信号与槽绑定
-        self.ui.comboBox.currentTextChanged.connect(self.handle_mode_change)
-        self.ui.pushButton.clicked.connect(self.window_detection)
-        self.ui.pushButton_2.clicked.connect(self.start_challenge)
-        self.ui.pushButton_3.clicked.connect(self.emergency_stop)
+        self.ui.find_mode_combo.currentTextChanged.connect(self.handle_mode_change)
+        self.ui.window_detect_btn.clicked.connect(self.window_detection)
+        self.ui.start_challenge_btn.clicked.connect(self.start_challenge)
+        self.ui.emergency_stop_btn.clicked.connect(self.emergency_stop)
         self.ui.sync_instruction_btn.clicked.connect(self.sync_instruction)
         self.ui.refresh_windows_btn.clicked.connect(self.update_window_table)
         self.ui.select_all_btn.clicked.connect(self.select_all)
@@ -84,16 +84,16 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.check_update_check.clicked.connect(self.check_is_update)
 
         # 给按钮绑定快捷键
-        self.ui.pushButton.setShortcut("Ctrl+W")
-        self.ui.pushButton_3.setShortcut("Ctrl+E")
-        self.ui.pushButton_2.setShortcut("Return")
-        self.ui.pushButton4.setShortcut("Ctrl+R")
+        self.ui.window_detect_btn.setShortcut("Ctrl+W")
+        self.ui.emergency_stop_btn.setShortcut("Ctrl+E")
+        self.ui.start_challenge_btn.setShortcut("Return")
+        self.ui.refresh_window_btn.setShortcut("Ctrl+R")
 
         # 设置工具提示
-        self.ui.pushButton4.setToolTip("刷新窗口 (Ctrl+R)")
-        self.ui.pushButton.setToolTip("窗口检测 (Ctrl+W)")
-        self.ui.pushButton_2.setToolTip("开始挑战 (Enter)")
-        self.ui.pushButton_3.setToolTip("紧急停止 (Ctrl+E)")
+        self.ui.refresh_window_btn.setToolTip("刷新窗口 (Ctrl+R)")
+        self.ui.window_detect_btn.setToolTip("窗口检测 (Ctrl+W)")
+        self.ui.start_challenge_btn.setToolTip("开始挑战 (Enter)")
+        self.ui.emergency_stop_btn.setToolTip("紧急停止 (Ctrl+E)")
 
         # 定向输出print
         self.log_redirect = LogRedirect(self.ui.textBrowser)
@@ -107,7 +107,7 @@ class MainWindow(QtWidgets.QDialog):
         self.lock = threading.Lock()
 
         # 刷新窗口按钮
-        self.ui.pushButton4.clicked.connect(self.refresh_window)
+        self.ui.refresh_window_btn.clicked.connect(self.refresh_window)
 
         # 设置界面样式
         # 加载外部样式表 - 由UI类统一管理主题样式
@@ -137,7 +137,7 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.textBrowser.clear()
         self.ui.textBrowser_2.clear()
         self.ui.textBrowser_2.setHtml(self.ui.get_text())
-        self.ui.comboBox.setCurrentIndex(0)
+        self.ui.find_mode_combo.setCurrentIndex(0)
         self.ui.spinBox.setValue(1)
 
         # 打印刷新信息
@@ -187,7 +187,7 @@ class MainWindow(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(self, "提示", "已有任务在进行中，请等待完成")
             return
         times = self.ui.spinBox.value()
-        mode: str = self.ui.comboBox.currentText()
+        mode: str = self.ui.find_mode_combo.currentText()
         sub_mode: str = ""
 
         # 动态获取子模式，不再硬编码判断
