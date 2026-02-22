@@ -5,6 +5,7 @@
 import os
 
 from OAT.tools.OnmyojiAuto import OnmyojiAutomation
+from OAT.tools import settings
 from OAT.utils.do_after_challenge import do_after_challenge
 
 def common_challenge(
@@ -12,10 +13,21 @@ def common_challenge(
         script_dir: str, window_title: str,
         hidden_window: bool=False, sync_mode: bool=False,
         synchronizer=None, # 同步器实例
-        sync_mode_value: str = "exactly_sync" # 同步模式值
+        sync_mode_value: str = "exactly_sync", # 同步模式值
+        threshold: int = None,
+        find_mode: str = None
 ) -> bool:
     try:
-        automation_obj = OnmyojiAutomation(window_title, synchronizer, sync_mode_value)
+        # 使用设置中的阈值和识别模式
+        if threshold is None:
+            threshold = settings.FIND_THRESHOLD
+        if find_mode is None:
+            find_mode = settings.FIND_MODE
+        
+        # 转换阈值为0-1之间的值
+        threshold_value = threshold / 100.0
+        
+        automation_obj = OnmyojiAutomation(window_title, synchronizer, sync_mode_value, find_mode, threshold)
 
         # 预先构建好所有图片路径并预加载
         image_paths = {}
@@ -53,7 +65,7 @@ def common_challenge(
                 img_path = image_paths[key]
                 # print(f"正在识别图片：{key}")
                 try:
-                    # 尝试识别并执行操作，启用低置信度重试
+                    # 尝试识别并执行操作，使用设置中的阈值
                     if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode):
                         # print(f"已成功识别并执行操作：{key}")
                         
