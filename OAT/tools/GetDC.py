@@ -9,6 +9,8 @@ from typing import Optional, Tuple, Union
 import pyscreeze
 from PIL import Image
 
+from OAT.tools import settings
+
 # 确保CAPTUREBLT常量可用
 if not hasattr(win32con, 'CAPTUREBLT'):
     win32con.CAPTUREBLT = 0x40000000
@@ -264,13 +266,13 @@ class WindowCapture:
             print(f"检查窗口状态出错: {str(e)}")
             return False
 
-    def find_image_precise(self, target_image: Union[str, np.ndarray], threshold: float = 0.8,
+    def find_image_precise(self, target_image: Union[str, np.ndarray], threshold: Union[float, int] = None,
                            method: str = "opencv", fallback: bool = True) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
         """在窗口中精确查找目标图像，返回区域范围
 
         Args:
             target_image: 目标图像路径或numpy数组
-            threshold: 匹配阈值，默认0.8
+            threshold: 匹配阈值，默认使用配置文件中的值
             method: 识别方法，可选值："opencv" 或 "pyscreeze"
             fallback: 当首选方法失败时是否尝试备选方法，默认True
 
@@ -279,6 +281,19 @@ class WindowCapture:
             未找到匹配时返回None
         """
         try:
+            # 处理阈值参数
+            # 如果没有提供阈值，使用配置文件中的值
+            if threshold is None:
+                threshold = settings.FIND_THRESHOLD
+            
+            # 确保阈值在0-1之间
+            if isinstance(threshold, int) and threshold > 1:
+                # 如果是整数且大于1，认为是百分比值（如85表示85%）
+                threshold = threshold / 100.0
+            elif isinstance(threshold, float) and threshold > 1:
+                # 如果是浮点数且大于1，也认为是百分比值
+                threshold = threshold / 100.0
+            
             # 捕获当前窗口图像
             window_img = self.capture_window()
             if window_img is None:
@@ -287,22 +302,39 @@ class WindowCapture:
             # 根据选择的方法执行识别
             if method == "opencv":
                 # 使用OpenCV方法
-                result = self._find_image_opencv(window_img, target_image, threshold)
-                if result is not None or not fallback:
-                    return result
-                else:
-                    # 降级到PyScreeze方法
-                    print("OpenCV识别失败，尝试使用PyScreeze...")
-                    return self._find_image_pyscreeze(window_img, target_image, threshold)
+                try:
+                    result = self._find_image_opencv(window_img, target_image, threshold)
+                    if result is not None:
+                        return result
+                    elif not fallback:
+                        return None
+                    else:
+                        return None
+                except Exception as e:
+                    # 只有在OpenCV识别过程中出现报错时，才降级到PyScreeze方法
+                    print(f"OpenCV识别出错: {str(e)}，尝试使用PyScreeze...")
+                    if fallback:
+                        return self._find_image_pyscreeze(window_img, target_image, threshold)
+                    else:
+                        return None
             else:  # pyscreeze
                 # 使用PyScreeze方法
-                result = self._find_image_pyscreeze(window_img, target_image, threshold)
-                if result is not None or not fallback:
-                    return result
-                else:
-                    # 降级到OpenCV方法
-                    print("PyScreeze识别失败，尝试使用OpenCV...")
-                    return self._find_image_opencv(window_img, target_image, threshold)
+                try:
+                    result = self._find_image_pyscreeze(window_img, target_image, threshold)
+                    # 如果找到了结果，直接返回
+                    if result is not None:
+                        return result
+                    elif not fallback:
+                        return None
+                    else:
+                        return None
+                except Exception as e:
+                    # 只有在PyScreeze识别过程中出现报错时，才降级到OpenCV方法
+                    print(f"PyScreeze识别出错: {str(e)}，尝试使用OpenCV...")
+                    if fallback:
+                        return self._find_image_opencv(window_img, target_image, threshold)
+                    else:
+                        return None
         except Exception as e:
             print(f"图像查找出错: {str(e)}")
             return None

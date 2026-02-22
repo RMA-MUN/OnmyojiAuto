@@ -4,6 +4,6 @@
   "close_program_after_challenge": false,
   "close_game_after_challenge": false,
   "sync_mode": "input_sync",
-  "find_value": 70,
+  "find_value": 85,
   "find_mode": "pyscreeze"
 }

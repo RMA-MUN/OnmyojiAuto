@@ -14,10 +14,12 @@ from PIL import Image
 
 from .WindowSynchronizer import WindowSynchronizer
 from .GetDC import WindowCapture
+# 导入整个settings模块，而不是单个变量
+from . import settings
 
 
 class OnmyojiAutomation:
-    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync"):
+    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync", find_mode=None, find_threshold=None):
         self.window_title = window_title
         # 窗口信息获取与初始化
         self.hwnd = win32gui.FindWindow(None, window_title)
@@ -33,7 +35,7 @@ class OnmyojiAutomation:
             else:
                 self.synchronizer = synchronizer
             # 跳过后续窗口初始化
-            self._init_common_params()
+            self._init_common_params(find_mode, find_threshold)
             return
 
         # 窗口同步器 - 如果没有提供则创建新实例
@@ -50,9 +52,9 @@ class OnmyojiAutomation:
         self.x2, self.y2 = self.x1 + self.width, self.y1 + self.height
 
         # 初始化公共参数
-        self._init_common_params()
+        self._init_common_params(find_mode, find_threshold)
     
-    def _init_common_params(self):
+    def _init_common_params(self, find_mode=None, find_threshold=None):
         """初始化公共参数"""
         # 线程与控制变量
         self.lock = threading.Lock()
@@ -61,7 +63,12 @@ class OnmyojiAutomation:
         # 图像识别缓存和参数
         self.recognition_cache = {}
         self.cache_timeout = 1.0
-        self.default_confidence = 0.85  # 默认置信度
+        # 设置识别模式和阈值
+        # 优先使用传入的参数，其次使用settings.py中的配置
+        self.find_mode = find_mode if find_mode else settings.FIND_MODE
+        # 获取阈值并转换为0-1之间的值
+        threshold_value = find_threshold if find_threshold is not None else settings.FIND_THRESHOLD
+        self.default_confidence = threshold_value / 100.0  # 转换为0-1之间的值
         self.image_templates = {}
 
         # 模拟鼠标移动的参数
@@ -204,7 +211,7 @@ class OnmyojiAutomation:
     def perform_action(self,
                        logo: str,
                        hidden_window: bool = False,
-                       threshold: float = 0.85,
+                       threshold: float = None,
                        sync_mode: bool = False,
                        # sync_type: str = "完全同步"
                        ) -> bool:
@@ -212,12 +219,15 @@ class OnmyojiAutomation:
         执行操作：根据是否隐藏窗口选择不同的执行模式
         :param logo: 要识别的图像路径
         :param hidden_window: 是否使用隐藏窗口模式
-        :param threshold: 识别阈值
+        :param threshold: 识别阈值，默认使用设置中的值
         :param sync_mode: 是否同步执行
         :param sync_type: 同步类型，可选值："完全同步"、"点击同步"
         :return: 是否成功执行操作
         """
         try:
+            # 使用设置中的阈值作为默认值
+            if threshold is None:
+                threshold = self.default_confidence
             if hidden_window:
                 return self._perform_action_hidden_window(logo, threshold, sync_mode)
             else:
@@ -246,7 +256,8 @@ class OnmyojiAutomation:
 
                 target_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             
-            position = wc.find_image_precise(target_image, threshold=threshold)
+            # 使用设置的识别模式和阈值
+            position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
             if position:
                 # 从区域范围中计算中心点坐标
                 (x1, x2), (y1, y2) = position

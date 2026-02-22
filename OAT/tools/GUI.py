@@ -1,7 +1,6 @@
-import json
-
 import os
 import shutil
+import json
 from typing import Any
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -10,7 +9,8 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QPushButton, QAbstractItemView, QSizePolicy
 
 from OAT.source.mode_config import mode_choice, mode_config
-from OAT.tools.settings import APP_VERSION
+from OAT.tools.settings import APP_VERSION, settings_data, update_settings
+from OAT.tools.settings import THEME, TRANSPARENCY, FIND_MODE, FIND_THRESHOLD
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -25,13 +25,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # 构建项目根目录
 project_root = os.path.dirname(os.path.dirname(current_dir))
 
-# 加载设置配置
-settings_file_path = os.path.join(current_dir, 'settings.json')
-with open(settings_file_path, 'r', encoding='utf-8') as f:
-    settings_data = json.load(f)
-
 # 当前主题设置
-current_theme = settings_data.get('theme', 'light')
+current_theme = THEME
 
 class UiDialog(object):
     # 同步模式映射：中文选项 -> 英文值
@@ -516,13 +511,20 @@ class UiDialog(object):
         general_form.addRow(self.close_game_checkbox)
 
         # 图像识别相关配置
-        self.find_mode_combo = QtWidgets.QComboBox()
-        self.find_mode_combo.setObjectName("find_mode")
-        self.find_mode_combo.addItem("opencv", "opencv")
-        self.find_mode_combo.addItem("pyscreeze", "pyscreeze")
-        general_form.addRow("识别模式:", self.find_mode_combo)
+        self.recognition_mode_combo = QtWidgets.QComboBox()
+        self.recognition_mode_combo.setObjectName("find_mode")
+        self.recognition_mode_combo.addItem("opencv", "opencv")
+        self.recognition_mode_combo.addItem("pyscreeze", "pyscreeze")
+        # 加载设置值
+        find_mode_setting = settings_data.get('find_mode', 'opencv')
+        find_mode_index = self.recognition_mode_combo.findText(find_mode_setting)
+        if find_mode_index != -1:
+            self.recognition_mode_combo.setCurrentIndex(find_mode_index)
+        else:
+            self.recognition_mode_combo.setCurrentIndex(0)
+        general_form.addRow("识别模式:", self.recognition_mode_combo)
         # 连接识别模式的信号
-        self.find_mode_combo.currentTextChanged.connect(self.save_find_img_mode_settings)
+        self.recognition_mode_combo.currentTextChanged.connect(self.save_find_img_mode_settings)
 
         # 图像识别相似度阈值
         self.img_find_threshold = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
@@ -530,11 +532,12 @@ class UiDialog(object):
         self.img_find_threshold.setMinimum(70)  # 最小识别阙值
         self.img_find_threshold.setMaximum(100)  # 最大识别阙值
         self.img_find_threshold.setSingleStep(1)
-        # 设置默认值为85
-        self.img_find_threshold.setValue(85)
+        # 加载设置值
+        find_value_setting = settings_data.get('find_value', 85)
+        self.img_find_threshold.setValue(find_value_setting)
         self.find_value_label = QtWidgets.QLabel("识别阙值:")
         self.find_value_label.setObjectName("find_value_label")
-        self.find_value_label_value = QtWidgets.QLabel("85%")
+        self.find_value_label_value = QtWidgets.QLabel(f"{find_value_setting}%")
         self.find_value_label_value.setObjectName("find_value_label_value")
         self.find_value_label_value.setMinimumWidth(50)
         self.find_value_label_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -734,12 +737,8 @@ class UiDialog(object):
         if update_global and global_var_name:
             globals()[global_var_name] = global_var_value
         
-        # 更新设置数据
-        settings_data[key] = value
-        
-        # 保存到文件
-        with open(settings_file_path, 'w', encoding='utf-8') as f:
-            json.dump(settings_data, f, ensure_ascii=False, indent=2)
+        # 使用settings.py中的update_settings函数保存配置
+        update_settings(key, value)
 
     def save_theme_setting(self, theme: str):
         """
