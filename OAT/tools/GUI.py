@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QPushButton, QAbstractItemView, QSizePolicy
 
 from OAT.source.mode_config import mode_choice, mode_config
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
-from OAT.tools.settings import THEME, TRANSPARENCY, FIND_MODE, FIND_THRESHOLD
+from OAT.tools.settings import THEME
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -745,7 +745,7 @@ class UiDialog(object):
         author_label.setObjectName("about_text")
         about_layout.addWidget(author_label)
 
-        connect_author_label = QtWidgets.QLabel("联系作者: \n  邮箱: n3032747608@163.com\n  QQ : 3032747608")
+        connect_author_label = QtWidgets.QLabel("反馈与建议请联系作者: \n  邮箱: n3032747608@163.com\n  QQ : 3032747608")
         about_layout.addWidget(connect_author_label)
 
         warning_text = QtWidgets.QLabel("免责声明:\n  1. 本工具仅供学习交流，禁止商用及违规使用；\n  2. 使用风险自负，开发者不承担任何责任；\n  3. 请勿违反游戏运营方相关规定。 ")
@@ -1028,6 +1028,12 @@ class UiDialog(object):
         try:
             # 获取项目根目录的logs文件夹路径
             logs_dir = os.path.join(project_root, "logs")
+            # 获取到temp文件夹路径
+            temp_dir = os.path.join(project_root, "temp")
+            # 检查temp文件夹是否存在，如果存在，则删除
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                print("残留安装包已清理")
             # 检查log文件夹是否存在，如果存在，则删除
             if os.path.exists(logs_dir):
                 # 构建screen_shot文件夹路径
@@ -1035,7 +1041,7 @@ class UiDialog(object):
                 # 检查screen_shot文件夹是否存在，如果存在，则删除
                 if os.path.exists(screen_shot_dir):
                     shutil.rmtree(screen_shot_dir)
-                    print("screen_shot文件夹已清理")
+                    print("窗口预览缓存已清理")
                 # 构建log.log文件路径
                 log_file_path = os.path.join(logs_dir, "log.log")
                 # 检查log.log文件是否存在，如果存在，则清空内容
@@ -1053,15 +1059,17 @@ class UiDialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.增加同步器模式自选,可在同步设置页面选择</span>
+                <span style="margin: 0;">1.自动更新功能正式上线</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.增加挑战结束后自动关闭游戏和程序功能</span>
+                <span style="margin: 0;">2.优化同步器算法，实现几乎0偏移</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.增加缓存清理功能</span>
+                <span style="margin: 0;">3.新增自定义后台识别方式和识别阙值</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.增加组件透明度设置</span>
+                <span style="margin: 0;">4.新增自定义同步窗口大小</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">5.修复已知bug</span>
+                <span style="margin: 0;">5.新增对角线和平铺两种窗口排列方式</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">6.修复已知bug</span>
             </div>
          '''
          return text
