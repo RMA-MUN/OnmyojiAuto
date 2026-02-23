@@ -1,0 +1,353 @@
+import os
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, 
+    QTextEdit, QPushButton, QFileDialog, QMessageBox
+)
+from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtGui import QFont, QPixmap
+
+from OAT_Updater.utils.update_worker import UpdateWorker
+
+
+class UpdateGUI(QWidget):
+    """
+    OAT更新程序主界面
+    """
+
+    def __init__(self, zip_path=None, update_log="", parent=None):
+        """
+        初始化更新界面
+        :param zip_path: 压缩包路径，可选
+        :param update_log: 更新日志，可选
+        :param parent: 父窗口
+        """
+        super().__init__(parent)
+        self.zip_path = zip_path
+        self.update_log = update_log
+        self.update_worker = None
+        self.dragging = False
+        self.drag_start_position = QPoint()
+        self.init_ui()
+
+    def init_ui(self):
+        """
+        初始化UI界面
+        :return: None
+        """
+        # 设置无边框窗口
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowCloseButtonHint)
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(500)
+        self.setStyleSheet("background-color: white;")
+
+        # 主布局
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(30, 30, 30, 30)
+
+        # 标题栏（自定义）
+        title_layout = QHBoxLayout()
+
+        # 应用图标
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'OAT', 'tools', 'uiResources', 'icon.ico')
+        if os.path.exists(icon_path):
+            icon_label = QLabel()
+            icon_pixmap = QPixmap(icon_path)
+            icon_pixmap = icon_pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio)
+            icon_label.setPixmap(icon_pixmap)
+            title_layout.addWidget(icon_label)
+
+        # 标题
+        title_label = QLabel("OAT 更新程序")
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_layout.addWidget(title_label)
+
+        # 空出空间
+        title_layout.addStretch()
+
+        # 关闭按钮
+        close_button = QPushButton("×")
+        close_button.setFixedSize(30, 30)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #666;
+                font-size: 20px;
+                font-weight: bold;
+                border: none;
+                border-radius: 15px;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                color: #333;
+            }
+        """)
+        close_button.clicked.connect(self.close)
+        title_layout.addWidget(close_button)
+
+        main_layout.addLayout(title_layout)
+
+        # 任务状态
+        status_layout = QHBoxLayout()
+        status_label = QLabel("当前状态:")
+        self.status_value_label = QLabel("准备就绪")
+        self.status_value_label.setStyleSheet("color: #2196F3; font-weight: bold;")
+        status_layout.addWidget(status_label)
+        status_layout.addWidget(self.status_value_label)
+        status_layout.addStretch()
+        main_layout.addLayout(status_layout)
+
+        # 更新日志
+        log_layout = QVBoxLayout()
+        log_title = QLabel("更新日志:")
+        log_title.setStyleSheet("font-weight: bold;")
+        self.log_text_edit = QTextEdit()
+        self.log_text_edit.setReadOnly(True)
+        self.log_text_edit.setMaximumHeight(120)
+        self.log_text_edit.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 10px;
+                background-color: #f9f9f9;
+            }
+        """)
+        # 显示更新日志
+        if self.update_log:
+            self.log_text_edit.setText(self.update_log)
+        else:
+            self.log_text_edit.setText("暂无更新日志")
+        log_layout.addWidget(log_title)
+        log_layout.addWidget(self.log_text_edit)
+        main_layout.addLayout(log_layout)
+
+        # 解压进度条
+        unzip_layout = QVBoxLayout()
+        unzip_title = QLabel("解压进度:")
+        self.unzip_progress_bar = QProgressBar()
+        self.unzip_progress_bar.setMinimum(0)
+        self.unzip_progress_bar.setMaximum(50)  # 解压占50%
+        self.unzip_progress_bar.setValue(0)
+        self.unzip_progress_bar.setTextVisible(True)
+        self.unzip_progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                background-color: #f0f0f0;
+                height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #2196F3;
+                border-radius: 8px;
+            }
+        """)
+        unzip_layout.addWidget(unzip_title)
+        unzip_layout.addWidget(self.unzip_progress_bar)
+        main_layout.addLayout(unzip_layout)
+
+        # 文件替换进度条
+        replace_layout = QVBoxLayout()
+        replace_title = QLabel("文件替换进度:")
+        self.replace_progress_bar = QProgressBar()
+        self.replace_progress_bar.setMinimum(0)
+        self.replace_progress_bar.setMaximum(50)  # 替换占50%
+        self.replace_progress_bar.setValue(0)
+        self.replace_progress_bar.setTextVisible(True)
+        self.replace_progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                background-color: #f0f0f0;
+                height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 8px;
+            }
+        """)
+        replace_layout.addWidget(replace_title)
+        replace_layout.addWidget(self.replace_progress_bar)
+        main_layout.addLayout(replace_layout)
+
+        # 操作日志
+        op_log_layout = QVBoxLayout()
+        op_log_title = QLabel("操作日志:")
+        self.op_log_text_edit = QTextEdit()
+        self.op_log_text_edit.setReadOnly(True)
+        self.op_log_text_edit.setMaximumHeight(100)
+        self.op_log_text_edit.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 10px;
+                background-color: #f9f9f9;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 10pt;
+            }
+        """)
+        op_log_layout.addWidget(op_log_title)
+        op_log_layout.addWidget(self.op_log_text_edit)
+        main_layout.addLayout(op_log_layout)
+
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        # 开始更新按钮
+        self.start_button = QPushButton("开始更新")
+        self.start_button.setMinimumWidth(120)
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                font-weight: bold;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:disabled {
+                background-color: #BDBDBD;
+            }
+        """)
+        self.start_button.clicked.connect(self.start_update)
+        button_layout.addWidget(self.start_button)
+
+        button_layout.addStretch()
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
+
+        # 如果提供了zip路径，自动填充
+        if self.zip_path:
+            self.op_log_text_edit.append(f"已指定压缩包: {self.zip_path}")
+            self.status_value_label.setText("准备就绪")
+        else:
+            self.status_value_label.setText("等待压缩包")
+            self.status_value_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self.start_button.setEnabled(False)
+
+    def start_update(self):
+        """
+        开始更新
+        :return: None
+        """
+        if not self.zip_path:
+            QMessageBox.warning(self, "提示", "未指定压缩包路径！")
+            return
+
+        if not os.path.exists(self.zip_path):
+            QMessageBox.warning(self, "错误", "压缩包文件不存在！")
+            return
+
+        # 禁用按钮
+        self.start_button.setEnabled(False)
+
+        # 创建并启动更新工作线程
+        self.update_worker = UpdateWorker(self.zip_path)
+
+        # 连接信号
+        self.update_worker.status_signal.connect(self.update_status)
+        self.update_worker.unzip_progress_signal.connect(self.update_unzip_progress)
+        self.update_worker.replace_progress_signal.connect(self.update_replace_progress)
+        self.update_worker.log_signal.connect(self.log_message)
+        self.update_worker.finished_signal.connect(self.update_finished)
+        self.update_worker.error_signal.connect(self.update_error)
+
+        # 启动线程
+        self.update_worker.start()
+
+    def update_status(self, status):
+        """
+        更新状态显示
+        :param status: 状态文本
+        :return: None
+        """
+        self.status_value_label.setText(status)
+        if "正在" in status:
+            self.status_value_label.setStyleSheet("color: #FF9800; font-weight: bold;")
+        elif "完成" in status:
+            self.status_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        elif "错误" in status:
+            self.status_value_label.setStyleSheet("color: #F44336; font-weight: bold;")
+
+    def update_unzip_progress(self, value):
+        """
+        更新解压进度条
+        :param value: 进度值 (0-100)
+        :return: None
+        """
+        # 将0-100转换为0-50
+        progress = int(value / 2)
+        self.unzip_progress_bar.setValue(progress)
+
+    def update_replace_progress(self, value):
+        """
+        更新文件替换进度条
+        :param value: 进度值 (0-100)
+        :return: None
+        """
+        # 将0-100转换为0-50
+        progress = int(value / 2)
+        self.replace_progress_bar.setValue(progress)
+
+    def log_message(self, message):
+        """
+        添加日志消息
+        :param message: 日志文本
+        :return: None
+        """
+        self.op_log_text_edit.append(message)
+
+    def update_finished(self):
+        """
+        更新完成
+        :return: None
+        """
+        self.status_value_label.setText("更新完成")
+        self.status_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        self.op_log_text_edit.append("更新完成！请重新启动应用程序。")
+        QMessageBox.information(self, "完成", "更新完成！请重新启动应用程序。")
+
+    def update_error(self, error_msg):
+        """
+        更新出错
+        :param error_msg: 错误信息
+        :return: None
+        """
+        self.status_value_label.setText("更新失败")
+        self.status_value_label.setStyleSheet("color: #F44336; font-weight: bold;")
+        self.op_log_text_edit.append(f"错误: {error_msg}")
+        self.start_button.setEnabled(True)
+        QMessageBox.critical(self, "错误", f"更新失败: {error_msg}")
+
+    def mousePressEvent(self, event):
+        """
+        鼠标按下事件，用于窗口拖拽
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.drag_start_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        """
+        鼠标移动事件，用于窗口拖拽
+        """
+        if self.dragging:
+            self.move(event.globalPosition().toPoint() - self.drag_start_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """
+        鼠标释放事件，结束窗口拖拽
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+            event.accept()
