@@ -1,7 +1,7 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v1.6.1-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v2.0.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
@@ -181,3 +181,4 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
 <div align="center">
     <p>✨ 如有问题或建议，欢迎提交 Issue ✨</p>
 </div>
+
