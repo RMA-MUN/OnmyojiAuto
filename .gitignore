@@ -49,6 +49,7 @@ test/
 *.bak
 *.old
 update/
+temp/
 
 # 排除venv虚拟环境文件夹
 .venv
