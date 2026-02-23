@@ -1,15 +1,12 @@
 from OAT.config.check_update import UpdateChecker
 from OAT.tools.ConfigManager import ConfigReader
 import os
-import zipfile
 import requests
 import time
 import subprocess
 import sys
 from urllib3.exceptions import InsecureRequestWarning
 from tqdm import tqdm
-
-from OAT.tools.settings import APP_VERSION
 
 # 禁用不安全请求警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -31,7 +28,6 @@ class UpdateManager:
             print(f"警告：配置文件不存在: {update_json_path}")
             # 创建默认配置
             default_config = {
-                "current_version": f"{APP_VERSION}",
                 "ignore_versions": []
             }
             # 保存默认配置
@@ -47,7 +43,6 @@ class UpdateManager:
         if self.config_data is None:
             print("警告：配置文件读取失败，使用默认配置")
             self.config_data = {
-                "current_version": f"{APP_VERSION}",
                 "ignore_versions": []
             }
 
