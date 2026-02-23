@@ -50,6 +50,36 @@ class WindowChecker:
             return (left, top), (right, bottom), (width, height)
         print('未找到指定客户端窗口')
         return None
+        
+    def get_client_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
+        """
+        获取窗口客户区域的位置和尺寸信息
+        返回值格式：((客户区域左上角 x, 客户区域左上角 y), (客户区域右下角 x, 客户区域右下角 y), (客户区域宽度, 客户区域高度))
+        """
+        if not self.window_handle and not self.window_title:
+            print('窗口标题未设置且未提供窗口句柄')
+            return None
+
+        if not self.window_handle:
+            hwnd = win32gui.FindWindow(None, self.window_title)
+        else:
+            hwnd = self.window_handle
+
+        if hwnd:
+            # 获取客户区域矩形（相对于窗口内部）
+            client_rect = win32gui.GetClientRect(hwnd)
+            client_left, client_top, client_right, client_bottom = client_rect
+            client_width = client_right - client_left
+            client_height = client_bottom - client_top
+            
+            # 将客户区域左上角转换为屏幕坐标
+            client_screen_left, client_screen_top = win32gui.ClientToScreen(hwnd, (client_left, client_top))
+            # 将客户区域右下角转换为屏幕坐标
+            client_screen_right, client_screen_bottom = win32gui.ClientToScreen(hwnd, (client_right, client_bottom))
+            
+            return (client_screen_left, client_screen_top), (client_screen_right, client_screen_bottom), (client_width, client_height)
+        print('未找到指定客户端窗口')
+        return None
 
     def resize_window(self, width: int, height: int, hwnd: Optional[int] = None):
         try:
