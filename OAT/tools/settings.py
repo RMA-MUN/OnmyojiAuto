@@ -1,4 +1,4 @@
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.6.0"
 
 import json
 import os
@@ -21,7 +21,11 @@ except Exception as e:
         'close_game_after_challenge': False,
         'sync_mode': 'exactly_sync',
         'find_value': 85,
-        'find_mode': 'opencv'
+        'find_mode': 'opencv',
+        'custom_res_width': 1404,
+        'custom_res_height': 834,
+        'window_arrange_mode': 'diagonal',  # 窗口排列方式：diagonal（对角线）或 tile（平铺）
+        'windows_per_row': 3  # 平铺排列时一行的窗口数量
     }
 
 # 导出配置变量
@@ -35,6 +39,11 @@ TRANSPARENCY = settings_data.get('transparency', 50)
 CLOSE_PROGRAM_AFTER_CHALLENGE = settings_data.get('close_program_after_challenge', False)
 CLOSE_GAME_AFTER_CHALLENGE = settings_data.get('close_game_after_challenge', False)
 SYNC_MODE = settings_data.get('sync_mode', 'exactly_sync')
+CUSTOM_RES_WIDTH = settings_data.get('custom_res_width', 1404)
+CUSTOM_RES_HEIGHT = settings_data.get('custom_res_height', 834)
+# 窗口排列相关设置
+WINDOW_ARRANGE_MODE = settings_data.get('window_arrange_mode', 'diagonal')  # 窗口排列方式
+WINDOWS_PER_ROW = settings_data.get('windows_per_row', 3)  # 平铺排列时一行的窗口数量
 
 # 提供更新配置的函数
 def update_settings(key, value):
@@ -72,6 +81,18 @@ def update_settings(key, value):
         elif key == 'sync_mode':
             global SYNC_MODE
             SYNC_MODE = value
+        elif key == 'custom_res_width':
+            global CUSTOM_RES_WIDTH
+            CUSTOM_RES_WIDTH = value
+        elif key == 'custom_res_height':
+            global CUSTOM_RES_HEIGHT
+            CUSTOM_RES_HEIGHT = value
+        elif key == 'window_arrange_mode':
+            global WINDOW_ARRANGE_MODE
+            WINDOW_ARRANGE_MODE = value
+        elif key == 'windows_per_row':
+            global WINDOWS_PER_ROW
+            WINDOWS_PER_ROW = value
         return True
     except Exception as e:
         print(f"保存配置文件失败: {str(e)}")

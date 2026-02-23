@@ -2,7 +2,7 @@ import os
 import shutil
 import json
 from typing import Any
-
+import re
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
@@ -142,6 +142,40 @@ class UiDialog(object):
         else:
             # 如果找不到对应的选项，使用默认值（完全同步）
             self.sync_mode_combo.setCurrentIndex(0)
+        
+        # 设置默认窗口排列方式
+        current_arrange_mode = settings_data.get('window_arrange_mode', 'diagonal')
+        # 排列方式映射
+        arrange_mode_map = {
+            "diagonal": "对角线排列",
+            "tile": "平铺排列"
+        }
+        # 根据英文值获取对应的中文选项
+        arrange_mode_text = arrange_mode_map.get(current_arrange_mode, "对角线排列")
+        # 获取对应的索引
+        arrange_mode_index = self.window_arrange_combo.findText(arrange_mode_text)
+        if arrange_mode_index != -1:
+            self.window_arrange_combo.setCurrentIndex(arrange_mode_index)
+        else:
+            # 如果找不到对应的选项，使用默认值（对角线排列）
+            self.window_arrange_combo.setCurrentIndex(0)
+        
+        # 设置默认一行窗口数量
+        current_windows_per_row = settings_data.get('windows_per_row', 3)
+        # 确保值在有效范围内
+        if not isinstance(current_windows_per_row, int) or current_windows_per_row < 1 or current_windows_per_row > 10:
+            current_windows_per_row = 3
+        self.windows_per_row_input.setValue(current_windows_per_row)
+        
+        # 根据当前排列方式设置输入框可见性
+        # 只有选择平铺排列时才显示一行窗口数量输入框
+        current_arrange_mode = settings_data.get('window_arrange_mode', 'diagonal')
+        if current_arrange_mode == 'tile':
+            self.windows_per_row_label.setVisible(True)
+            self.windows_per_row_input.setVisible(True)
+        else:
+            self.windows_per_row_label.setVisible(False)
+            self.windows_per_row_input.setVisible(False)
 
         # 初始化窗口列表
         self.initialize_window_list()
@@ -641,6 +675,26 @@ class UiDialog(object):
         sync_form.addRow(self.sync_mode_label, self.sync_mode_combo)
         # 连接信号
         self.sync_mode_combo.currentIndexChanged.connect(self.on_sync_mode_changed)
+        
+        # 窗口排列方式选择
+        self.window_arrange_label = QtWidgets.QLabel("窗口排列方式:")
+        self.window_arrange_combo = QtWidgets.QComboBox()
+        self.window_arrange_combo.setObjectName("settings_combo")
+        self.window_arrange_combo.addItems(["对角线排列", "平铺排列"])
+        sync_form.addRow(self.window_arrange_label, self.window_arrange_combo)
+        # 连接信号
+        self.window_arrange_combo.currentIndexChanged.connect(self.on_window_arrange_changed)
+        
+        # 平铺排列窗口数量输入
+        self.windows_per_row_label = QtWidgets.QLabel("一行窗口数量:")
+        self.windows_per_row_input = QtWidgets.QSpinBox()
+        self.windows_per_row_input.setObjectName("settings_input")
+        self.windows_per_row_input.setMinimum(1)
+        self.windows_per_row_input.setMaximum(10)
+        self.windows_per_row_input.setValue(3)
+        sync_form.addRow(self.windows_per_row_label, self.windows_per_row_input)
+        # 连接信号
+        self.windows_per_row_input.valueChanged.connect(self.on_windows_per_row_changed)
 
         # 自定义窗口分辨率(需要提示用户，自定义窗口分辨率可能导致点击同步错位、无法使用自动挑战等问题)
         # 给两个行编辑框，用户输入自定义窗口分辨率，用户输入窗口宽度或高度，自动建议另外一个值，但是不是强制
@@ -653,6 +707,17 @@ class UiDialog(object):
         self.custom_res_height_input.setObjectName("custom_res_height_input")
         self.custom_res_height_input.setPlaceholderText("例如: 834")
         sync_form.addRow(self.custom_res_width_input, self.custom_res_height_input)
+        
+        # 添加提示信息
+        self.custom_res_warning = QtWidgets.QLabel("提示:自定义宽高后，自动挑战将无法正常使用!只有在宽为1404，高为834时才可以使用自动挑战!")
+        self.custom_res_warning.setStyleSheet("color: #ff6666; font-size: 10px;")
+        sync_form.addRow(self.custom_res_warning)
+        
+        # 连接输入框文本变化信号
+        self.custom_res_width_input.textChanged.connect(self.on_width_changed)
+        self.custom_res_height_input.textChanged.connect(self.on_height_changed)
+        # 加载保存的分辨率设置
+        self.load_custom_resolution_settings()
 
         sync_group.setLayout(sync_form)
         sync_settings_layout.addWidget(sync_group)
@@ -879,7 +944,7 @@ class UiDialog(object):
                     # 处理包含 rgba 的行
                     if 'rgba(' in line:
                         # 查找 rgba(...) 模式
-                        import re
+
                         rgba_pattern = r'rgba\((\d+,\s*\d+,\s*\d+),\s*[^)]*\)'
                         
                         def replace_opacity(match):
@@ -917,6 +982,45 @@ class UiDialog(object):
         sync_mode_value = self.sync_mode_map.get(sync_mode_text, 'exactly_sync')
         # 保存同步模式设置
         self.save_setting('sync_mode', sync_mode_value)
+    
+    def on_window_arrange_changed(self, index: int):
+        """
+        处理窗口排列方式选择变化事件
+        
+        Args:
+            index: 窗口排列方式组合框的索引
+        """
+        # 获取选择的中文选项
+        arrange_mode_text = self.window_arrange_combo.currentText()
+        # 排列方式映射：中文选项 -> 英文值
+        arrange_mode_map = {
+            "对角线排列": "diagonal",
+            "平铺排列": "tile"
+        }
+        # 获取对应的英文值
+        arrange_mode_value = arrange_mode_map.get(arrange_mode_text, 'diagonal')
+        # 保存窗口排列方式设置
+        self.save_setting('window_arrange_mode', arrange_mode_value)
+        
+        # 根据选择的排列方式显示或隐藏一行窗口数量输入框
+        if arrange_mode_value == 'tile':
+            # 选择平铺排列时显示输入框
+            self.windows_per_row_label.setVisible(True)
+            self.windows_per_row_input.setVisible(True)
+        else:
+            # 选择其他排列方式时隐藏输入框
+            self.windows_per_row_label.setVisible(False)
+            self.windows_per_row_input.setVisible(False)
+    
+    def on_windows_per_row_changed(self, value: int):
+        """
+        处理一行窗口数量变化事件
+        
+        Args:
+            value: 一行窗口数量
+        """
+        # 保存一行窗口数量设置
+        self.save_setting('windows_per_row', value)
 
     def clean_cache(self):
         """清理缓存，删除logs/screen_shot文件夹，然后给log.log里的内容都替换为一个空字符串"""
@@ -1000,6 +1104,89 @@ class UiDialog(object):
             self.soul_land_options.show()
 
     # 同步器功能实现
+    def on_width_changed(self, text):
+        """
+        处理宽度输入变化事件，自动计算高度
+        
+        Args:
+            text: 宽度输入框的文本
+        """
+        try:
+            # 尝试将文本转换为整数
+            width = int(text)
+            # 计算高度，保持1404:834的比例
+            # 1404/834 = 234/139 ≈ 1.68345
+            height = int(round(width * 834 / 1404))
+            # 更新高度输入框，不触发文本变化事件
+            self.custom_res_height_input.blockSignals(True)
+            self.custom_res_height_input.setText(str(height))
+            self.custom_res_height_input.blockSignals(False)
+            # 保存设置
+            self.save_custom_resolution_settings()
+        except ValueError:
+            # 如果输入不是有效的整数，清空高度输入框
+            self.custom_res_height_input.blockSignals(True)
+            self.custom_res_height_input.clear()
+            self.custom_res_height_input.blockSignals(False)
+
+    def on_height_changed(self, text):
+        """
+        处理高度输入变化事件，自动计算宽度
+        
+        Args:
+            text: 高度输入框的文本
+        """
+        try:
+            # 尝试将文本转换为整数
+            height = int(text)
+            # 计算宽度，保持1404:834的比例
+            width = int(round(height * 1404 / 834))
+            # 更新宽度输入框，不触发文本变化事件
+            self.custom_res_width_input.blockSignals(True)
+            self.custom_res_width_input.setText(str(width))
+            self.custom_res_width_input.blockSignals(False)
+            # 保存设置
+            self.save_custom_resolution_settings()
+        except ValueError:
+            # 如果输入不是有效的整数，清空宽度输入框
+            self.custom_res_width_input.blockSignals(True)
+            self.custom_res_width_input.clear()
+            self.custom_res_width_input.blockSignals(False)
+
+    def load_custom_resolution_settings(self):
+        """
+        加载保存的自定义分辨率设置
+        """
+        # 从settings_data中获取保存的宽度和高度
+        width = settings_data.get('custom_res_width', 1404)
+        height = settings_data.get('custom_res_height', 834)
+        # 设置输入框的值
+        self.custom_res_width_input.setText(str(width))
+        self.custom_res_height_input.setText(str(height))
+
+    def save_custom_resolution_settings(self):
+        """
+        保存自定义分辨率设置到配置文件
+        """
+        try:
+            # 获取输入框的值
+            width_text = self.custom_res_width_input.text()
+            height_text = self.custom_res_height_input.text()
+            
+            if width_text and height_text:
+                width = int(width_text)
+                height = int(height_text)
+                # 保存设置
+                print(f"保存窗口尺寸设置: {width}x{height}")
+                self.save_setting('custom_res_width', width)
+                self.save_setting('custom_res_height', height)
+            else:
+                print("窗口尺寸输入框为空，不保存设置")
+        except ValueError as e:
+            # 如果输入不是有效的整数，不保存
+            print(f"窗口尺寸输入无效: {e}")
+            pass
+
     def initialize_window_list(self):
         """初始化窗口列表（示例数据）"""
         self.window_table.setRowCount(0)

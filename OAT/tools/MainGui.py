@@ -3,19 +3,21 @@ import json
 import os
 import threading
 import traceback
+import glob
 
 import cv2
 import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QDesktopServices, QPixmap
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton
 from PyQt6.QtWidgets import QMessageBox
 
 from OAT.tools.GetDC import WindowCapture
-from .GUI import UiDialog
-from .WindowSynchronizer import WindowSynchronizer
 from .ConfigManager import ConfigReader
+from .GUI import UiDialog
 from .ThreadManager import UpdateCheckThread
+from .WindowSynchronizer import WindowSynchronizer
 from ..config.check_update import UpdateChecker
 from ..config.update_manager import UpdateManager
 from ..source import *
@@ -23,6 +25,9 @@ from ..source import MODE_MAPPING
 from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
 from ..utils.logging import LogRedirect
+from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT
+from .ThreadManager import UpdateDownloadThread
+
 # 设置全局异常处理程序
 setup_global_exception_handler()
 
@@ -545,11 +550,28 @@ class MainWindow(QtWidgets.QDialog):
                 wc = WindowChecker()
                 # 将所有相关窗口句柄收集起来
                 window_handles = self.sub_windows + [self.main_window]
+                
+                # 从设置文件中直接读取最新的窗口大小设置
+                settings_file_path = os.path.join(os.path.dirname(__file__), 'settings.json')
+                try:
+                    with open(settings_file_path, 'r', encoding='utf-8') as f:
+                        settings_data = json.load(f)
+                        # 获取最新的窗口大小设置
+                        target_width = settings_data.get('custom_res_width', 1404)
+                        target_height = settings_data.get('custom_res_height', 834)
+                        print(f"从设置文件读取窗口尺寸: {target_width}x{target_height}")
+                except Exception as e:
+                    print(f"读取设置文件失败：{e}")
+                    # 使用默认值
+                    target_width = 1404
+                    target_height = 834
+                    print(f"使用默认窗口尺寸: {target_width}x{target_height}")
+                
                 for hwnd in window_handles:
                     try:
-                        # 直接使用句柄调整窗口大小
-                        target_width = 1404
-                        target_height = 834
+                        # 使用获取到的窗口大小来调整窗口
+                        print(f"使用窗口尺寸: {target_width}x{target_height}")
+                        
                         wc.set_window_handle(hwnd)
                         current_size = wc.get_window_info()
                         if current_size:
@@ -742,7 +764,6 @@ class MainWindow(QtWidgets.QDialog):
             self.download_dialog = self.create_download_dialog()
             
             # 创建下载线程
-            from .ThreadManager import UpdateDownloadThread
             self.update_download_thread = UpdateDownloadThread(download_url)
             
             # 连接信号
@@ -764,8 +785,6 @@ class MainWindow(QtWidgets.QDialog):
         创建下载进度对话框
         :return: QDialog对象
         """
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton
-        from PyQt6.QtCore import Qt
         
         dialog = QDialog(self)
         dialog.setWindowTitle("正在下载更新")
@@ -859,8 +878,6 @@ class MainWindow(QtWidgets.QDialog):
             update_manager = UpdateManager()
             
             # 1. 首先检查 temp 目录
-            import glob
-            import os
             if not zip_path:
                 temp_dir = os.path.join(os.getcwd(), "temp")
                 if os.path.exists(temp_dir):
