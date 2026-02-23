@@ -1,12 +1,12 @@
 import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, 
-    QTextEdit, QPushButton, QFileDialog, QMessageBox
+    QTextEdit, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtGui import QFont, QPixmap, QTextDocument
 
-from OAT_Updater.utils.update_worker import UpdateWorker
+from OAT_Updater_GUI.utils.update_worker import UpdateWorker
 
 
 class UpdateGUI(QWidget):
@@ -56,6 +56,9 @@ class UpdateGUI(QWidget):
             icon_pixmap = icon_pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio)
             icon_label.setPixmap(icon_pixmap)
             title_layout.addWidget(icon_label)
+            # 设置窗口图标
+            from PyQt6.QtGui import QIcon
+            self.setWindowIcon(QIcon(icon_path))
 
         # 标题
         title_label = QLabel("OAT 更新程序")
@@ -102,37 +105,60 @@ class UpdateGUI(QWidget):
 
         # 更新日志
         log_layout = QVBoxLayout()
-        log_title = QLabel("更新日志:")
+        log_title = QLabel("更新日志")
         log_title.setStyleSheet("font-weight: bold;")
         self.log_text_edit = QTextEdit()
+        self.log_text_edit.setObjectName("updateLogText")
         self.log_text_edit.setReadOnly(True)
-        self.log_text_edit.setMaximumHeight(120)
+        self.log_text_edit.setMaximumHeight(250)  # 增大高度以显示更多内容
+        self.log_text_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)  # 自动换行
+        self.log_text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # 垂直滚动条按需显示
+        self.log_text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 禁用水平滚动条
         self.log_text_edit.setStyleSheet("""
             QTextEdit {
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 10px;
-                background-color: #f9f9f9;
+                border: 1px solid #d1d5db;
+                border-radius: 0px;
+                padding: 8px;
+                background-color: #ffffff;
+                font-family: 'Microsoft YaHei';
+                font-size: 14px;
+                line-height: 1.5;
+            }
+            QScrollBar:vertical {
+                width: 16px;
+                background: #f3f4f6;
+            }
+            QScrollBar::handle:vertical {
+                background: #9ca3af;
+                border-radius: 0px;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 16px;
+                background: #f3f4f6;
             }
         """)
         # 显示更新日志
         if self.update_log:
-            self.log_text_edit.setText(self.update_log)
+            # 使用QTextDocument的setMarkdown方法原生支持markdown
+            doc = QTextDocument()
+            doc.setMarkdown(self.update_log)
+            self.log_text_edit.setDocument(doc)
         else:
             self.log_text_edit.setText("暂无更新日志")
         log_layout.addWidget(log_title)
         log_layout.addWidget(self.log_text_edit)
         main_layout.addLayout(log_layout)
 
-        # 解压进度条
-        unzip_layout = QVBoxLayout()
-        unzip_title = QLabel("解压进度:")
-        self.unzip_progress_bar = QProgressBar()
-        self.unzip_progress_bar.setMinimum(0)
-        self.unzip_progress_bar.setMaximum(50)  # 解压占50%
-        self.unzip_progress_bar.setValue(0)
-        self.unzip_progress_bar.setTextVisible(True)
-        self.unzip_progress_bar.setStyleSheet("""
+        # 合并进度条
+        progress_layout = QVBoxLayout()
+        progress_title = QLabel("更新进度:")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)  # 总进度100%
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setStyleSheet("""
             QProgressBar {
                 border: 1px solid #e0e0e0;
                 border-radius: 8px;
@@ -144,48 +170,42 @@ class UpdateGUI(QWidget):
                 border-radius: 8px;
             }
         """)
-        unzip_layout.addWidget(unzip_title)
-        unzip_layout.addWidget(self.unzip_progress_bar)
-        main_layout.addLayout(unzip_layout)
-
-        # 文件替换进度条
-        replace_layout = QVBoxLayout()
-        replace_title = QLabel("文件替换进度:")
-        self.replace_progress_bar = QProgressBar()
-        self.replace_progress_bar.setMinimum(0)
-        self.replace_progress_bar.setMaximum(50)  # 替换占50%
-        self.replace_progress_bar.setValue(0)
-        self.replace_progress_bar.setTextVisible(True)
-        self.replace_progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                background-color: #f0f0f0;
-                height: 20px;
-            }
-            QProgressBar::chunk {
-                background-color: #4CAF50;
-                border-radius: 8px;
-            }
-        """)
-        replace_layout.addWidget(replace_title)
-        replace_layout.addWidget(self.replace_progress_bar)
-        main_layout.addLayout(replace_layout)
+        progress_layout.addWidget(progress_title)
+        progress_layout.addWidget(self.progress_bar)
+        main_layout.addLayout(progress_layout)
 
         # 操作日志
         op_log_layout = QVBoxLayout()
-        op_log_title = QLabel("操作日志:")
+        op_log_title = QLabel("操作日志")
         self.op_log_text_edit = QTextEdit()
+        self.op_log_text_edit.setObjectName("operateLogText")
         self.op_log_text_edit.setReadOnly(True)
-        self.op_log_text_edit.setMaximumHeight(100)
+        self.op_log_text_edit.setMaximumHeight(100)  # 减小高度以节省空间
+        self.op_log_text_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)  # 自动换行
+        self.op_log_text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # 垂直滚动条按需显示
+        self.op_log_text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 禁用水平滚动条
         self.op_log_text_edit.setStyleSheet("""
             QTextEdit {
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 10px;
-                background-color: #f9f9f9;
-                font-family: Consolas, Monaco, monospace;
-                font-size: 10pt;
+                border: 1px solid #d1d5db;
+                border-radius: 0px;
+                padding: 6px;
+                background-color: #ffffff;
+                font-family: 'Microsoft YaHei';
+                font-size: 10px;
+                line-height: 1.3;
+            }
+            QScrollBar:vertical {
+                width: 12px;
+                background: #f3f4f6;
+            }
+            QScrollBar::handle:vertical {
+                background: #9ca3af;
+                border-radius: 0px;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 12px;
+                background: #f3f4f6;
             }
         """)
         op_log_layout.addWidget(op_log_title)
@@ -283,9 +303,9 @@ class UpdateGUI(QWidget):
         :param value: 进度值 (0-100)
         :return: None
         """
-        # 将0-100转换为0-50
+        # 解压占总进度的50%
         progress = int(value / 2)
-        self.unzip_progress_bar.setValue(progress)
+        self.progress_bar.setValue(progress)
 
     def update_replace_progress(self, value):
         """
@@ -293,9 +313,9 @@ class UpdateGUI(QWidget):
         :param value: 进度值 (0-100)
         :return: None
         """
-        # 将0-100转换为0-50
-        progress = int(value / 2)
-        self.replace_progress_bar.setValue(progress)
+        # 文件替换占总进度的50%，加上解压的50%
+        progress = 50 + int(value / 2)
+        self.progress_bar.setValue(progress)
 
     def log_message(self, message):
         """
@@ -303,7 +323,25 @@ class UpdateGUI(QWidget):
         :param message: 日志文本
         :return: None
         """
+        self.append_operate_log(message)
+    
+    def append_update_log(self, message: str) -> None:
+        """
+        追加更新日志并自动滚动到底部
+        :param message: 日志文本
+        :return: None
+        """
+        self.log_text_edit.append(message)
+        self.log_text_edit.verticalScrollBar().setValue(self.log_text_edit.verticalScrollBar().maximum())
+    
+    def append_operate_log(self, message: str) -> None:
+        """
+        追加操作日志并自动滚动到底部
+        :param message: 日志文本
+        :return: None
+        """
         self.op_log_text_edit.append(message)
+        self.op_log_text_edit.verticalScrollBar().setValue(self.op_log_text_edit.verticalScrollBar().maximum())
 
     def update_finished(self):
         """

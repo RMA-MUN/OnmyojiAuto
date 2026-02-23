@@ -4,7 +4,6 @@ import shutil
 import time
 import psutil
 import ctypes
-import tempfile
 from PyQt6.QtCore import QThread, pyqtSignal
 
 # Windows API 常量
