@@ -642,6 +642,18 @@ class UiDialog(object):
         # 连接信号
         self.sync_mode_combo.currentIndexChanged.connect(self.on_sync_mode_changed)
 
+        # 自定义窗口分辨率(需要提示用户，自定义窗口分辨率可能导致点击同步错位、无法使用自动挑战等问题)
+        # 给两个行编辑框，用户输入自定义窗口分辨率，用户输入窗口宽度或高度，自动建议另外一个值，但是不是强制
+        self.custom_res_label = QtWidgets.QLabel("自定义同步时的窗口大小:")
+        self.custom_res_width_input = QtWidgets.QLineEdit()
+        self.custom_res_width_input.setObjectName("custom_res_width_input")
+        self.custom_res_width_input.setPlaceholderText("例如: 1404")
+        sync_form.addRow(self.custom_res_label)
+        self.custom_res_height_input = QtWidgets.QLineEdit()
+        self.custom_res_height_input.setObjectName("custom_res_height_input")
+        self.custom_res_height_input.setPlaceholderText("例如: 834")
+        sync_form.addRow(self.custom_res_width_input, self.custom_res_height_input)
+
         sync_group.setLayout(sync_form)
         sync_settings_layout.addWidget(sync_group)
         sync_settings_layout.addStretch()
@@ -668,13 +680,17 @@ class UiDialog(object):
         author_label.setObjectName("about_text")
         about_layout.addWidget(author_label)
 
-        connect_author_label = QtWidgets.QLabel("联系作者: n3032747608@163.com")
-        connect_author_label.setObjectName("about_text")
+        connect_author_label = QtWidgets.QLabel("联系作者: \n  邮箱: n3032747608@163.com\n  QQ : 3032747608")
         about_layout.addWidget(connect_author_label)
 
         warning_text = QtWidgets.QLabel("免责声明:\n  1. 本工具仅供学习交流，禁止商用及违规使用；\n  2. 使用风险自负，开发者不承担任何责任；\n  3. 请勿违反游戏运营方相关规定。 ")
         warning_text.setObjectName("about_text")
         about_layout.addWidget(warning_text)
+
+        # 求star
+        star_label = QtWidgets.QLabel("如果您觉得本工具对您有帮助，在Github给个star支持一下！")
+        star_label.setObjectName("about_text")
+        about_layout.addWidget(star_label)
 
         link_label = QtWidgets.QLabel("<a href='https://github.com/RMA-MUN/OnmyoujiAuto'>GitHub 仓库</a>")
         link_label.setObjectName("about_link")

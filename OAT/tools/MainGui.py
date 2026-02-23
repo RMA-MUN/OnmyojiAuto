@@ -699,11 +699,11 @@ class MainWindow(QtWidgets.QDialog):
             # 创建并配置消息框
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle("发现新的版本")
-            msg_box.setText(f"最新版本：{latest_version}\n\n更新日志：\n{update_info.replace('# 更新日志', '').strip()}\n\n自动更新功能敬请期待")
+            msg_box.setText(f"最新版本：{latest_version}\n\n更新日志：\n{update_info.replace('# 更新日志', '').strip()}")
             msg_box.setIcon(QMessageBox.Icon.Information)
             
             # 添加自定义按钮
-            btn_update = msg_box.addButton("前往更新", QMessageBox.ButtonRole.AcceptRole)
+            btn_update = msg_box.addButton("立即更新", QMessageBox.ButtonRole.AcceptRole)
             btn_later = msg_box.addButton("下次再说", QMessageBox.ButtonRole.RejectRole)
             btn_ignore = msg_box.addButton("忽略本版本", QMessageBox.ButtonRole.ActionRole)
             
@@ -713,15 +713,202 @@ class MainWindow(QtWidgets.QDialog):
             # 处理用户选择
             clicked_button = msg_box.clickedButton()
             if clicked_button == btn_update:
-                # 前往更新页面
-                if 'html_url' in latest_info:
-                    QDesktopServices.openUrl(QUrl(latest_info['html_url']))
+                # 开始下载并更新
+                self.start_update_process(latest_info)
             elif clicked_button == btn_ignore:
                 # 忽略此版本
                 update_manager = UpdateManager()
                 update_manager.ignore_update(latest_version)
         except Exception as e:
             self.on_update_error(str(e))
+
+    def start_update_process(self, latest_info: dict):
+        """
+        开始更新流程：下载压缩包并启动更新程序
+        
+        Args:
+            latest_info: 最新版本信息
+        """
+        try:
+            # 获取下载链接
+            update_manager = UpdateManager()
+            download_url = update_manager.get_download_url(latest_info)
+            
+            if not download_url:
+                QMessageBox.warning(self, "更新失败", "无法获取更新包下载链接")
+                return
+            
+            # 创建下载进度对话框
+            self.download_dialog = self.create_download_dialog()
+            
+            # 创建下载线程
+            from .ThreadManager import UpdateDownloadThread
+            self.update_download_thread = UpdateDownloadThread(download_url)
+            
+            # 连接信号
+            self.update_download_thread.download_progress.connect(self.on_download_progress)
+            self.update_download_thread.download_complete.connect(self.on_download_complete)
+            self.update_download_thread.download_error.connect(self.on_download_error)
+            
+            # 显示下载对话框
+            self.download_dialog.show()
+            
+            # 启动下载
+            self.update_download_thread.start()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "更新错误", f"启动更新失败: {str(e)}")
+    
+    def create_download_dialog(self):
+        """
+        创建下载进度对话框
+        :return: QDialog对象
+        """
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton
+        from PyQt6.QtCore import Qt
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("正在下载更新")
+        dialog.setMinimumWidth(450)
+        dialog.setModal(True)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 下载信息标签
+        self.download_info_label = QLabel("正在准备下载...")
+        layout.addWidget(self.download_info_label)
+        
+        # 进度条
+        self.download_progress_bar = QProgressBar()
+        self.download_progress_bar.setMinimum(0)
+        self.download_progress_bar.setMaximum(100)
+        self.download_progress_bar.setValue(0)
+        layout.addWidget(self.download_progress_bar)
+        
+        # 速度和剩余时间
+        self.speed_label = QLabel("下载速度: 等待中...")
+        layout.addWidget(self.speed_label)
+        
+        # 取消按钮
+        self.cancel_download_btn = QPushButton("取消")
+        self.cancel_download_btn.clicked.connect(self.cancel_download)
+        layout.addWidget(self.cancel_download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        dialog.setLayout(layout)
+        return dialog
+    
+    def cancel_download(self):
+        """
+        取消下载
+        :return: None
+        """
+        if hasattr(self, 'update_download_thread') and self.update_download_thread:
+            self.update_download_thread.terminate()
+        if hasattr(self, 'download_dialog') and self.download_dialog:
+            self.download_dialog.close()
+    
+    def on_download_progress(self, downloaded: int, total_size: int, speed: float, remaining: float):
+        """
+        更新下载进度
+        
+        Args:
+            downloaded: 已下载字节数
+            total_size: 总字节数
+            speed: 下载速度 (字节/秒)
+            remaining: 剩余时间 (秒)
+        """
+        if total_size > 0:
+            progress = int((downloaded / total_size) * 100)
+            self.download_progress_bar.setValue(progress)
+            
+            # 格式化显示
+            downloaded_mb = downloaded / (1024 * 1024)
+            total_mb = total_size / (1024 * 1024)
+            speed_kb = speed / 1024
+            speed_mb = speed_kb / 1024
+            
+            if speed_mb > 1:
+                speed_str = f"{speed_mb:.2f} MB/s"
+            else:
+                speed_str = f"{speed_kb:.2f} KB/s"
+            
+            if remaining > 60:
+                remaining_min = int(remaining // 60)
+                remaining_sec = int(remaining % 60)
+                remaining_str = f"{remaining_min}分{remaining_sec}秒"
+            else:
+                remaining_str = f"{int(remaining)}秒"
+            
+            self.download_info_label.setText(f"已下载: {downloaded_mb:.2f} MB / {total_mb:.2f} MB")
+            self.speed_label.setText(f"下载速度: {speed_str} | 预计剩余: {remaining_str}")
+
+    def on_download_complete(self, zip_path: str):
+        """
+        下载完成，启动更新程序
+        
+        Args:
+            zip_path: 下载的压缩包路径
+        """
+        # 关闭下载对话框
+        if hasattr(self, 'download_dialog') and self.download_dialog:
+            self.download_dialog.close()
+        
+        try:
+            update_manager = UpdateManager()
+            
+            # 1. 首先检查 temp 目录
+            import glob
+            import os
+            if not zip_path:
+                temp_dir = os.path.join(os.getcwd(), "temp")
+                if os.path.exists(temp_dir):
+                    zip_files = glob.glob(os.path.join(temp_dir, "*.zip"))
+                    if zip_files:
+                        # 按修改时间排序，取最新的
+                        zip_files.sort(key=os.path.getmtime, reverse=True)
+                        zip_path = zip_files[0]
+            
+            # 2. 如果没找到，扫描整个项目
+            if not zip_path:
+                for root, dirs, files in os.walk(os.getcwd()):
+                    for file in files:
+                        if file.endswith(".zip"):
+                            file_path = os.path.join(root, file)
+                            if not zip_path or os.path.getmtime(file_path) > os.path.getmtime(zip_path):
+                                zip_path = file_path
+            
+            if not zip_path:
+                QMessageBox.critical(self, "更新失败", "未找到更新压缩包")
+                return
+            
+            # 获取更新日志
+            update_checker = UpdateChecker()
+            latest_info = update_checker.get_latest_release_info()
+            update_log = update_checker.get_update_info(latest_info) or ""
+            
+            # 启动更新程序
+            if update_manager.launch_updater(zip_path, update_log):
+                # 使用紧急退出函数关闭OAT程序
+                self.emergency_stop()
+            else:
+                QMessageBox.critical(self, "更新失败", "无法启动更新程序，请确保OAT_Updater.exe或OAT_Updater_GUI存在于程序目录下")
+        except Exception as e:
+            QMessageBox.critical(self, "更新错误", f"启动更新程序失败: {str(e)}")
+
+    def on_download_error(self, error_msg: str):
+        """
+        下载出错
+        
+        Args:
+            error_msg: 错误信息
+        """
+        # 关闭下载对话框
+        if hasattr(self, 'download_dialog') and self.download_dialog:
+            self.download_dialog.close()
+        
+        QMessageBox.critical(self, "下载失败", f"下载更新包时出错: {error_msg}")
     
     def on_update_not_available(self):
         """处理没有更新的信号"""
