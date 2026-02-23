@@ -15,9 +15,8 @@
 
 | 功能                | 链接                                                         |
 | ------------------- | :----------------------------------------------------------- |
-| 下载最新exe安装程序 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.1/OAT-v1.6.1_setup.exe) |
+| 下载最新exe安装程序 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.0.0/OAT-v2.0.0_setup.exe) |
 | 查看版本更新内容    | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
-| 下载最新版exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.6.1/OAT-v1.6.1.zip) |
 
 ---
 
@@ -51,7 +50,7 @@ OnmyojiAuto是一款基于Python开发的阴阳师游戏自动化辅助工具，
 
 ---
 
-## 🛠️ 源码运行步骤
+## 🛠️ 源码运行步骤(需要python和git环境,非开发者不推荐)
 
 ### 1. 克隆仓库
 
@@ -93,7 +92,7 @@ pip install -r requirements.txt
     - 如需自定义客户端，可在`client.json`中添加
 
 3. **选择副本模式**：
-    
+   
     - 选择目标副本（如"魂土"、"爬塔"等）
     - 部分模式需选择子模式（如魂土的"队长"或"队员"）
     - 可在`OAT/source/mode.json`中添加和修改模式配置
