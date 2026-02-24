@@ -1,12 +1,23 @@
 import os
+import sys
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, 
     QTextEdit, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtGui import QFont, QPixmap, QIcon
 
 from OAT_Updater_GUI.utils.update_worker import UpdateWorker
+
+# 添加项目根目录到Python路径
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# 尝试导入APP_VERSION
+try:
+    from OAT.tools.settings import APP_VERSION
+except:
+    APP_VERSION = "v1.9.0"
 
 
 class UpdateGUI(QWidget):
@@ -143,7 +154,6 @@ class UpdateGUI(QWidget):
             icon_label.setPixmap(icon_pixmap)
             title_layout.addWidget(icon_label)
             # 设置窗口图标
-            from PyQt6.QtGui import QIcon
             self.setWindowIcon(QIcon(icon_path))
 
         # 标题
@@ -192,14 +202,7 @@ class UpdateGUI(QWidget):
         # 版本信息栏
         version_layout = QHBoxLayout()
         # 获取当前版本
-        current_version = "v1.9.0"
-        try:
-            import sys
-            sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-            from OAT.tools.settings import APP_VERSION
-            current_version = APP_VERSION
-        except:
-            pass
+        current_version = APP_VERSION
         
         # 使用传递进来的最新版本和发布日期
         latest_version = self.latest_version
@@ -207,7 +210,6 @@ class UpdateGUI(QWidget):
         
         # 格式化发布日期，从ISO格式转换为YYYY-MM-DD
         if published_date != "2026-02-24":
-            from datetime import datetime
             try:
                 published_date = datetime.fromisoformat(published_date).strftime('%Y-%m-%d')
             except:

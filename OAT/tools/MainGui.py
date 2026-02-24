@@ -4,13 +4,14 @@ import os
 import threading
 import traceback
 import glob
+from datetime import datetime
 
 import cv2
 import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
 from PyQt6.QtWidgets import QMessageBox
 
 from OAT.tools.GetDC import WindowCapture
@@ -25,7 +26,7 @@ from ..source import MODE_MAPPING
 from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
 from ..utils.logging import LogRedirect
-from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT
+from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT, APP_VERSION
 from .ThreadManager import UpdateDownloadThread
 
 # 设置全局异常处理程序
@@ -797,9 +798,6 @@ class MainWindow(QtWidgets.QDialog):
             self.checking_msg = None
         
         try:
-            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit
-            from PyQt6.QtCore import Qt
-            
             update_checker = UpdateChecker()
             update_info = update_checker.get_update_info(latest_info) or "暂无更新日志"
             
@@ -853,13 +851,11 @@ class MainWindow(QtWidgets.QDialog):
             main_layout.addWidget(log_text_edit, 1)  # 占满剩余空间
             
             # 添加版本信息栏
-            from OAT.tools.settings import APP_VERSION
             
             # 从latest_info中获取发布日期和更新包大小
             published_at = latest_info.get('published_at', '未知')
             if published_at != '未知':
                 # 格式化发布日期，从ISO格式转换为YYYY-MM-DD
-                from datetime import datetime
                 try:
                     published_at = datetime.fromisoformat(published_at).strftime('%Y-%m-%d')
                 except:

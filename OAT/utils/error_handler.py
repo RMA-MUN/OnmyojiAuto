@@ -1,6 +1,7 @@
 import datetime
 import os
 import traceback
+import sys
 from PyQt6.QtWidgets import QMessageBox
 
 # 创建 logs 文件夹
@@ -33,5 +34,4 @@ def setup_global_exception_handler():
     """
     设置全局异常处理器
     """
-    import sys
     sys.excepthook = log_exception

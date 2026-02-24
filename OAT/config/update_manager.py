@@ -1,10 +1,13 @@
 from OAT.config.check_update import UpdateChecker
 from OAT.tools.ConfigManager import ConfigReader
 import os
+import json
 import requests
 import time
 import subprocess
 import sys
+import shutil
+import traceback
 from urllib3.exceptions import InsecureRequestWarning
 from tqdm import tqdm
 
@@ -32,7 +35,6 @@ class UpdateManager:
             }
             # 保存默认配置
             with open(update_json_path, 'w', encoding='utf-8') as f:
-                import json
                 json.dump(default_config, f, ensure_ascii=False, indent=2)
             print(f"已创建默认配置文件: {update_json_path}")
 
@@ -185,7 +187,6 @@ class UpdateManager:
                         if remote_size > 0 and local_size == remote_size:
                             print(f"在项目目录中找到匹配的文件，直接使用: {found_path}")
                             # 复制到temp目录
-                            import shutil
                             shutil.copy2(found_path, save_path)
                             if progress_callback:
                                 progress_callback(local_size, remote_size, 0, 0)
@@ -338,7 +339,6 @@ class UpdateManager:
             return True
         except Exception as e:
             print(f"启动更新程序时出错: {e}")
-            import traceback
             traceback.print_exc()
             return False
 

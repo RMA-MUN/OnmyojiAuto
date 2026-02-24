@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Optional
 
 from OAT.source.mode_config import mode_config
+from .common_challenge import common_challenge
 
 # 获取当前文件所在目录
 current_dir = os.path.dirname(__file__)
@@ -53,5 +54,4 @@ def mode_choice(
         return
 
     # 执行通用挑战函数
-    from .common_challenge import common_challenge
     common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer, sync_mode_value)

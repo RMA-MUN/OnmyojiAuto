@@ -4,6 +4,7 @@ import shutil
 import time
 import psutil
 import ctypes
+import traceback
 from PyQt6.QtCore import QThread, pyqtSignal
 
 # Windows API 常量
@@ -63,7 +64,6 @@ class UpdateWorker(QThread):
 
         except Exception as e:
             self.log_signal.emit(f"错误: {str(e)}")
-            import traceback
             self.log_signal.emit(traceback.format_exc())
             self.error_signal.emit(str(e))
 
@@ -335,7 +335,6 @@ class UpdateWorker(QThread):
             file_name = os.path.basename(file_path)
             
             # 设置总超时时间为5秒，避免无限等待
-            import time
             start_time = time.time()
             max_wait_time = 5
             

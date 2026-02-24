@@ -8,7 +8,7 @@ import time
 from pynput import mouse, keyboard
 from typing import List, Tuple, Optional
 from OAT.tools.WindowChecker import WindowChecker
-from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT
+from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT, WINDOW_ARRANGE_MODE, WINDOWS_PER_ROW
 
 
 class WindowSynchronizer:
