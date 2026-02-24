@@ -700,6 +700,88 @@ class MainWindow(QtWidgets.QDialog):
         self.checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         self.checking_msg.show()
     
+    def markdown_to_html(self, markdown: str) -> str:
+        """
+        将Markdown格式的文本转换为HTML格式
+        
+        Args:
+            markdown: Markdown格式的文本
+        
+        Returns:
+            HTML格式的文本
+        """
+        if not markdown:
+            return "<p>暂无更新日志</p>"
+        
+        # 替换Markdown格式为HTML
+        lines = markdown.split('\n')
+        html_lines = []
+        in_list = False
+        in_code = False
+        first_header_skipped = False
+        
+        for line in lines:
+            # 处理代码块
+            if line.startswith('```'):
+                in_code = not in_code
+                if in_code:
+                    html_lines.append('<pre><code>')
+                else:
+                    html_lines.append('</code></pre>')
+                continue
+            
+            if in_code:
+                html_lines.append(line)
+                continue
+            
+            # 处理标题，跳过第一个标题行（避免与弹窗顶部版本信息重复）
+            if line.startswith('# '):
+                if not first_header_skipped:
+                    first_header_skipped = True
+                    continue
+                html_lines.append(f'<h1>{line[2:]}</h1>')
+                continue
+            elif line.startswith('## '):
+                html_lines.append(f'<h2>{line[3:]}</h2>')
+                continue
+            elif line.startswith('### '):
+                html_lines.append(f'<h3>{line[4:]}</h3>')
+                continue
+            
+            # 处理列表
+            if line.startswith('- '):
+                if not in_list:
+                    html_lines.append('<ul>')
+                    in_list = True
+                html_lines.append(f'<li>{line[2:]}</li>')
+                continue
+            elif in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            
+            # 处理空行
+            if not line.strip():
+                if html_lines and not html_lines[-1].strip():
+                    continue
+                html_lines.append('')
+                continue
+            
+            # 处理普通行（包含粗体和斜体）
+            processed_line = line
+            # 处理粗体
+            processed_line = processed_line.replace('**', '<strong>').replace('**', '</strong>')
+            # 处理斜体
+            processed_line = processed_line.replace('*', '<em>').replace('*', '</em>')
+            html_lines.append(f'<p>{processed_line}</p>')
+        
+        # 关闭未关闭的标签
+        if in_list:
+            html_lines.append('</ul>')
+        if in_code:
+            html_lines.append('</code></pre>')
+        
+        return '\n'.join(html_lines)
+    
     def on_update_available(self, latest_version: str, latest_info: dict):
         """
         处理发现更新的信号
@@ -715,32 +797,198 @@ class MainWindow(QtWidgets.QDialog):
             self.checking_msg = None
         
         try:
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit
+            from PyQt6.QtCore import Qt
+            
             update_checker = UpdateChecker()
             update_info = update_checker.get_update_info(latest_info) or "暂无更新日志"
             
-            # 创建并配置消息框
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("发现新的版本")
-            msg_box.setText(f"最新版本：{latest_version}\n\n更新日志：\n{update_info.replace('# 更新日志', '').strip()}")
-            msg_box.setIcon(QMessageBox.Icon.Information)
+            # 将Markdown转换为HTML
+            html_content = self.markdown_to_html(update_info)
             
-            # 添加自定义按钮
-            btn_update = msg_box.addButton("立即更新", QMessageBox.ButtonRole.AcceptRole)
-            btn_later = msg_box.addButton("下次再说", QMessageBox.ButtonRole.RejectRole)
-            btn_ignore = msg_box.addButton("忽略本版本", QMessageBox.ButtonRole.ActionRole)
+            # 创建自定义更新弹窗
+            update_dialog = QDialog(self)
+            update_dialog.setWindowTitle("发现新的版本")
+            update_dialog.setFixedSize(600, 500)  # 固定窗口大小
+            update_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
             
-            # 执行消息框
-            msg_box.exec()
+            # 创建主布局
+            main_layout = QVBoxLayout(update_dialog)
             
-            # 处理用户选择
-            clicked_button = msg_box.clickedButton()
-            if clicked_button == btn_update:
+            # 添加版本信息
+            version_label = QLabel(f"最新版本：{latest_version}")
+            version_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+            main_layout.addWidget(version_label)
+            
+            # 添加更新日志标题
+            log_title = QLabel("更新日志")
+            log_title.setStyleSheet("font-size: 14px; font-weight: bold; margin-top: 10px;")
+            main_layout.addWidget(log_title)
+            
+            # 添加支持HTML的文本编辑框
+            log_text_edit = QTextEdit()
+            log_text_edit.setReadOnly(True)
+            log_text_edit.setStyleSheet("""
+                QTextEdit {
+                    border: 1px solid #d1d5db;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-family: 'Microsoft YaHei';
+                    font-size: 14px;
+                    line-height: 1.5;
+                }
+                QScrollBar:vertical {
+                    width: 16px;
+                    background: #f3f4f6;
+                }
+                QScrollBar::handle:vertical {
+                    background: #9ca3af;
+                    border-radius: 8px;
+                }
+            """)
+            
+            # 设置HTML内容
+            log_text_edit.setHtml(html_content)
+            
+            main_layout.addWidget(log_text_edit, 1)  # 占满剩余空间
+            
+            # 添加版本信息栏
+            from OAT.tools.settings import APP_VERSION
+            
+            # 从latest_info中获取发布日期和更新包大小
+            published_at = latest_info.get('published_at', '未知')
+            if published_at != '未知':
+                # 格式化发布日期，从ISO格式转换为YYYY-MM-DD
+                from datetime import datetime
+                try:
+                    published_at = datetime.fromisoformat(published_at).strftime('%Y-%m-%d')
+                except:
+                    published_at = '未知'
+            
+            # 获取更新包大小
+            update_size = 'XX MB'
+            assets = latest_info.get('assets', [])
+            if assets:
+                # 找到第一个资产的大小
+                for asset in assets:
+                    size = asset.get('size', 0)
+                    if size > 0:
+                        # 转换为MB
+                        size_mb = round(size / (1024 * 1024), 2)
+                        update_size = f"{size_mb} MB"
+                        break
+            
+            version_info = QLabel(f"【当前版本 {APP_VERSION}】→【最新版本】{latest_version} | 发布日期: {published_at} | 更新包大小: {update_size}")
+            version_info.setStyleSheet("""
+                QLabel {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    padding: 8px;
+                    background-color: #f5f5f5;
+                    font-family: 'Microsoft YaHei';
+                    font-size: 12px;
+                    color: #333333;
+                    margin-top: 10px;
+                }
+            """)
+            main_layout.addWidget(version_info)
+            
+            # 添加按钮布局
+            button_layout = QHBoxLayout()
+            
+            # 添加按钮
+            btn_ignore = QPushButton("忽略本版本")
+            btn_later = QPushButton("下次再说")
+            btn_update = QPushButton("立即更新")
+            
+            # 设置按钮样式
+            # 忽略本版本 - 弱操作
+            btn_ignore.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #666666;
+                    font-size: 12px;
+                    border: 1px solid #f0f0f0;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                }
+                QPushButton:hover {
+                    background-color: #f5f5f5;
+                }
+            """)
+            
+            # 下次再说 - 次要操作
+            btn_later.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    color: #333333;
+                    font-size: 14px;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #f9f9f9;
+                }
+            """)
+            
+            # 立即更新 - 主操作
+            btn_update.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
+            
+            # 添加按钮到布局（按照从左到右：忽略此版本 -> 下次再说 -> 立即更新）
+            button_layout.addWidget(btn_ignore)
+            button_layout.addStretch()
+            button_layout.addWidget(btn_later)
+            button_layout.addStretch()
+            button_layout.addWidget(btn_update)
+            
+            main_layout.addLayout(button_layout)
+            
+            # 定义按钮点击事件处理函数
+            def on_btn_update_clicked():
+                update_dialog.close()
                 # 开始下载并更新
                 self.start_update_process(latest_info)
-            elif clicked_button == btn_ignore:
-                # 忽略此版本
-                update_manager = UpdateManager()
-                update_manager.ignore_update(latest_version)
+            
+            def on_btn_later_clicked():
+                update_dialog.close()
+            
+            def on_btn_ignore_clicked():
+                # 添加二次确认弹窗
+                reply = QMessageBox.question(
+                    update_dialog, 
+                    "确认忽略", 
+                    f"确定要忽略 {latest_version} 版本吗？后续将不会再提醒此版本的更新",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    update_dialog.close()
+                    # 忽略此版本
+                    update_manager = UpdateManager()
+                    update_manager.ignore_update(latest_version)
+            
+            # 连接按钮信号
+            btn_update.clicked.connect(on_btn_update_clicked)
+            btn_later.clicked.connect(on_btn_later_clicked)
+            btn_ignore.clicked.connect(on_btn_ignore_clicked)
+            
+            # 显示对话框
+            update_dialog.exec()
         except Exception as e:
             self.on_update_error(str(e))
 
@@ -906,7 +1154,7 @@ class MainWindow(QtWidgets.QDialog):
             update_log = update_checker.get_update_info(latest_info) or ""
             
             # 启动更新程序
-            if update_manager.launch_updater(zip_path, update_log):
+            if update_manager.launch_updater(zip_path, update_log, latest_info):
                 # 使用紧急退出函数关闭OAT程序
                 self.emergency_stop()
             else:

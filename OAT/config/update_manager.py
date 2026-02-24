@@ -267,11 +267,12 @@ class UpdateManager:
         return False
 
     @staticmethod
-    def launch_updater(zip_path: str, update_log: str = ""):
+    def launch_updater(zip_path: str, update_log: str = "", latest_info: dict = None):
         """
         启动外部更新程序进行安装
         :param zip_path: 下载的压缩包路径
         :param update_log: 更新日志
+        :param latest_info: 最新版本信息
         :return: 是否成功启动更新程序
         """
         try:
@@ -312,6 +313,15 @@ class UpdateManager:
             else:
                 # 可执行文件
                 args = [updater_path, f'/ZIP={zip_path}', f'/LOG={update_log}']
+            
+            # 添加版本信息参数
+            if latest_info:
+                latest_version = latest_info.get('tag_name', '')
+                published_at = latest_info.get('published_at', '')
+                if latest_version:
+                    args.append(f'/VERSION={latest_version}')
+                if published_at:
+                    args.append(f'/DATE={published_at}')
             
             print(f"启动更新程序: {updater_path}")
             print(f"参数: {args}")

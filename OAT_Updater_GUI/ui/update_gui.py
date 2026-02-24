@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QFont, QPixmap, QTextDocument
+from PyQt6.QtGui import QFont, QPixmap
 
 from OAT_Updater_GUI.utils.update_worker import UpdateWorker
 
@@ -14,20 +14,106 @@ class UpdateGUI(QWidget):
     OAT更新程序主界面
     """
 
-    def __init__(self, zip_path=None, update_log="", parent=None):
+    def __init__(self, zip_path=None, update_log="", latest_version="OAT-v2.0.0", published_date="2026-02-24", parent=None):
         """
         初始化更新界面
         :param zip_path: 压缩包路径，可选
         :param update_log: 更新日志，可选
+        :param latest_version: 最新版本号，可选
+        :param published_date: 发布日期，可选
         :param parent: 父窗口
         """
         super().__init__(parent)
         self.zip_path = zip_path
         self.update_log = update_log
+        self.latest_version = latest_version
+        self.published_date = published_date
         self.update_worker = None
         self.dragging = False
         self.drag_start_position = QPoint()
         self.init_ui()
+    
+    def markdown_to_html(self, markdown: str) -> str:
+        """
+        将Markdown格式的文本转换为HTML格式
+        
+        Args:
+            markdown: Markdown格式的文本
+        
+        Returns:
+            HTML格式的文本
+        """
+        if not markdown:
+            return "<p>暂无更新日志</p>"
+        
+        # 替换Markdown格式为HTML
+        lines = markdown.split('\n')
+        html_lines = []
+        in_list = False
+        in_code = False
+        first_header_skipped = False
+        
+        for line in lines:
+            # 处理代码块
+            if line.startswith('```'):
+                in_code = not in_code
+                if in_code:
+                    html_lines.append('<pre><code>')
+                else:
+                    html_lines.append('</code></pre>')
+                continue
+            
+            if in_code:
+                html_lines.append(line)
+                continue
+            
+            # 处理标题，跳过第一个标题行（避免与版本信息重复）
+            if line.startswith('# '):
+                if not first_header_skipped:
+                    first_header_skipped = True
+                    continue
+                html_lines.append(f'<h1>{line[2:]}</h1>')
+                continue
+            elif line.startswith('## '):
+                html_lines.append(f'<h2>{line[3:]}</h2>')
+                continue
+            elif line.startswith('### '):
+                html_lines.append(f'<h3>{line[4:]}</h3>')
+                continue
+            
+            # 处理列表
+            if line.startswith('- '):
+                if not in_list:
+                    html_lines.append('<ul>')
+                    in_list = True
+                html_lines.append(f'<li>{line[2:]}</li>')
+                continue
+            elif in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            
+            # 处理空行
+            if not line.strip():
+                if html_lines and not html_lines[-1].strip():
+                    continue
+                html_lines.append('')
+                continue
+            
+            # 处理普通行（包含粗体和斜体）
+            processed_line = line
+            # 处理粗体
+            processed_line = processed_line.replace('**', '<strong>').replace('**', '</strong>')
+            # 处理斜体
+            processed_line = processed_line.replace('*', '<em>').replace('*', '</em>')
+            html_lines.append(f'<p>{processed_line}</p>')
+        
+        # 关闭未关闭的标签
+        if in_list:
+            html_lines.append('</ul>')
+        if in_code:
+            html_lines.append('</code></pre>')
+        
+        return '\n'.join(html_lines)
 
     def init_ui(self):
         """
@@ -37,12 +123,12 @@ class UpdateGUI(QWidget):
         # 设置无边框窗口
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowCloseButtonHint)
         self.setMinimumWidth(600)
-        self.setMinimumHeight(500)
+        self.setMinimumHeight(600)
         self.setStyleSheet("background-color: white;")
 
         # 主布局
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(15)
         main_layout.setContentsMargins(30, 30, 30, 30)
 
         # 标题栏（自定义）
@@ -103,6 +189,55 @@ class UpdateGUI(QWidget):
         status_layout.addStretch()
         main_layout.addLayout(status_layout)
 
+        # 版本信息栏
+        version_layout = QHBoxLayout()
+        # 获取当前版本
+        current_version = "v1.9.0"
+        try:
+            import sys
+            sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+            from OAT.tools.settings import APP_VERSION
+            current_version = APP_VERSION
+        except:
+            pass
+        
+        # 使用传递进来的最新版本和发布日期
+        latest_version = self.latest_version
+        published_date = self.published_date
+        
+        # 格式化发布日期，从ISO格式转换为YYYY-MM-DD
+        if published_date != "2026-02-24":
+            from datetime import datetime
+            try:
+                published_date = datetime.fromisoformat(published_date).strftime('%Y-%m-%d')
+            except:
+                pass
+        
+        # 尝试从压缩包获取大小
+        update_size = "XX MB"
+        if self.zip_path and os.path.exists(self.zip_path):
+            try:
+                size = os.path.getsize(self.zip_path)
+                size_mb = round(size / (1024 * 1024), 2)
+                update_size = f"{size_mb} MB"
+            except:
+                pass
+        
+        version_info = QLabel(f"【当前版本 {current_version}】→【最新版本】{latest_version} | 发布日期: {published_date} | 更新包大小: {update_size}")
+        version_info.setStyleSheet("""
+            QLabel {
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 8px;
+                background-color: #f5f5f5;
+                font-family: 'Microsoft YaHei';
+                font-size: 12px;
+                color: #333333;
+            }
+        """)
+        version_layout.addWidget(version_info)
+        main_layout.addLayout(version_layout)
+
         # 更新日志
         log_layout = QVBoxLayout()
         log_title = QLabel("更新日志")
@@ -110,14 +245,14 @@ class UpdateGUI(QWidget):
         self.log_text_edit = QTextEdit()
         self.log_text_edit.setObjectName("updateLogText")
         self.log_text_edit.setReadOnly(True)
-        self.log_text_edit.setMaximumHeight(250)  # 增大高度以显示更多内容
+        self.log_text_edit.setMaximumHeight(250)  # 增大更新日志区域的高度
         self.log_text_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)  # 自动换行
         self.log_text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # 垂直滚动条按需显示
         self.log_text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 禁用水平滚动条
         self.log_text_edit.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #d1d5db;
-                border-radius: 0px;
+                border-radius: 4px;
                 padding: 8px;
                 background-color: #ffffff;
                 font-family: 'Microsoft YaHei';
@@ -130,22 +265,16 @@ class UpdateGUI(QWidget):
             }
             QScrollBar::handle:vertical {
                 background: #9ca3af;
-                border-radius: 0px;
-            }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 16px;
-                background: #f3f4f6;
+                border-radius: 8px;
             }
         """)
         # 显示更新日志
         if self.update_log:
-            # 使用QTextDocument的setMarkdown方法原生支持markdown
-            doc = QTextDocument()
-            doc.setMarkdown(self.update_log)
-            self.log_text_edit.setDocument(doc)
+            # 将Markdown转换为HTML并显示
+            html_content = self.markdown_to_html(self.update_log)
+            self.log_text_edit.setHtml(html_content)
         else:
-            self.log_text_edit.setText("暂无更新日志")
+            self.log_text_edit.setHtml("<p>暂无更新日志</p>")
         log_layout.addWidget(log_title)
         log_layout.addWidget(self.log_text_edit)
         main_layout.addLayout(log_layout)
@@ -187,7 +316,7 @@ class UpdateGUI(QWidget):
         self.op_log_text_edit.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #d1d5db;
-                border-radius: 0px;
+                border-radius: 4px;
                 padding: 6px;
                 background-color: #ffffff;
                 font-family: 'Microsoft YaHei';
@@ -200,12 +329,7 @@ class UpdateGUI(QWidget):
             }
             QScrollBar::handle:vertical {
                 background: #9ca3af;
-                border-radius: 0px;
-            }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 12px;
-                background: #f3f4f6;
+                border-radius: 6px;
             }
         """)
         op_log_layout.addWidget(op_log_title)
