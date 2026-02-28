@@ -173,6 +173,9 @@ class WindowSynchronizer:
             main_relative_x = screen_x - main_left
             main_relative_y = screen_y - main_top
 
+            # 初始化结果列表
+            sub_relative_positions = []
+
             # 检查相对位置是否在主窗口内
             if 0 <= main_relative_x <= main_width and 0 <= main_relative_y <= main_height:
                 sub_relative_positions = []
