@@ -26,8 +26,9 @@ from ..source import MODE_MAPPING
 from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
 from ..utils.logging import LogRedirect
-from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT, APP_VERSION
+from OAT.tools.settings import APP_VERSION
 from .ThreadManager import UpdateDownloadThread
+from ..utils.markdown_to_html import markdown_to_html
 
 # 设置全局异常处理程序
 setup_global_exception_handler()
@@ -158,7 +159,8 @@ class MainWindow(QtWidgets.QDialog):
         painter.setOpacity(self.alpha / 255.0)
         painter.drawPixmap(self.rect(), self.background)
 
-    def handle_mode_change(self, mode: str):
+    @staticmethod
+    def handle_mode_change(mode: str):
         print(f"选择模式：{mode}")
 
     def window_detection(self, *args):
@@ -700,89 +702,7 @@ class MainWindow(QtWidgets.QDialog):
         self.checking_msg.setIcon(QMessageBox.Icon.Information)
         self.checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         self.checking_msg.show()
-    
-    def markdown_to_html(self, markdown: str) -> str:
-        """
-        将Markdown格式的文本转换为HTML格式
-        
-        Args:
-            markdown: Markdown格式的文本
-        
-        Returns:
-            HTML格式的文本
-        """
-        if not markdown:
-            return "<p>暂无更新日志</p>"
-        
-        # 替换Markdown格式为HTML
-        lines = markdown.split('\n')
-        html_lines = []
-        in_list = False
-        in_code = False
-        first_header_skipped = False
-        
-        for line in lines:
-            # 处理代码块
-            if line.startswith('```'):
-                in_code = not in_code
-                if in_code:
-                    html_lines.append('<pre><code>')
-                else:
-                    html_lines.append('</code></pre>')
-                continue
-            
-            if in_code:
-                html_lines.append(line)
-                continue
-            
-            # 处理标题，跳过第一个标题行（避免与弹窗顶部版本信息重复）
-            if line.startswith('# '):
-                if not first_header_skipped:
-                    first_header_skipped = True
-                    continue
-                html_lines.append(f'<h1>{line[2:]}</h1>')
-                continue
-            elif line.startswith('## '):
-                html_lines.append(f'<h2>{line[3:]}</h2>')
-                continue
-            elif line.startswith('### '):
-                html_lines.append(f'<h3>{line[4:]}</h3>')
-                continue
-            
-            # 处理列表
-            if line.startswith('- '):
-                if not in_list:
-                    html_lines.append('<ul>')
-                    in_list = True
-                html_lines.append(f'<li>{line[2:]}</li>')
-                continue
-            elif in_list:
-                html_lines.append('</ul>')
-                in_list = False
-            
-            # 处理空行
-            if not line.strip():
-                if html_lines and not html_lines[-1].strip():
-                    continue
-                html_lines.append('')
-                continue
-            
-            # 处理普通行（包含粗体和斜体）
-            processed_line = line
-            # 处理粗体
-            processed_line = processed_line.replace('**', '<strong>').replace('**', '</strong>')
-            # 处理斜体
-            processed_line = processed_line.replace('*', '<em>').replace('*', '</em>')
-            html_lines.append(f'<p>{processed_line}</p>')
-        
-        # 关闭未关闭的标签
-        if in_list:
-            html_lines.append('</ul>')
-        if in_code:
-            html_lines.append('</code></pre>')
-        
-        return '\n'.join(html_lines)
-    
+
     def on_update_available(self, latest_version: str, latest_info: dict):
         """
         处理发现更新的信号
@@ -802,7 +722,7 @@ class MainWindow(QtWidgets.QDialog):
             update_info = update_checker.get_update_info(latest_info) or "暂无更新日志"
             
             # 将Markdown转换为HTML
-            html_content = self.markdown_to_html(update_info)
+            html_content = markdown_to_html(update_info)
             
             # 创建自定义更新弹窗
             update_dialog = QDialog(self)
@@ -1235,4 +1155,3 @@ class MainWindow(QtWidgets.QDialog):
         msg_box.setText(instruction_text)
         msg_box.setIcon(QMessageBox.Icon.Information)
         msg_box.exec()
-        msg_box = None
