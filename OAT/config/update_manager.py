@@ -24,7 +24,7 @@ class UpdateManager:
         update_json_path = os.path.join(config_dir, "update.json")
 
         # 调试信息：打印配置文件路径
-        print(f"尝试读取配置文件: {update_json_path}")
+        # print(f"尝试读取配置文件: {update_json_path}")
 
         # 确保文件存在
         if not os.path.exists(update_json_path):
