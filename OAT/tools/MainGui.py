@@ -99,6 +99,9 @@ class MainWindow(QtWidgets.QDialog):
         # 设置工具提示
         self.ui.refresh_window_btn.setToolTip("刷新窗口 (Ctrl+R)")
         self.ui.window_detect_btn.setToolTip("窗口检测 (Ctrl+W)")
+        
+        # 程序启动时静默检查更新
+        self.check_update_silently()
         self.ui.start_challenge_btn.setToolTip("开始挑战 (Enter)")
         self.ui.emergency_stop_btn.setToolTip("紧急停止 (Ctrl+E)")
 
@@ -702,6 +705,29 @@ class MainWindow(QtWidgets.QDialog):
         self.checking_msg.setIcon(QMessageBox.Icon.Information)
         self.checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         self.checking_msg.show()
+    
+    def check_update_silently(self):
+        """静默检查是否存在更新，不显示检查提示，只在有更新时弹窗"""
+        # 创建更新检查线程
+        self.update_thread = UpdateCheckThread()
+        
+        # 连接信号槽
+        self.update_thread.update_available.connect(self.on_update_available)
+        self.update_thread.update_not_available.connect(self.on_update_not_available_silent)
+        self.update_thread.update_error.connect(self.on_update_error_silent)
+        
+        # 启动线程
+        self.update_thread.start()
+    
+    def on_update_not_available_silent(self):
+        """处理没有更新的信号（静默模式）"""
+        # 静默模式下，无更新时不做任何操作
+        pass
+    
+    def on_update_error_silent(self, error_msg: str):
+        """处理更新检查错误的信号（静默模式）"""
+        # 静默模式下，错误时只记录日志，不显示提示
+        self.log_redirect.log_to_file(f"检查更新时出错: {error_msg}")
 
     def on_update_available(self, latest_version: str, latest_info: dict):
         """
