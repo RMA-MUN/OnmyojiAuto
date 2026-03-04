@@ -75,6 +75,33 @@ class OnmyojiAutomation:
         self.move_duration_range = (0.3, 0.8)  # 移动时长范围（秒）
         self.jitter_amplitude = 0.5  # 鼠标抖动幅度
         self.curve_intensity = 5  # 曲线弯曲程度
+        
+        # 创建WindowCapture实例，用于隐藏窗口模式
+        self.window_capture = None
+        if hasattr(self, 'hwnd') and self.hwnd:
+            try:
+                self.window_capture = WindowCapture(hwnd=self.hwnd)
+            except Exception:
+                pass
+
+    def is_window_present(self) -> bool:
+        """检查窗口是否存在且有效"""
+        if self.hwnd == 0:
+            return False
+        
+        # 尝试获取窗口矩形，进一步验证窗口是否有效
+        try:
+            rect = win32gui.GetWindowRect(self.hwnd)
+            # 检查窗口是否有有效的尺寸
+            x1, y1, x2, y2 = rect
+            if x1 == 0 and y1 == 0 and x2 == 0 and y2 == 0:
+                return False
+            if x2 <= x1 or y2 <= y1:
+                return False
+            return True
+        except Exception:
+            # 如果获取窗口矩形失败，说明窗口无效
+            return False
 
     def print_window_info(self) -> None:
         """输出窗口信息"""
@@ -242,7 +269,11 @@ class OnmyojiAutomation:
     def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool) -> bool:
         """使用隐藏窗口捕获模式执行操作"""
         try:
-            wc = WindowCapture(hwnd=self.hwnd)
+            # 使用初始化时创建的WindowCapture实例
+            if not self.window_capture:
+                self.window_capture = WindowCapture(hwnd=self.hwnd)
+            
+            wc = self.window_capture
             
             # 准备目标图像：优先使用预加载的图像
             target_image = logo

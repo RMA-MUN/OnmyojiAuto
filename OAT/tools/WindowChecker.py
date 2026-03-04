@@ -10,8 +10,10 @@
 import win32gui
 import win32con
 import pywintypes
-
 from typing import Optional, Tuple
+
+from OAT.utils.warning_box import warning_box
+
 
 class WindowChecker:
     """窗口状态检查与操作类"""
@@ -116,6 +118,21 @@ class WindowChecker:
             print('窗口标题未设置')
             return
 
+        # 获取窗口句柄
+        if not self.window_handle:
+            hwnd = win32gui.FindWindow(None, self.window_title)
+        else:
+            hwnd = self.window_handle
+
+        # 检查窗口是否最小化
+        if hwnd:
+            if win32gui.IsIconic(hwnd):
+                try:
+                    warning_box("检测到窗口处于最小化状态，请先恢复窗口再继续操作。")
+                except Exception as e:
+                    print(f"显示弹窗失败: {e}")
+                return
+
         current_size = self.get_window_info()
         if current_size:
             current_width, current_height = current_size[2]
@@ -126,11 +143,14 @@ class WindowChecker:
                 # 检查调整后的尺寸
                 updated_size = self.get_window_info()
                 if updated_size and (updated_size[2][0] != target_width or updated_size[2][1] != target_height):
-                    # 如果调整失败但已提供了窗口句柄，仍然继续运行
-                    if self.window_handle:
-                        print(f"警告：窗口尺寸不是标准尺寸({target_width}x{target_height})，当前尺寸：{updated_size[2]}。程序将继续运行，但可能影响自动化效果。")
-                    else:
-                        raise ValueError(f"窗口尺寸调整失败，当前尺寸：{updated_size[2]}")
+                    # 导入必要的模块用于弹窗
+                    try:
+                        warning_box(f"窗口尺寸调整失败，当前尺寸：{updated_size[2]}。\n请手动调整窗口大小为{target_width}x{target_height}，或检查窗口是否被其他程序占用。")
+                    except Exception as e:
+                        print(f"显示弹窗失败: {e}")
+                    # 如果已提供了窗口句柄，仍然继续运行
+                    if not self.window_handle:
+                        return
 
     # 获取所有窗口
     @staticmethod
