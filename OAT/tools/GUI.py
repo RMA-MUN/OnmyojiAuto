@@ -544,6 +544,22 @@ class UiDialog(object):
         self.close_game_checkbox.stateChanged.connect(self.on_close_game_setting_changed)
         general_form.addRow(self.close_game_checkbox)
 
+        # 后台获取图像相关配置
+        self.capture_window_mode = QtWidgets.QComboBox()
+        self.capture_window_mode.setObjectName("capture_window_mode")
+        self.capture_window_mode.addItem("PrintWindow", "PrintWindow")
+        self.capture_window_mode.addItem("BitBlt", "BitBlt")
+        # 加载设置值
+        backend_get_img_mode_setting = settings_data.get('capture_window_mode', 'PrintWindow')
+        backend_get_img_mode_index = self.capture_window_mode.findText(backend_get_img_mode_setting)
+        if backend_get_img_mode_index != -1:
+            self.capture_window_mode.setCurrentIndex(backend_get_img_mode_index)
+        else:
+            self.capture_window_mode.setCurrentIndex(0)
+        general_form.addRow("后台获取图像模式:", self.capture_window_mode)
+        # 连接信号
+        self.capture_window_mode.currentTextChanged.connect(self.save_backend_get_img_mode_settings)
+
         # 图像识别相关配置
         self.recognition_mode_combo = QtWidgets.QComboBox()
         self.recognition_mode_combo.setObjectName("find_mode")
@@ -874,6 +890,15 @@ class UiDialog(object):
             find_mode: 识别模式(opencv/pyscreeze)
         """
         self.save_setting('find_mode', find_mode)
+
+    def save_backend_get_img_mode_settings(self, backend_get_img_mode: str="PrintWindow"):
+        """
+        保存窗口捕获模式设置到配置文件
+
+        Args:
+            backend_get_img_mode: 窗口捕获模式(PrintWindow/BitBlt)
+        """
+        self.save_setting('capture_window_mode', backend_get_img_mode)
 
 
     def on_close_program_setting_changed(self, state: int):

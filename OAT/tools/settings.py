@@ -25,7 +25,8 @@ except Exception as e:
         'custom_res_width': 1404,
         'custom_res_height': 834,
         'window_arrange_mode': 'diagonal',  # 窗口排列方式：diagonal（对角线）或 tile（平铺）
-        'windows_per_row': 3  # 平铺排列时一行的窗口数量
+        'windows_per_row': 3,  # 平铺排列时一行的窗口数量
+        'capture_window_mode': 'PrintWindow'  # 窗口捕获模式(PrintWindow/BitBlt)
     }
 
 # 导出配置变量
@@ -44,6 +45,8 @@ CUSTOM_RES_HEIGHT = settings_data.get('custom_res_height', 834)
 # 窗口排列相关设置
 WINDOW_ARRANGE_MODE = settings_data.get('window_arrange_mode', 'diagonal')  # 窗口排列方式
 WINDOWS_PER_ROW = settings_data.get('windows_per_row', 3)  # 平铺排列时一行的窗口数量
+# 后台获取图像模式
+BACKEND_GET_IMG_MODE = settings_data.get('capture_window_mode', 'PrintWindow')  # 后台获取图像模式(PrintWindow/BitBlt)
 
 # 提供更新配置的函数
 def update_settings(key, value):
@@ -93,6 +96,9 @@ def update_settings(key, value):
         elif key == 'windows_per_row':
             global WINDOWS_PER_ROW
             WINDOWS_PER_ROW = value
+        elif key == 'capture_window_mode':
+            global BACKEND_GET_IMG_MODE
+            BACKEND_GET_IMG_MODE = value
         return True
     except Exception as e:
         print(f"保存配置文件失败: {str(e)}")
