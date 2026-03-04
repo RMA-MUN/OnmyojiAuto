@@ -84,7 +84,7 @@ class UpdateManager:
         """
         # 首先检查是否真的需要更新（版本号比较）
         if not self.checker.check_update():
-            print("当前版本已是最新版本")
+            # print("当前版本已是最新版本")
             return None
             
         # 获取最新版本
