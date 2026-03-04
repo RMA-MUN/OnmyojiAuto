@@ -170,6 +170,11 @@ class MainWindow(QtWidgets.QDialog):
         print("客户端窗口检测：")
         # 使用更新后的 window_title
         automation = OnmyojiAutomation(self.window_title)
+        # 先检测窗口是否存在
+        if automation.is_window_present() is False:
+            QtWidgets.QMessageBox.warning(self, "警告", "未检测到阴阳师窗口，请先打开游戏")
+            return
+
         automation.print_window_info()
 
         # 调用 get_window_size 函数获取窗口大小

@@ -8,8 +8,8 @@ from ctypes import wintypes
 from typing import Optional, Tuple, Union
 import pyscreeze
 from PIL import Image
-
 from OAT.tools import settings
+from OAT.utils.warning_box import warning_box
 
 # 确保CAPTUREBLT常量可用
 if not hasattr(win32con, 'CAPTUREBLT'):
@@ -45,6 +45,8 @@ class WindowCapture:
         self.client_rect = win32gui.GetClientRect(self.hwnd)
         self.client_width = self.client_rect[2] - self.client_rect[0]
         self.client_height = self.client_rect[3] - self.client_rect[1]
+        # 记录上次使用的捕获模式
+        self.last_capture_mode = None
 
     def get_window_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
         """获取窗口的位置和尺寸信息"""
@@ -68,8 +70,45 @@ class WindowCapture:
             print(f"获取窗口信息时出错: {str(e)}")
             return None
 
+    def _cleanup_resources(self, hWndDC=None, mfcDC=None, saveDC=None, saveBitMap=None):
+        """
+        清理窗口捕获相关的资源
+
+        Args:
+            hWndDC: 窗口DC句柄
+            mfcDC: MFC DC对象
+            saveDC: 保存DC对象
+            saveBitMap: 位图对象
+        """
+        # 确保资源清理
+        if saveBitMap:
+            try:
+                win32gui.DeleteObject(saveBitMap.GetHandle())
+            except:
+                pass
+        if saveDC:
+            try:
+                saveDC.DeleteDC()
+            except:
+                pass
+        if mfcDC:
+            try:
+                mfcDC.DeleteDC()
+            except:
+                pass
+        if hWndDC:
+            try:
+                win32gui.ReleaseDC(self.hwnd, hWndDC)
+            except:
+                pass
+
     def capture_window_bitblt(self, region: Optional[Tuple[int, int, int, int]] = None) -> Optional[np.ndarray]:
         """使用BitBlt方法捕获窗口图像，借鉴GitHub代码的完整DC处理流程"""
+        hWndDC = None
+        mfcDC = None
+        saveDC = None
+        saveBitMap = None
+
         try:
             # 确保窗口可见
             if win32gui.IsIconic(self.hwnd):
@@ -123,12 +162,6 @@ class WindowCapture:
             img = np.frombuffer(bmpstr, dtype='uint8').reshape((height, width, 4))
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-            # 清理资源
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(self.hwnd, hWndDC)
-
             # 检查图像是否全黑
             if np.mean(img) < 5:  # 如果平均像素值小于5，可能是全黑图像
                 print("BitBlt捕获到的图像可能是全黑的")
@@ -138,9 +171,72 @@ class WindowCapture:
         except Exception as e:
             print(f"BitBlt捕获出错: {str(e)}")
             return None
-    
+        finally:
+            # 清理资源
+            self._cleanup_resources(hWndDC, mfcDC, saveDC, saveBitMap)
+
+    def capture_window(self, region: Optional[Tuple[int, int, int, int]] = None, capture_mode: Optional[str] = None) -> Optional[np.ndarray]:
+        """捕获窗口图像，使用指定的捕获模式
+
+        Args:
+            region: 可选的捕获区域，格式为 (left, top, width, height)
+            capture_mode: 窗口捕获模式，可选值："PrintWindow" 或 "BitBlt"，默认使用配置文件中的设置
+
+        Returns:
+            成功时返回捕获的图像数组，失败时返回None
+        """
+        # 如果未指定捕获模式，使用配置文件中的设置
+        if capture_mode is None:
+            capture_mode = settings.BACKEND_GET_IMG_MODE
+        
+        # 根据指定模式调用对应的捕获函数
+        def capture_by_mode(mode):
+            # 只有当捕获模式发生变化时才输出信息
+            if self.last_capture_mode != mode:
+                print(f"使用{mode}模式捕获")
+                self.last_capture_mode = mode
+            
+            if mode == "PrintWindow":
+                return self.capture_window_printwindow(region)
+            elif mode == "BitBlt":
+                return self.capture_window_bitblt(region)
+            else:
+                print(f"未知的窗口捕获模式: {mode}")
+                return None
+
+        # 使用指定模式捕获
+        img = capture_by_mode(capture_mode)
+        if img is not None and np.mean(img) > 5:
+            return img
+
+        # 如果指定模式失败，尝试另一种模式
+        fallback_mode = "BitBlt" if capture_mode == "PrintWindow" else "PrintWindow"
+        print(f"{capture_mode}捕获失败，尝试{fallback_mode}方法")
+        img = capture_by_mode(fallback_mode)
+        if img is not None and np.mean(img) > 5:
+            # 永久切换到 fallback_mode 并更新配置
+            if settings.BACKEND_GET_IMG_MODE != fallback_mode:
+                print(f"切换到{fallback_mode}模式")
+                settings.update_settings('capture_window_mode', fallback_mode)
+            return img
+
+        # 如果都失败，显示错误弹窗并返回None
+        print("所有捕获方法失败")
+        try: 
+            warning_box("所有窗口捕获方法都失败了，请检查窗口状态或尝试重启程序。")
+        except Exception as e:
+            print(f"显示错误弹窗失败: {e}")
+        
+        return None
+
     def capture_window_printwindow(self, region: Optional[Tuple[int, int, int, int]] = None) -> Optional[np.ndarray]:
         """使用PrintWindow方法捕获窗口图像（更好地支持硬件加速窗口）"""
+        # 确保资源清理
+        hWndDC = None
+        mfcDC = None
+        saveDC = None
+        saveBitMap = None
+
         try:
             # 重新获取客户区尺寸
             self.client_rect = win32gui.GetClientRect(self.hwnd)
@@ -165,9 +261,24 @@ class WindowCapture:
 
             # 获取窗口DC
             hWndDC = win32gui.GetDC(self.hwnd)
+            if not hWndDC:
+                print("获取窗口DC失败")
+                return None
+
             mfcDC = win32ui.CreateDCFromHandle(hWndDC)
-            saveDC = mfcDC.CreateCompatibleDC()
-            
+            if not mfcDC:
+                print("创建MFC DC失败")
+                return None
+
+            try:
+                saveDC = mfcDC.CreateCompatibleDC()
+                if not saveDC:
+                    print("CreateCompatibleDC failed")
+                    return None
+            except Exception as e:
+                print(f"CreateCompatibleDC失败: {str(e)}")
+                return None
+
             # 创建位图对象
             saveBitMap = win32ui.CreateBitmap()
             saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
@@ -176,49 +287,31 @@ class WindowCapture:
             # 使用ctypes的PrintWindow函数或回退到win32gui
             success = False
             if PrintWindow:
-                # print("使用ctypes.PrintWindow")
                 success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
             else:
                 try:
-                    # print("尝试使用win32gui.PrintWindow")
                     success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
                 except AttributeError:
-                    # print("win32gui.PrintWindow不可用")
-                    # 清理资源
-                    win32gui.DeleteObject(saveBitMap.GetHandle())
-                    saveDC.DeleteDC()
-                    mfcDC.DeleteDC()
-                    win32gui.ReleaseDC(self.hwnd, hWndDC)
+                    print("win32gui.PrintWindow不可用")
                     return None
-            
+
             if not success:
                 print("PrintWindow调用失败，尝试使用PW_CLIENTONLY模式")
                 if PrintWindow:
                     success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
                 else:
                     success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
-                
+
                 if not success:
                     print("PrintWindow在PW_CLIENTONLY模式下也失败了")
-                    # 清理资源
-                    win32gui.DeleteObject(saveBitMap.GetHandle())
-                    saveDC.DeleteDC()
-                    mfcDC.DeleteDC()
-                    win32gui.ReleaseDC(self.hwnd, hWndDC)
                     return None
 
             # 获取位图数据
             bmpstr = saveBitMap.GetBitmapBits(True)
-            
+
             # 转换为OpenCV图像
             img = np.frombuffer(bmpstr, dtype='uint8').reshape((height, width, 4))
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-
-            # 清理资源
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(self.hwnd, hWndDC)
 
             # 检查图像是否全黑
             if np.mean(img) < 5:
@@ -229,18 +322,10 @@ class WindowCapture:
         except Exception as e:
             print(f"PrintWindow捕获出错: {str(e)}")
             return None
+        finally:
+            # 清理资源
+            self._cleanup_resources(hWndDC, mfcDC, saveDC, saveBitMap)
 
-
-    def capture_window(self, region: Optional[Tuple[int, int, int, int]] = None) -> Optional[np.ndarray]:
-        """捕获窗口图像，直接使用PrintWindow方法"""
-        # 直接使用PrintWindow方法（不使用BitBlt方法）
-        img = self.capture_window_printwindow(region)
-        if img is not None and np.mean(img) > 5:
-            # print("PrintWindow捕获成功")
-            return img
-            
-        print("捕获方法失败")
-        return None
 
     def get_raw_dc(self) -> Optional[int]:
         """获取原始DC句柄"""
@@ -267,7 +352,7 @@ class WindowCapture:
             return False
 
     def find_image_precise(self, target_image: Union[str, np.ndarray], threshold: Union[float, int] = None,
-                           method: str = "opencv", fallback: bool = True) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+                           method: str = "opencv", fallback: bool = True, capture_mode: Optional[str] = None) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
         """在窗口中精确查找目标图像，返回区域范围
 
         Args:
@@ -275,6 +360,7 @@ class WindowCapture:
             threshold: 匹配阈值，默认使用配置文件中的值
             method: 识别方法，可选值："opencv" 或 "pyscreeze"
             fallback: 当首选方法失败时是否尝试备选方法，默认True
+            capture_mode: 窗口捕获模式，可选值："PrintWindow" 或 "BitBlt"，默认使用配置文件中的设置
 
         Returns:
             找到匹配时返回((x1, x2), (y1, y2))元组，表示区域范围
@@ -294,8 +380,12 @@ class WindowCapture:
                 # 如果是浮点数且大于1，也认为是百分比值
                 threshold = threshold / 100.0
             
+            # 如果未指定捕获模式，使用配置文件中的设置
+            if capture_mode is None:
+                capture_mode = settings.BACKEND_GET_IMG_MODE
+            
             # 捕获当前窗口图像
-            window_img = self.capture_window()
+            window_img = self.capture_window(capture_mode=capture_mode)
             if window_img is None:
                 return None
 
