@@ -1084,17 +1084,15 @@ class UiDialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.自动更新功能正式上线</span>
+                <span style="margin: 0;">1.新增自定义后台图像捕获方式</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.优化同步器算法，实现几乎0偏移</span>
+                <span style="margin: 0;">2.修复PrintWindow方法出现CreateCompatibleDC failed的问题</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.新增自定义后台识别方式和识别阙值</span>
+                <span style="margin: 0;">3.修复游戏检测提示不准确的问题</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.新增自定义同步窗口大小</span>
+                <span style="margin: 0;">4.优化部分错误提示信息</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">5.新增对角线和平铺两种窗口排列方式</span>
-                <br style="margin: 0;"/>
-                <span style="margin: 0;">6.修复已知bug</span>
+                <span style="margin: 0;">5.修复已知问题</span>
             </div>
          '''
          return text

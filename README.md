@@ -15,7 +15,7 @@
 
 | 功能              | 链接                                                         |
 | ----------------- | :----------------------------------------------------------- |
-| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.0.1/OAT-v2.0.1.zip) |
+| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.0.2/OAT-v2.0.2.zip) |
 | 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
 
 ---
@@ -160,8 +160,16 @@ A: 验证`source`目录下对应副本的图片资源是否匹配当前游戏版
 ### Q: 多窗口同步失效如何处理？
 A: 确认主窗口和副窗口均已正确选择，主窗口需一直可见，副窗口可以最小化，但需确保主副窗口大小不变。
 
-### Q: 执行挑战无效怎么办？
-A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
+### Q: 窗口检测与执行挑战无效怎么办？
+A: 确保本程序以管理员身份运行，确保窗口大小不变且可见。
+
+
+
+---
+
+<div align="center">
+    <p>✨ 如还有问题或建议，欢迎提交 Issue ✨</p>
+</div>
 
 ---
 
@@ -174,10 +182,5 @@ A: 确保程序以管理员身份运行，确保窗口大小不变且可见。
 ## 📞 联系作者
 
 - 📧 邮箱：n3032747608@163.com
+- 🐧 QQ：3032747608
 - 📦 GitHub：[RMA-MUN/OnmyojiAuto](https://github.com/RMA-MUN)
-
----
-
-<div align="center">
-    <p>✨ 如有问题或建议，欢迎提交 Issue ✨</p>
-</div>
