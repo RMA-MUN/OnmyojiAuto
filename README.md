@@ -1,7 +1,7 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v2.0.1-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v2.0.2-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
