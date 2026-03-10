@@ -604,6 +604,10 @@ class UiDialog(object):
         self.img_find_threshold.valueChanged.connect(self.save_find_value_settings)
         self.img_find_threshold.valueChanged.connect(lambda value: self.find_value_label_value.setText(f"{value}%"))
 
+        self.edit_mode_and_img_btn = QtWidgets.QPushButton("编辑模式和图像")
+        self.edit_mode_and_img_btn.setObjectName("edit_mode_and_img_btn")
+        general_form.addRow(self.edit_mode_and_img_btn)
+
         self.check_update_check = QtWidgets.QPushButton("检查更新")
         self.check_update_check.setObjectName("settings_button")
         general_form.addRow(self.check_update_check)
