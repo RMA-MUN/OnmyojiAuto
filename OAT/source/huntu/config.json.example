@@ -1,0 +1,45 @@
+{
+  "image_paths": {
+    "jieshu": {
+      "path": "jieshu.png",
+      "click_type": "image",
+      "next_image": "tiaozhan",
+      "is_global": false,
+      "message": "已结束挑战"
+    },
+    "tiaozhan": {
+      "path": "tiaozhan.png",
+      "click_type": "image",
+      "is_challenge_start": true,
+      "next_image": "xiezhu",
+      "is_global": false,
+      "message": "已开始挑战"
+    },
+    "xiezhu": {
+      "path": "xiezhu.png",
+      "click_type": "image",
+      "next_image": "zuihou",
+      "is_global": false,
+      "message": "已拒绝好友协助"
+    },
+    "zuihou": {
+      "path": "zuihou.png",
+      "click_type": "image",
+      "next_image": "jieshu",
+      "is_global": false
+    },
+    "baocang": {
+      "path": "baocang.png",
+      "click_type": "image",
+      "is_global": true,
+      "message": "已处理御魂爆仓"
+    },
+    "gouxie": {
+      "path": "gouxie.png",
+      "click_type": "image",
+      "is_global": true,
+      "message": "已处理勾协"
+    }
+  },
+  "recognition_order": ["jieshu", "tiaozhan", "xiezhu", "zuihou"]
+}

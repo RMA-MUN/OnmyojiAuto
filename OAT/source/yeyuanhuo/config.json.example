@@ -1,0 +1,37 @@
+{
+  "image_paths": {
+    "jieshu": {
+      "path": "jieshu.png",
+      "click_type": "image",
+      "is_global": false,
+      "message": "已结束挑战"
+    },
+    "tiaozhan": {
+      "path": "tiaozhan.png",
+      "click_type": "image",
+      "is_challenge_start": true,
+      "is_global": false,
+      "message": "已开始挑战"
+    },
+    "shenshe": {
+      "path": "shenshe.png",
+      "click_type": "coordinate",
+      "click_area": [750, 850, 450, 550],
+      "is_global": false,
+      "message": "已选择深蛇"
+    },
+    "zuihou": {
+      "path": "zuihou.png",
+      "click_type": "image",
+      "next_image": "jieshu",
+      "is_global": false
+    },
+    "baocang": {
+      "path": "baocang.png",
+      "click_type": "image",
+      "is_global": true,
+      "message": "已处理御魂爆仓"
+    }
+  },
+  "recognition_order": ["jieshu", "tiaozhan", "shenshe", "zuihou"]
+}

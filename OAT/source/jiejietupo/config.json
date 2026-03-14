@@ -1,0 +1,66 @@
+{
+  "image_paths": {
+    "ling_xunzang": {
+      "path": "ling_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "【debug】 识别到零勋章结界",
+      "is_global": false
+    },
+    "yi_xunzang": {
+      "path": "yi_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "【debug】 识别到一勋章结界",
+      "is_global": false
+    },
+    "si_xunzang": {
+      "path": "si_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "【debug】 识别到四勋章结界",
+      "is_global": false
+    },
+    "san_xunzang": {
+      "path": "san_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "【debug】 识别到三勋章结界",
+      "is_global": false
+    },
+    "er_xunzang": {
+      "path": "er_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "【debug】 识别到二勋章结界",
+      "is_global": false
+    },
+    "jingong": {
+      "path": "jingong.png",
+      "click_type": "image",
+      "is_global": false,
+      "message": "【debug】 进攻",
+      "is_challenge_start": true
+    },
+    "image": {
+      "path": "image.png",
+      "click_type": "coordinate",
+      "click_area": [100, 200, 200, 400],
+      "is_global": false,
+      "message": "【debug】 已选择最后一个目标"
+    },
+    "baocang": {
+      "path": "baocang.png",
+      "click_type": "image",
+      "is_global": true,
+      "message": "御魂爆仓"
+    },
+    "xiezhu": {
+      "path": "xiezhu.png",
+      "click_type": "image",
+      "is_global": true,
+      "message": "已自动拒绝好友的协助"
+    }
+  },
+  "recognition_order": ["san_xunzang", "jingong", "er_xunzang", "image", "ling_xunzang", "yi_xunzang", "si_xunzang", "baocang", "xiezhu"]
+}
