@@ -240,6 +240,8 @@ class OnmyojiAutomation:
                        hidden_window: bool = False,
                        threshold: float = None,
                        sync_mode: bool = False,
+                       click_type: str = "image",
+                       click_area: list = None,
                        # sync_type: str = "完全同步"
                        ) -> bool:
         """
@@ -248,6 +250,8 @@ class OnmyojiAutomation:
         :param hidden_window: 是否使用隐藏窗口模式
         :param threshold: 识别阈值，默认使用设置中的值
         :param sync_mode: 是否同步执行
+        :param click_type: 点击方式：image（图片区域）、coordinate（指定坐标）
+        :param click_area: 当click_type为coordinate时的点击区域 [x1, x2, y1, y2]
         :param sync_type: 同步类型，可选值："完全同步"、"点击同步"
         :return: 是否成功执行操作
         """
@@ -256,9 +260,9 @@ class OnmyojiAutomation:
             if threshold is None:
                 threshold = self.default_confidence
             if hidden_window:
-                return self._perform_action_hidden_window(logo, threshold, sync_mode)
+                return self._perform_action_hidden_window(logo, threshold, sync_mode, click_type, click_area)
             else:
-                return self._perform_action_normal(logo, threshold, sync_mode)
+                return self._perform_action_normal(logo, threshold, sync_mode, click_type, click_area)
         except pyautogui.FailSafeException:
             print("警告：触发了PyAutoGUI的安全模式，操作已停止")
             return False
@@ -266,7 +270,7 @@ class OnmyojiAutomation:
             print(f"警告：执行操作时发生错误：{str(e)}")
             return False
 
-    def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+    def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool, click_type: str = "image", click_area: list = None) -> bool:
         """使用隐藏窗口捕获模式执行操作"""
         try:
             # 使用初始化时创建的WindowCapture实例
@@ -290,11 +294,24 @@ class OnmyojiAutomation:
             # 使用设置的识别模式和阈值
             position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
             if position:
-                # 从区域范围中计算中心点坐标
-                (x1, x2), (y1, y2) = position
-                # 使用随机偏移点击
-                relative_x = random.randint(x1, x2)
-                relative_y = random.randint(y1, y2)
+                # 确定点击坐标
+                if click_type == "coordinate" and click_area:
+                    # 使用指定区域生成随机坐标
+                    x1, x2, y1, y2 = click_area
+                    relative_x = random.randint(x1, x2)
+                    relative_y = random.randint(y1, y2)
+                else:
+                    # 从区域范围中计算中心点坐标
+                    (x1, x2), (y1, y2) = position
+                    # 计算区域中心
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    # 计算区域的1/3大小作为随机范围，使点击更靠近中心
+                    range_x = (x2 - x1) // 3
+                    range_y = (y2 - y1) // 3
+                    # 在中心附近生成随机坐标
+                    relative_x = random.randint(max(x1, center_x - range_x), min(x2, center_x + range_x))
+                    relative_y = random.randint(max(y1, center_y - range_y), min(y2, center_y + range_y))
 
                 self._send_click_messages(relative_x, relative_y, sync_mode)
                 return True
@@ -303,18 +320,46 @@ class OnmyojiAutomation:
         except Exception as e:
             print(f"隐藏窗口捕获发生错误: {str(e)}")
             # 降级到常规模式
-            return self._perform_action_normal(logo, threshold, sync_mode)
+            return self._perform_action_normal(logo, threshold, sync_mode, click_type, click_area)
 
-
-
-    def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool) -> bool:
+    def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool, click_type: str = "image", click_area: list = None) -> bool:
         """使用常规模式执行操作"""
         found = self.find_img(logo)
         if not found:
             return False
 
         with self.lock:  # 只在执行关键操作时持有锁
-            self._complex_move(target_x=self.target_x, target_y=self.target_y)
+            # 确定点击坐标
+            if click_type == "coordinate" and click_area:
+                # 使用指定区域生成随机坐标
+                x1, x2, y1, y2 = click_area
+                # 转换为屏幕绝对坐标
+                target_x = self.x1 + random.randint(x1, x2)
+                target_y = self.y1 + random.randint(y1, y2)
+            else:
+                # 重新计算更靠近中心的随机坐标
+                # 从find_img方法中，target_x和target_y是在区域内随机生成的
+                if logo in self.recognition_cache:
+                    cached_result, _ = self.recognition_cache[logo]
+                    if cached_result:
+                        x, y, width, height = cached_result
+                        # 计算区域中心
+                        center_x = x + width // 2
+                        center_y = y + height // 2
+                        # 计算区域的1/3大小作为随机范围，使点击更靠近中心
+                        range_x = width // 3
+                        range_y = height // 3
+                        # 在中心附近生成随机坐标
+                        target_x = random.randint(max(x, center_x - range_x), min(x + width, center_x + range_x))
+                        target_y = random.randint(max(y, center_y - range_y), min(y + height, center_y + range_y))
+                    else:
+                        # 如果缓存中没有结果，使用原来的坐标
+                        target_x, target_y = self.target_x, self.target_y
+                else:
+                    # 如果缓存中没有结果，使用原来的坐标
+                    target_x, target_y = self.target_x, self.target_y
+
+            self._complex_move(target_x=target_x, target_y=target_y)
             self._win32_double_click()
             
             # 如果启用同步模式，根据同步类型执行相应操作

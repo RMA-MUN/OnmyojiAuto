@@ -41,14 +41,22 @@ def common_challenge(
                 path = os.path.join(script_dir, v['path'])
                 image_info[k] = {
                     'message': v.get('message', ''),
-                    'is_challenge_start': v.get('is_challenge_start', False)
+                    'is_challenge_start': v.get('is_challenge_start', False),
+                    'click_type': v.get('click_type', 'image'),
+                    'click_area': v.get('click_area', None),
+                    'next_image': v.get('next_image', None),
+                    'is_global': v.get('is_global', False)
                 }
             else:
                 # 兼容旧格式
                 path = os.path.join(script_dir, v)
                 image_info[k] = {
                     'message': '',
-                    'is_challenge_start': k in ['tiaozhan', 'kaishi']
+                    'is_challenge_start': k in ['tiaozhan', 'kaishi'],
+                    'click_type': 'image',
+                    'click_area': None,
+                    'next_image': None,
+                    'is_global': False
                 }
             
             image_paths[k] = path
@@ -58,32 +66,137 @@ def common_challenge(
         print(f"已预加载 {len(image_paths)} 张图像模板")
 
         i = 0
+        current_next_image = None
+        # 跟踪图片连续出现次数
+        consecutive_count = {}
+        # 跟踪重试次数
+        retry_count = 0
 
         while i < times:
-            # 动态遍历配置文件中的所有图片键
-            for key in config['image_paths']:
+            # 优先检测全局图片
+            global_images = [key for key, info in image_info.items() if info['is_global']]
+            for key in global_images:
                 img_path = image_paths[key]
-                # print(f"正在识别图片：{key}")
                 try:
-                    # 尝试识别并执行操作，使用设置中的阈值
-                    if automation_obj.perform_action(img_path, hidden_window=hidden_window, sync_mode=sync_mode):
-                        # print(f"已成功识别并执行操作：{key}")
-                        
-                        # 获取图片的扩展信息
-                        info = image_info[key]
-                        
-                        # 检查是否需要打印消息
+                    info = image_info[key]
+                    if automation_obj.perform_action(
+                        img_path, 
+                        hidden_window=hidden_window, 
+                        sync_mode=sync_mode,
+                        click_type=info['click_type'],
+                        click_area=info['click_area']
+                    ):
                         if info['message']:
                             print(info['message'])
-                        
-                        # 检查是否是开始挑战的图片
-                        if info['is_challenge_start']:
-                            i += 1
-                            print(f"还剩{times - i}次挑战")
-                    else:
-                        pass
+                        # 重置连续出现次数，因为全局图片处理不影响正常流程
+                        consecutive_count = {}
+                        retry_count = 0
+                        # 全局图片处理后继续循环，不改变current_next_image
+                        continue
                 except Exception as e:
                     pass
+
+            # 处理指定的下一个图片
+            if current_next_image:
+                if current_next_image in image_paths:
+                    img_path = image_paths[current_next_image]
+                    try:
+                        info = image_info[current_next_image]
+                        if automation_obj.perform_action(
+                            img_path, 
+                            hidden_window=hidden_window, 
+                            sync_mode=sync_mode,
+                            click_type=info['click_type'],
+                            click_area=info['click_area']
+                        ):
+                            # 增加连续出现次数
+                            consecutive_count[current_next_image] = consecutive_count.get(current_next_image, 0) + 1
+                            count = consecutive_count[current_next_image]
+                            
+                            # 检查连续出现次数
+                            if count == 2:
+                                print(f"警告：图片 {current_next_image} 已连续出现2次，开始计数重试")
+                                retry_count = 1
+                            elif count >= 5:
+                                print(f"错误：图片 {current_next_image} 已连续出现5次，强制停止挑战")
+                                return False
+                            
+                            # 检查重试次数
+                            if retry_count > 0:
+                                print(f"重试次数：{retry_count}/5")
+                                if retry_count >= 5:
+                                    print(f"错误：重试5次后图片 {current_next_image} 仍然存在，结束挑战")
+                                    return False
+                                retry_count += 1
+                            
+                            if info['message']:
+                                print(info['message'])
+                            if info['is_challenge_start']:
+                                i += 1
+                                print(f"还剩{times - i}次挑战")
+                                # 挑战开始时重置连续出现次数
+                                consecutive_count = {}
+                                retry_count = 0
+                            # 更新下一个图片
+                            current_next_image = info['next_image']
+                            # 如果更新了下一个图片，重置连续出现次数
+                            if current_next_image != key:
+                                consecutive_count = {}
+                                retry_count = 0
+                    except Exception as e:
+                        pass
+            else:
+                # 按照识别顺序处理
+                recognition_order = config.get('recognition_order', list(config['image_paths'].keys()))
+                for key in recognition_order:
+                    if key in image_paths:
+                        img_path = image_paths[key]
+                        try:
+                            info = image_info[key]
+                            if automation_obj.perform_action(
+                                img_path, 
+                                hidden_window=hidden_window, 
+                                sync_mode=sync_mode,
+                                click_type=info['click_type'],
+                                click_area=info['click_area']
+                            ):
+                                # 增加连续出现次数
+                                consecutive_count[key] = consecutive_count.get(key, 0) + 1
+                                count = consecutive_count[key]
+                                
+                                # 检查连续出现次数
+                                if count == 2:
+                                    print(f"警告：图片 {key} 已连续出现2次，开始计数重试")
+                                    retry_count = 1
+                                elif count >= 5:
+                                    print(f"错误：图片 {key} 已连续出现5次，强制停止挑战")
+                                    return False
+                                
+                                # 检查重试次数
+                                if retry_count > 0:
+                                    print(f"重试次数：{retry_count}/5")
+                                    if retry_count >= 5:
+                                        print(f"错误：重试5次后图片 {key} 仍然存在，结束挑战")
+                                        return False
+                                    retry_count += 1
+                                
+                                if info['message']:
+                                    print(info['message'])
+                                if info['is_challenge_start']:
+                                    i += 1
+                                    print(f"还剩{times - i}次挑战")
+                                    # 挑战开始时重置连续出现次数
+                                    consecutive_count = {}
+                                    retry_count = 0
+                                # 更新下一个图片
+                                current_next_image = info['next_image']
+                                # 如果更新了下一个图片，重置连续出现次数
+                                if current_next_image and current_next_image != key:
+                                    consecutive_count = {}
+                                    retry_count = 0
+                                break
+                        except Exception as e:
+                            pass
 
         print(f"挑战完成！共执行{times}次挑战")
         
