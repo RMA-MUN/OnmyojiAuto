@@ -12,7 +12,8 @@
       "click_type": "image",
       "next_image": "jingong",
       "message": "【debug】 识别到一勋章结界",
-      "is_global": false
+      "is_global": false,
+      "is_challenge_start": false
     },
     "si_xunzang": {
       "path": "si_xunzang.png",
@@ -26,7 +27,8 @@
       "click_type": "image",
       "next_image": "jingong",
       "message": "【debug】 识别到三勋章结界",
-      "is_global": false
+      "is_global": false,
+      "is_challenge_start": false
     },
     "er_xunzang": {
       "path": "er_xunzang.png",
@@ -45,7 +47,12 @@
     "image": {
       "path": "image.png",
       "click_type": "coordinate",
-      "click_area": [100, 200, 200, 400],
+      "click_area": [
+        100,
+        200,
+        200,
+        400
+      ],
       "is_global": false,
       "message": "【debug】 已选择最后一个目标"
     },
@@ -62,5 +69,15 @@
       "message": "已自动拒绝好友的协助"
     }
   },
-  "recognition_order": ["san_xunzang", "jingong", "er_xunzang", "image", "ling_xunzang", "yi_xunzang", "si_xunzang", "baocang", "xiezhu"]
+  "recognition_order": [
+    "san_xunzang",
+    "jingong",
+    "er_xunzang",
+    "image",
+    "ling_xunzang",
+    "yi_xunzang",
+    "si_xunzang",
+    "baocang",
+    "xiezhu"
+  ]
 }

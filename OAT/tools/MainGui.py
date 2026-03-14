@@ -11,10 +11,10 @@ import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit, QMessageBox
 
 from OAT.tools.GetDC import WindowCapture
+from OAT.utils.warning_box import warning_box
 from .ConfigManager import ConfigReader
 from .GUI import UiDialog
 from .ThreadManager import UpdateCheckThread
@@ -266,33 +266,60 @@ class MainWindow(QtWidgets.QDialog):
 
             # 读取模式对应的子配置文件
             folder_info = MODE_MAPPING.get(mode)
-            if folder_info:
+            
+            # 获取项目根目录
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            
+            # 如果在MODE_MAPPING中找不到模式，尝试从mode.json文件中读取
+            if not folder_info:
+                # 加载mode.json文件
+                mode_json_path = os.path.join(project_root, 'OAT', 'source', 'mode.json')
+                try:
+                    with open(mode_json_path, 'r', encoding='utf-8') as f:
+                        mode_config = json.load(f)
+                    
+                    # 从mode_config中获取模式信息
+                    mode_data = mode_config.get(mode)
+                    if mode_data:
+                        if isinstance(mode_data, dict):
+                            folder_name = mode_data.get(sub_mode, mode_data.get('default', ''))
+                        else:
+                            folder_name = mode_data
+                    else:
+                        print('暂不支持此模式，敬请期待！')
+                        return
+                except Exception as e:
+                    print(f"读取mode.json文件失败: {e}")
+                    print('暂不支持此模式，敬请期待！')
+                    return
+            else:
+                # 从MODE_MAPPING中获取模式信息
                 if isinstance(folder_info, dict):
                     folder_name = folder_info.get(sub_mode, folder_info['default'])
                 else:
                     folder_name = folder_info
-                sub_config_path = os.path.join('source', folder_name, 'config.json')
-                sub_config_reader = ConfigReader(sub_config_path)
-                sub_config = sub_config_reader.read_config()
-                if sub_config:
-                    # 获取synchronizer实例，如果存在的话
-                    synchronizer = self.sync if hasattr(self, 'sync') else None
-                    mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
-                                hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
-                                sync_mode_value=self.sync_mode_value)
-                else:
-                    print(f"读取 {sub_config_path} 配置文件失败。")
+            
+            # 构建配置文件路径并读取
+            sub_config_path = os.path.join(project_root, 'OAT', 'source', folder_name, 'config.json')
+            sub_config_reader = ConfigReader(sub_config_path)
+            sub_config = sub_config_reader.read_config()
+            
+            if sub_config:
+                # 获取synchronizer实例，如果存在的话
+                synchronizer = self.sync if hasattr(self, 'sync') else None
+                mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
+                            hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
+                            sync_mode_value=self.sync_mode_value)
             else:
-                print('暂不支持此模式，敬请期待！')
+                print(f"读取 {sub_config_path} 配置文件失败。")
 
         except Exception as e:
             error_msg = f"执行挑战时出现异常: {e}"
-            print(error_msg)
-            self.log_redirect.log_to_file(error_msg)
-            # 修改日志文件路径
+            # 记录错误到日志文件
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(traceback.format_exc() + '\n')
-            QtWidgets.QMessageBox.critical(self, "错误", f"执行挑战时出现异常: {e}，请检查日志文件。")
+            # 显示警告弹窗
+            warning_box(error_msg)
 
         finally:
             # 通过current_thread()获取当前线程对象
@@ -973,7 +1000,7 @@ class MainWindow(QtWidgets.QDialog):
             self.update_download_thread.start()
             
         except Exception as e:
-            QMessageBox.critical(self, "更新错误", f"启动更新失败: {str(e)}")
+            warning_box(f"启动更新失败: {str(e)}")
     
     def create_download_dialog(self):
         """
@@ -1120,7 +1147,7 @@ class MainWindow(QtWidgets.QDialog):
         if hasattr(self, 'download_dialog') and self.download_dialog:
             self.download_dialog.close()
         
-        QMessageBox.critical(self, "下载失败", f"下载更新包时出错: {error_msg}")
+        warning_box(f"下载更新包时出错: {error_msg}")
     
     def on_update_not_available(self):
         """处理没有更新的信号"""
@@ -1149,13 +1176,7 @@ class MainWindow(QtWidgets.QDialog):
             self.checking_msg.deleteLater()
             self.checking_msg = None
         
-        # 记录错误并显示友好提示
-        print(f"检查更新时出错: {error_msg}")
-        error_msg_box = QMessageBox(self)
-        error_msg_box.setWindowTitle("检查更新失败")
-        error_msg_box.setText("检查更新时发生错误，请稍后重试")
-        error_msg_box.setIcon(QMessageBox.Icon.Warning)
-        error_msg_box.exec()
+        warning_box("检查更新时发生错误，请稍后重试")
 
 
     def sync_instruction(self):

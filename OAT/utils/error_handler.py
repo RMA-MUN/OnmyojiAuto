@@ -2,7 +2,7 @@ import datetime
 import os
 import traceback
 import sys
-from PyQt6.QtWidgets import QMessageBox
+from OAT.utils.warning_box import warning_box
 
 # 创建 logs 文件夹
 LOGS_DIR = 'logs'
@@ -14,10 +14,24 @@ LOG_FILE = os.path.join(LOGS_DIR, 'log.log')
 
 
 def handle_global_exception(e: Exception, window=None):
+    """
+    处理全局异常
+    
+    Args:
+        e: 异常对象
+        window: 窗口对象（可选）
+    
+    Returns:
+        None
+    """
     error_msg = f"主程序运行时出现异常: {e}"
-    if window and hasattr(window, 'log_redirect'):
-        window.log_redirect.print(error_msg)
-    QMessageBox.critical(None, "致命错误", str(e))
+    # 记录错误到日志文件
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"{timestamp} - Global exception: {error_msg}\n")
+        traceback.print_exc(file=f)
+    # 显示警告弹窗
+    warning_box(error_msg)
 
 
 def log_exception(exc_type, exc_value, exc_traceback):

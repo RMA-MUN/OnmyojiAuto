@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QPushButton, QAbstractItemView, QSizePolicy
 from OAT.source.mode_config import mode_choice, mode_config
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
 from OAT.tools.settings import THEME
+from OAT.tools.edit_mode_and_img import ModeEditorDialog
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -606,6 +607,7 @@ class UiDialog(object):
 
         self.edit_mode_and_img_btn = QtWidgets.QPushButton("编辑模式和图像")
         self.edit_mode_and_img_btn.setObjectName("edit_mode_and_img_btn")
+        self.edit_mode_and_img_btn.clicked.connect(self.open_mode_editor_dialog)
         general_form.addRow(self.edit_mode_and_img_btn)
 
         self.check_update_check = QtWidgets.QPushButton("检查更新")
@@ -1131,12 +1133,35 @@ class UiDialog(object):
                 
             if len(sub_modes) >= 2:
                 self.radioButton2.setText(sub_modes[1])
+                self.radioButton2.show()
             else:
-                # 如果只有一个子选项，隐藏第二个单选按钮或设置为空
+                # 如果只有一个子选项，隐藏第二个单选按钮
                 self.radioButton2.hide()
             
             # 显示子选项区域
             self.soul_land_options.show()
+        else:
+            # 如果没有子选项，隐藏子选项区域
+            self.soul_land_options.hide()
+    
+    def open_mode_editor_dialog(self):
+        """
+        打开模式和图像编辑弹窗
+        """
+        dialog = ModeEditorDialog(self.dialog)
+        dialog.exec()
+        # 重新加载模式配置
+        global mode_config_data
+        mode_config_data = mode_config(mode_json_path) or {}
+        # 重新加载模式选择下拉菜单
+        self.find_mode_combo.clear()
+        modes = mode_choice(mode_json_path)
+        if modes:
+            for mode in modes:
+                self.find_mode_combo.addItem(mode)
+            
+            # 调用on_mode_selected方法更新子选项
+            self.on_mode_selected(self.find_mode_combo.currentIndex())
 
     # 同步器功能实现
     def on_width_changed(self, text):

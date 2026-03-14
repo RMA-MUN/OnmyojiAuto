@@ -15,7 +15,6 @@ class ConfigReader:
     def read_config(self):
         try:
             with open(self.file_path, 'r', encoding='utf-8') as f:
-                print(f"已成功读取配置文件: {self.file_path}")
                 # 根据文件扩展名选择合适的解析方式
                 if self.file_path.endswith('.yaml') or self.file_path.endswith('.yml'):
                     return yaml.safe_load(f)
@@ -24,9 +23,7 @@ class ConfigReader:
                 else:
                     # 默认使用yaml解析
                     return yaml.safe_load(f)
-        except Exception as e:
-            error_msg = f"读取配置文件 {self.file_path} 时出现异常: {e}"
-            print(error_msg)
+        except Exception:
             return None
 
     def write_config(self, config_data):
@@ -40,9 +37,6 @@ class ConfigReader:
                 else:
                     # 默认使用yaml写入
                     yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
-            print(f"已成功写入配置文件: {self.file_path}")
             return True
-        except Exception as e:
-            error_msg = f"写入配置文件 {self.file_path} 时出现异常: {e}"
-            print(error_msg)
+        except Exception:
             return False
