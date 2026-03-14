@@ -11,10 +11,10 @@ import win32gui
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit, QMessageBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
+from PyQt6.QtWidgets import QMessageBox
 
 from OAT.tools.GetDC import WindowCapture
-from OAT.utils.warning_box import warning_box
 from .ConfigManager import ConfigReader
 from .GUI import UiDialog
 from .ThreadManager import UpdateCheckThread
@@ -24,8 +24,9 @@ from ..config.update_manager import UpdateManager
 from ..source import *
 from ..source import MODE_MAPPING
 from ..tools import *
-from ..utils.error_handler import setup_global_exception_handler, LOG_FILE
+from ..utils.error_handler import setup_global_exception_handler, LOG_FILE, log_error
 from ..utils.logging import LogRedirect
+from ..utils.warning_box import warning_box
 from OAT.tools.settings import APP_VERSION
 from .ThreadManager import UpdateDownloadThread
 from ..utils.markdown_to_html import markdown_to_html
@@ -315,11 +316,12 @@ class MainWindow(QtWidgets.QDialog):
 
         except Exception as e:
             error_msg = f"执行挑战时出现异常: {e}"
-            # 记录错误到日志文件
+            print(error_msg)
+            self.log_redirect.log_to_file(error_msg)
+            # 修改日志文件路径
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(traceback.format_exc() + '\n')
-            # 显示警告弹窗
-            warning_box(error_msg)
+            QtWidgets.QMessageBox.critical(self, "错误", f"执行挑战时出现异常: {e}，请检查日志文件。")
 
         finally:
             # 通过current_thread()获取当前线程对象
@@ -496,11 +498,10 @@ class MainWindow(QtWidgets.QDialog):
             title: 对话框标题
             message: 错误消息
         """
-        msg_box = QtWidgets.QMessageBox(self)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        msg_box.exec()
+        # 使用warning_box显示错误信息
+        warning_box(message)
+        # 写入日志文件
+        log_error(f"{title}: {message}")
 
     # 全选方法
     def select_all(self):
@@ -1000,7 +1001,7 @@ class MainWindow(QtWidgets.QDialog):
             self.update_download_thread.start()
             
         except Exception as e:
-            warning_box(f"启动更新失败: {str(e)}")
+            QMessageBox.critical(self, "更新错误", f"启动更新失败: {str(e)}")
     
     def create_download_dialog(self):
         """
@@ -1147,7 +1148,7 @@ class MainWindow(QtWidgets.QDialog):
         if hasattr(self, 'download_dialog') and self.download_dialog:
             self.download_dialog.close()
         
-        warning_box(f"下载更新包时出错: {error_msg}")
+        QMessageBox.critical(self, "下载失败", f"下载更新包时出错: {error_msg}")
     
     def on_update_not_available(self):
         """处理没有更新的信号"""
@@ -1176,7 +1177,13 @@ class MainWindow(QtWidgets.QDialog):
             self.checking_msg.deleteLater()
             self.checking_msg = None
         
-        warning_box("检查更新时发生错误，请稍后重试")
+        # 记录错误并显示友好提示
+        print(f"检查更新时出错: {error_msg}")
+        error_msg_box = QMessageBox(self)
+        error_msg_box.setWindowTitle("检查更新失败")
+        error_msg_box.setText("检查更新时发生错误，请稍后重试")
+        error_msg_box.setIcon(QMessageBox.Icon.Warning)
+        error_msg_box.exec()
 
 
     def sync_instruction(self):

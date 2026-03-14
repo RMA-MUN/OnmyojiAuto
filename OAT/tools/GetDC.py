@@ -25,7 +25,8 @@ try:
     PrintWindow = user32.PrintWindow
     PrintWindow.argtypes = [wintypes.HWND, wintypes.HDC, wintypes.UINT]
     PrintWindow.restype = wintypes.BOOL
-except Exception:
+except Exception as e:
+    warning_box(f"初始化PrintWindow时出错: {str(e)}")
     PrintWindow = None
 
 class WindowCapture:
@@ -35,7 +36,8 @@ class WindowCapture:
         if window_title and not hwnd:
             self.hwnd = win32gui.FindWindow(None, window_title)
             if not self.hwnd:
-                raise Exception(f"未找到窗口: {window_title}")
+                warning_box(f"未找到窗口: {window_title}")
+                raise
         elif not self.hwnd:
             # 使用当前活动窗口
             self.hwnd = win32gui.GetForegroundWindow()
@@ -65,7 +67,8 @@ class WindowCapture:
             client_height = client_rect[3] - client_rect[1]
             
             return (x, y), (width, height), (client_width, client_height)
-        except Exception:
+        except Exception as e:
+            warning_box(f"获取窗口信息时出错: {str(e)}")
             return None
 
     def _cleanup_resources(self, hWndDC=None, mfcDC=None, saveDC=None, saveBitMap=None):
@@ -110,6 +113,7 @@ class WindowCapture:
         try:
             # 确保窗口可见
             if win32gui.IsIconic(self.hwnd):
+                print("窗口最小化，无法使用BitBlt捕获")
                 return None
 
             # 重新获取客户区尺寸
@@ -119,6 +123,7 @@ class WindowCapture:
 
             # 检查窗口尺寸是否有效
             if self.client_width <= 0 or self.client_height <= 0:
+                print("无效的窗口尺寸")
                 return None
 
             # 确定捕获区域
@@ -126,6 +131,7 @@ class WindowCapture:
                 left, top, width, height = region
                 # 确保区域在有效范围内
                 if left < 0 or top < 0 or left + width > self.client_width or top + height > self.client_height:
+                    print("指定区域超出窗口范围")
                     return None
             else:
                 left, top = 0, 0
@@ -159,10 +165,12 @@ class WindowCapture:
 
             # 检查图像是否全黑
             if np.mean(img) < 5:  # 如果平均像素值小于5，可能是全黑图像
+                print("BitBlt捕获到的图像可能是全黑的")
                 return None
 
             return img
-        except Exception:
+        except Exception as e:
+            print(f"BitBlt捕获出错: {str(e)}")
             return None
         finally:
             # 清理资源
@@ -184,8 +192,9 @@ class WindowCapture:
         
         # 根据指定模式调用对应的捕获函数
         def capture_by_mode(mode):
-            # 只有当捕获模式发生变化时才更新记录
+            # 只有当捕获模式发生变化时才输出信息
             if self.last_capture_mode != mode:
+                print(f"使用{mode}模式捕获")
                 self.last_capture_mode = mode
             
             if mode == "PrintWindow":
@@ -203,18 +212,21 @@ class WindowCapture:
 
         # 如果指定模式失败，尝试另一种模式
         fallback_mode = "BitBlt" if capture_mode == "PrintWindow" else "PrintWindow"
+        print(f"{capture_mode}捕获失败，尝试{fallback_mode}方法")
         img = capture_by_mode(fallback_mode)
         if img is not None and np.mean(img) > 5:
             # 永久切换到 fallback_mode 并更新配置
             if settings.BACKEND_GET_IMG_MODE != fallback_mode:
+                print(f"切换到{fallback_mode}模式")
                 settings.update_settings('capture_window_mode', fallback_mode)
             return img
 
         # 如果都失败，显示错误弹窗并返回None
+        print("所有捕获方法失败")
         try: 
             warning_box("所有窗口捕获方法都失败了，请检查窗口状态或尝试重启程序。")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"显示错误弹窗失败: {e}")
         
         return None
 
@@ -234,6 +246,7 @@ class WindowCapture:
 
             # 检查窗口尺寸是否有效
             if self.client_width <= 0 or self.client_height <= 0:
+                print("无效的窗口尺寸")
                 return None
 
             # 确定捕获区域
@@ -241,6 +254,7 @@ class WindowCapture:
                 left, top, width, height = region
                 # 确保区域在有效范围内
                 if left < 0 or top < 0 or left + width > self.client_width or top + height > self.client_height:
+                    print("指定区域超出窗口范围")
                     return None
             else:
                 left, top = 0, 0
@@ -249,17 +263,21 @@ class WindowCapture:
             # 获取窗口DC
             hWndDC = win32gui.GetDC(self.hwnd)
             if not hWndDC:
+                print("获取窗口DC失败")
                 return None
 
             mfcDC = win32ui.CreateDCFromHandle(hWndDC)
             if not mfcDC:
+                print("创建MFC DC失败")
                 return None
 
             try:
                 saveDC = mfcDC.CreateCompatibleDC()
                 if not saveDC:
+                    print("CreateCompatibleDC failed")
                     return None
-            except Exception:
+            except Exception as e:
+                print(f"CreateCompatibleDC失败: {str(e)}")
                 return None
 
             # 创建位图对象
@@ -275,15 +293,18 @@ class WindowCapture:
                 try:
                     success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
                 except AttributeError:
+                    print("win32gui.PrintWindow不可用")
                     return None
 
             if not success:
+                print("PrintWindow调用失败，尝试使用PW_CLIENTONLY模式")
                 if PrintWindow:
                     success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
                 else:
                     success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
 
                 if not success:
+                    print("PrintWindow在PW_CLIENTONLY模式下也失败了")
                     return None
 
             # 获取位图数据
@@ -299,7 +320,8 @@ class WindowCapture:
                 return None
 
             return img
-        except Exception:
+        except Exception as e:
+            print(f"PrintWindow捕获出错: {str(e)}")
             return None
         finally:
             # 清理资源
@@ -310,21 +332,24 @@ class WindowCapture:
         """获取原始DC句柄"""
         try:
             return win32gui.GetDC(self.hwnd)
-        except Exception:
+        except Exception as e:
+            print(f"获取DC句柄出错: {str(e)}")
             return None
 
     def release_dc(self, hDC: int) -> bool:
         """释放DC句柄"""
         try:
             return win32gui.ReleaseDC(self.hwnd, hDC) == 1
-        except Exception:
+        except Exception as e:
+            print(f"释放DC句柄出错: {str(e)}")
             return False
 
     def is_window_minimized(self) -> bool:
         """检查窗口是否最小化"""
         try:
             return win32gui.IsIconic(self.hwnd)
-        except Exception:
+        except Exception as e:
+            print(f"检查窗口状态出错: {str(e)}")
             return False
 
     def find_image_precise(self, target_image: Union[str, np.ndarray], threshold: Union[float, int] = None,
@@ -376,8 +401,9 @@ class WindowCapture:
                         return None
                     else:
                         return None
-                except Exception:
+                except Exception as e:
                     # 只有在OpenCV识别过程中出现报错时，才降级到PyScreeze方法
+                    print(f"OpenCV识别出错: {str(e)}，尝试使用PyScreeze...")
                     if fallback:
                         return self._find_image_pyscreeze(window_img, target_image, threshold)
                     else:
@@ -400,7 +426,8 @@ class WindowCapture:
                         return self._find_image_opencv(window_img, target_image, threshold)
                     else:
                         return None
-        except Exception:
+        except Exception as e:
+            print(f"图像查找出错: {str(e)}")
             return None
 
     def _find_image_opencv(self, window_img: np.ndarray, target_image: Union[str, np.ndarray],
@@ -443,7 +470,8 @@ class WindowCapture:
                 return ((x1, x2), (y1, y2))
 
             return None
-        except Exception:
+        except Exception as e:
+            print(f"OpenCV图像查找出错: {str(e)}")
             return None
 
     def _find_image_pyscreeze(self, window_img: np.ndarray, target_image: Union[str, np.ndarray],
@@ -487,6 +515,8 @@ class WindowCapture:
 
             return None
         except ImportError:
+            print("PyScreeze 未安装，无法使用该方法")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"PyScreeze图像查找出错: {str(e)}")
             return None

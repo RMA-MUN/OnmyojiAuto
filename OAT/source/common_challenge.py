@@ -7,6 +7,8 @@ import os
 from OAT.tools.OnmyojiAuto import OnmyojiAutomation
 from OAT.tools import settings
 from OAT.utils.do_after_challenge import do_after_challenge
+from OAT.utils.warning_box import warning_box
+from OAT.utils.error_handler import log_error
 
 def common_challenge(
         times: int, config: dict,
@@ -205,5 +207,9 @@ def common_challenge(
         
         return True
     except Exception as e:
-        print(f"错误：挑战过程中发生致命错误：{str(e)}")
-        return False
+            error_msg = f"错误：挑战过程中发生致命错误：{str(e)}"
+            # 使用warning_box显示错误信息
+            warning_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
+            return False

@@ -71,7 +71,10 @@ class LogRedirect(QtCore.QObject):
         
         timestamp = self.get_timestamp()
         caller_info = self.get_caller_info()
-        
+        # 文本浏览器显示格式（保持可读性）
+        display_text = f"{timestamp} - {message}"
+        self.append_log.emit(display_text)
+
         # 日志文件JSON格式（便于后续分析）
         log_data = {
             'timestamp': timestamp,
@@ -110,8 +113,8 @@ class LogRedirect(QtCore.QObject):
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 json.dump(log_data, f, ensure_ascii=False)
                 f.write('\n')
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"写入日志文件失败: {e}")
 
     def _cleanup_log_file(self):
         """
@@ -132,6 +135,7 @@ class LogRedirect(QtCore.QObject):
             
             # 记录清理信息
             cleanup_message = f"检测到日志文件过大，已自动清理。"
+            self.append_log.emit(f"{self.get_timestamp()} - {cleanup_message}")
             cleanup_log_data = {
                 'timestamp': self.get_timestamp(),
                 'level': 'INFO',
@@ -141,5 +145,5 @@ class LogRedirect(QtCore.QObject):
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 json.dump(cleanup_log_data, f, ensure_ascii=False)
                 f.write('\n')
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"清理日志文件失败: {e}")

@@ -16,6 +16,8 @@ from .WindowSynchronizer import WindowSynchronizer
 from .GetDC import WindowCapture
 # 导入整个settings模块，而不是单个变量
 from . import settings
+from OAT.utils.warning_box import warning_box
+from OAT.utils.error_handler import log_error
 
 
 class OnmyojiAutomation:
@@ -264,10 +266,18 @@ class OnmyojiAutomation:
             else:
                 return self._perform_action_normal(logo, threshold, sync_mode, click_type, click_area)
         except pyautogui.FailSafeException:
-            print("警告：触发了PyAutoGUI的安全模式，操作已停止")
+            error_msg = "警告：触发了PyAutoGUI的安全模式，操作已停止"
+            # 使用warning_box显示错误信息
+            warning_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
             return False
         except Exception as e:
-            print(f"警告：执行操作时发生错误：{str(e)}")
+            error_msg = f"警告：执行操作时发生错误：{str(e)}"
+            # 使用warning_box显示错误信息
+            warning_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
             return False
 
     def _perform_action_hidden_window(self, logo: str, threshold: float, sync_mode: bool, click_type: str = "image", click_area: list = None) -> bool:

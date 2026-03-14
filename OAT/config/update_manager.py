@@ -10,6 +10,8 @@ import shutil
 import traceback
 from urllib3.exceptions import InsecureRequestWarning
 from tqdm import tqdm
+from OAT.utils.warning_box import warning_box
+from OAT.utils.error_handler import log_error
 
 # 禁用不安全请求警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -74,7 +76,11 @@ class UpdateManager:
                     return download_url
             return None
         except Exception as e:
-            print(f"获取下载链接时出错: {e}")
+            error_msg = f"获取下载链接时出错: {e}"
+            # 使用warning_box显示错误信息
+            warning_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
             return None
 
     def get_update(self) -> str | None:

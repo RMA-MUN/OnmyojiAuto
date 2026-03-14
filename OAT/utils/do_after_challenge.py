@@ -12,6 +12,8 @@ import time
 import win32api
 import win32con
 import win32gui
+from OAT.utils.warning_box import warning_box
+from OAT.utils.error_handler import log_error
 
 def load_settings():
     """
@@ -27,7 +29,12 @@ def load_settings():
     try:
         with open(settings_file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        error_msg = f"警告：加载设置文件失败：{str(e)}"
+        # 使用warning_box显示错误信息
+        warning_box(error_msg)
+        # 写入日志文件
+        log_error(error_msg)
         return {}
 
 
@@ -42,6 +49,7 @@ def close_game(window_hwnd: int) -> bool:
             window_title = win32gui.GetWindowText(window_hwnd)
             # 发送关闭消息
             win32gui.PostMessage(window_hwnd, win32con.WM_CLOSE, 0, 0)
+            print(f"已发送关闭命令到窗口：{window_title} (句柄: {window_hwnd})")
 
             # 等待一下，让窗口有时间处理关闭消息
             time.sleep(5)
@@ -56,23 +64,27 @@ def close_game(window_hwnd: int) -> bool:
             
             if confirm_hwnd:
                 confirm_window_title = win32gui.GetWindowText(confirm_hwnd)
+                print(f"检测到确认弹窗：{confirm_window_title} (句柄: {confirm_hwnd})")
+                print(f"发送确认关闭命令到窗口：{confirm_title}")
                 
                 # 1. 确保确认弹窗获得焦点
                 try:
-                    # 先将窗口置前
+                    # 先将模拟器窗口置前
                     win32gui.SetForegroundWindow(window_hwnd)
                     time.sleep(0.5)
                     # 再将确认弹窗置前
                     win32gui.SetForegroundWindow(confirm_hwnd)
                     time.sleep(0.5)
-                except Exception:
-                    pass
+                    print("已激活确认弹窗")
+                except Exception as e:
+                    print(f"激活确认弹窗时发生错误：{str(e)}")
                 
-                # 2. 尝试多种方式确认
+                # 2. 尝试多种方式确认，增加成功率
                 success = False
                 retry_count = 3
                 
                 for attempt in range(retry_count):
+                    print(f"第{attempt+1}/{retry_count}次尝试确认关闭")
                     
                     try:
                         # 方式1：发送完整的回车键消息（包含必要的参数）
@@ -90,14 +102,17 @@ def close_game(window_hwnd: int) -> bool:
                         
                         # 检查窗口是否还存在
                         if not win32gui.IsWindow(confirm_hwnd):
-                                success = True
-                                break
-                    except Exception:
-                        pass
+                            print("确认弹窗已关闭，操作成功")
+                            success = True
+                            break
+                            
+                    except Exception as e:
+                        print(f"方式1（完整回车键）失败：{str(e)}")
 
                     
                     # 方式2：尝试查找确认按钮并点击
                     try:
+                        print("尝试查找并点击确认按钮")
                         # 查找确认按钮（可能需要根据实际情况调整类名或标题）
                         # 先尝试作为子窗口查找按钮
                         confirm_btn_hwnd = win32gui.FindWindowEx(confirm_hwnd, 0, "Button", "确定")
@@ -105,27 +120,36 @@ def close_game(window_hwnd: int) -> bool:
                             confirm_btn_hwnd = win32gui.FindWindowEx(confirm_hwnd, 0, "Button", "确认")
                         
                         if confirm_btn_hwnd:
+                            print(f"找到确认按钮，句柄：{confirm_btn_hwnd}")
                             # 发送点击消息
                             win32gui.SendMessage(confirm_btn_hwnd, win32con.BM_CLICK, 0, 0)
                             time.sleep(1)
                             
                             if not win32gui.IsWindow(confirm_hwnd):
+                                print("确认弹窗已关闭，操作成功")
                                 success = True
                                 break
                                 
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"方式2（点击确认按钮）失败：{str(e)}")
                     
                     # 如果所有方式都失败，等待后重试
                     if attempt < retry_count - 1:
                         time.sleep(2)
                 
-                pass
+                if not success:
+                    print("警告：所有确认关闭尝试都失败了！")
+                else:
+                    print("确认关闭操作成功")
 
             return True
         else:
+            print("无效的窗口句柄")
             return False
-    except Exception:
+    except Exception as e:
+        print(f"关闭游戏窗口时发生错误：{str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -179,12 +203,15 @@ def close_program() -> None:
             except (ImportError, NameError):
                 pass
 
+            print("直接终止进程")
             os.kill(os.getpid(), signal.SIGTERM)
             
-        except Exception:
+        except Exception as thread_e:
+            print(f"终止线程时发生错误：{str(thread_e)}")
             # 如果还是不行，就直接退出
             sys.exit(0)
-    except Exception:
+    except Exception as e:
+        print(f"关闭程序时发生错误：{str(e)}")
         # 确保在内部try-except块中处理所有QtWidgets相关操作
         try:
             from PyQt6 import QtWidgets
@@ -223,6 +250,7 @@ def do_after_challenge(window_hwnds: list[int] | int, synchronizer=None, is_sync
         # 处理同步模式
         if synchronizer and is_sync and synchronizer.sync_enabled:
             # 关闭所有同步窗口
+            print("正在关闭所有同步窗口...")
             
             # 添加主窗口
             if synchronizer.main_window:

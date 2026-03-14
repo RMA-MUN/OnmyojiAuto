@@ -12,6 +12,8 @@ from OAT.source.mode_config import mode_choice, mode_config
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
 from OAT.tools.settings import THEME
 from OAT.tools.edit_mode_and_img import ModeEditorDialog
+from OAT.utils.warning_box import warning_box
+from OAT.utils.error_handler import log_error
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -823,7 +825,11 @@ class UiDialog(object):
             with open(qss_path, "r", encoding="utf-8") as f:
                 Dialog.setStyleSheet(f.read())
         except Exception as e:
-            print(f"样式表加载失败: {str(e)}")
+            error_msg = f"样式表加载失败: {str(e)}"
+            # 使用warning_box显示错误信息
+            warning_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
 
     def save_setting(self, key: str, value: Any, update_global: bool = False, global_var_name: str = None, global_var_value: Any = None):
         """
