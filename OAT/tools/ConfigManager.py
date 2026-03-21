@@ -1,6 +1,8 @@
 import yaml
 import json
 import os
+from OAT.utils.error_box import error_box
+from OAT.utils.error_handler import log_error
 
 class ConfigReader:
     def __init__(self, file_path: str):
@@ -26,7 +28,14 @@ class ConfigReader:
                     return yaml.safe_load(f)
         except Exception as e:
             error_msg = f"读取配置文件 {self.file_path} 时出现异常: {e}"
-            print(error_msg)
+            # 使用错误级别记录日志
+            from OAT.utils.logging import LogRedirect
+            log_redirect = LogRedirect(None)
+            log_redirect.error(error_msg)
+            # 使用error_box显示错误弹窗
+            error_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
             return None
 
     def write_config(self, config_data):
@@ -44,5 +53,12 @@ class ConfigReader:
             return True
         except Exception as e:
             error_msg = f"写入配置文件 {self.file_path} 时出现异常: {e}"
-            print(error_msg)
+            # 使用错误级别记录日志
+            from OAT.utils.logging import LogRedirect
+            log_redirect = LogRedirect(None)
+            log_redirect.error(error_msg)
+            # 使用error_box显示错误弹窗
+            error_box(error_msg)
+            # 写入日志文件
+            log_error(error_msg)
             return False

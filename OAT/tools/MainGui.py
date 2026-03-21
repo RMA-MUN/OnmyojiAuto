@@ -27,6 +27,7 @@ from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE, log_error
 from ..utils.logging import LogRedirect
 from ..utils.warning_box import warning_box
+from ..utils.error_box import error_box
 from OAT.tools.settings import APP_VERSION
 from .ThreadManager import UpdateDownloadThread
 from ..utils.markdown_to_html import markdown_to_html
@@ -173,7 +174,7 @@ class MainWindow(QtWidgets.QDialog):
         automation = OnmyojiAutomation(self.window_title)
         # 先检测窗口是否存在
         if automation.is_window_present() is False:
-            QtWidgets.QMessageBox.warning(self, "警告", "未检测到阴阳师窗口，请先打开游戏")
+            warning_box("未检测到阴阳师窗口，请先打开游戏")
             return
 
         automation.print_window_info()
@@ -201,7 +202,7 @@ class MainWindow(QtWidgets.QDialog):
         self.clean_threads()
         MAX_THREADS = 5
         if len(self.active_threads) >= MAX_THREADS:
-            QtWidgets.QMessageBox.warning(self, "提示", "已有任务在进行中，请等待完成")
+            warning_box("已有任务在进行中，请等待完成")
             return
         times = self.ui.spinBox.value()
         mode: str = self.ui.find_mode_combo.currentText()
@@ -312,7 +313,9 @@ class MainWindow(QtWidgets.QDialog):
                             hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
                             sync_mode_value=self.sync_mode_value)
             else:
-                print(f"读取 {sub_config_path} 配置文件失败。")
+                error_msg = f"读取 {sub_config_path} 配置文件失败。"
+                print(error_msg)
+                error_box(error_msg)
 
         except Exception as e:
             error_msg = f"执行挑战时出现异常: {e}"
@@ -321,7 +324,7 @@ class MainWindow(QtWidgets.QDialog):
             # 修改日志文件路径
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
                 f.write(traceback.format_exc() + '\n')
-            QtWidgets.QMessageBox.critical(self, "错误", f"执行挑战时出现异常: {e}，请检查日志文件。")
+            error_box(f"执行挑战时出现异常: {e}，请检查日志文件。")
 
         finally:
             # 通过current_thread()获取当前线程对象
@@ -980,7 +983,7 @@ class MainWindow(QtWidgets.QDialog):
             download_url = update_manager.get_download_url(latest_info)
             
             if not download_url:
-                QMessageBox.warning(self, "更新失败", "无法获取更新包下载链接")
+                warning_box("无法获取更新包下载链接")
                 return
             
             # 创建下载进度对话框
@@ -1001,7 +1004,7 @@ class MainWindow(QtWidgets.QDialog):
             self.update_download_thread.start()
             
         except Exception as e:
-            QMessageBox.critical(self, "更新错误", f"启动更新失败: {str(e)}")
+            error_box(f"启动更新失败: {str(e)}")
     
     def create_download_dialog(self):
         """
@@ -1120,7 +1123,7 @@ class MainWindow(QtWidgets.QDialog):
                                 zip_path = file_path
             
             if not zip_path:
-                QMessageBox.critical(self, "更新失败", "未找到更新压缩包")
+                error_box("未找到更新压缩包")
                 return
             
             # 获取更新日志
@@ -1133,9 +1136,9 @@ class MainWindow(QtWidgets.QDialog):
                 # 使用紧急退出函数关闭OAT程序
                 self.emergency_stop()
             else:
-                QMessageBox.critical(self, "更新失败", "无法启动更新程序，请确保OAT_Updater.exe或OAT_Updater_GUI存在于程序目录下")
+                error_box("无法启动更新程序，请确保OAT_Updater.exe或OAT_Updater_GUI存在于程序目录下")
         except Exception as e:
-            QMessageBox.critical(self, "更新错误", f"启动更新程序失败: {str(e)}")
+            error_box(f"启动更新程序失败: {str(e)}")
 
     def on_download_error(self, error_msg: str):
         """
@@ -1148,7 +1151,7 @@ class MainWindow(QtWidgets.QDialog):
         if hasattr(self, 'download_dialog') and self.download_dialog:
             self.download_dialog.close()
         
-        QMessageBox.critical(self, "下载失败", f"下载更新包时出错: {error_msg}")
+        error_box(f"下载更新包时出错: {error_msg}")
     
     def on_update_not_available(self):
         """处理没有更新的信号"""

@@ -131,9 +131,7 @@ class UiDialog(object):
         # 验证同步模式值是否有效
         if current_sync_mode not in self.sync_mode_reverse_map:
             # 弹窗提示用户配置文件被意外修改
-            QtWidgets.QMessageBox.warning(
-                dialog, "配置错误", "同步模式配置被意外修改，将使用默认值（完全同步）"
-            )
+            warning_box("同步模式配置被意外修改，将使用默认值（完全同步）")
             # 使用默认值
             current_sync_mode = 'exactly_sync'
         # 根据英文值获取对应的中文选项

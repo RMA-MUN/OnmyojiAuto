@@ -3,6 +3,7 @@ import os
 import traceback
 import sys
 from .warning_box import warning_box
+from .error_box import error_box
 
 # 创建 logs 文件夹
 LOGS_DIR = 'logs'
@@ -20,8 +21,8 @@ def handle_global_exception(e: Exception, window=None):
     :param window: 窗口对象（可选）
     """
     error_msg = f"主程序运行时出现异常: {e}"
-    # 使用warning_box显示警告弹窗
-    warning_box(str(e))
+    # 使用error_box显示错误弹窗
+    error_box(str(e))
     # 写入日志文件
     log_error(error_msg)
 
