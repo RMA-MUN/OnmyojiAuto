@@ -13,10 +13,10 @@
 
 ## 📥 程序下载 & 更新日志
 
-| 功能              | 链接                                                         |
-| ----------------- | :----------------------------------------------------------- |
-| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.0.2/OAT-v2.0.2.zip) |
-| 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
+| 功能              | 链接                                                                                         |
+| ----------------- |:-------------------------------------------------------------------------------------------|
+| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.1.0/OAT-v2.1.0.zip) |
+| 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest)                             |
 
 ---
 
