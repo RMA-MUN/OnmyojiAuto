@@ -5,7 +5,7 @@
   "close_game_after_challenge": false,
   "sync_mode": "exactly_sync",
   "find_value": 90,
-  "find_mode": "pyscreeze",
+  "find_mode": "opencv",
   "custom_res_width": 1404,
   "custom_res_height": 834,
   "window_arrange_mode": "diagonal",
