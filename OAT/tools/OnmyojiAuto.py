@@ -229,10 +229,19 @@ class OnmyojiAutomation:
         """
         # 将相对坐标转换为LPARAM格式
         l_param = relative_x | (relative_y << 16)
+        
         # 发送鼠标移动过去的信息
         win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param)
+        
+        # 添加短暂延时确保鼠标移动到位
+        time.sleep(0.05)
+        
         # 发送鼠标左键按下消息
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param)
+        
+        # 增加鼠标按下时长，确保点击被正确识别
+        time.sleep(0.5)
+        
         # 发送鼠标左键释放消息
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
 
@@ -298,7 +307,6 @@ class OnmyojiAutomation:
                 if pil_image.mode != 'RGB':
                     pil_image = pil_image.convert('RGB')
                 # 转换为NumPy数组并调整通道顺序（PIL是RGB，OpenCV是BGR）
-
                 target_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             
             # 使用设置的识别模式和阈值

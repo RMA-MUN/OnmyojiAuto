@@ -303,7 +303,16 @@ class WindowSynchronizer:
             
         # 组合发送鼠标消息
         self.send_mouse_move(hwnd, relative_x, relative_y)
+        
+        # 添加短暂延时确保鼠标移动到位
+        import time
+        time.sleep(0.05)
+        
         self.send_mouse_down(hwnd, relative_x, relative_y)
+        
+        # 增加鼠标按下时长，确保点击被正确识别
+        time.sleep(0.1)
+        
         self.send_mouse_up(hwnd, relative_x, relative_y)
 
     def send_mouse_move_to_all(self, relative_x: int, relative_y: int) -> None:
