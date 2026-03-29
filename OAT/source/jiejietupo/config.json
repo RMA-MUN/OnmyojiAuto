@@ -4,44 +4,49 @@
       "path": "ling_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
-      "message": "【debug】 识别到零勋章结界",
+      "message": "识别到零勋章结界",
       "is_global": false
     },
     "yi_xunzang": {
       "path": "yi_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
-      "message": "【debug】 识别到一勋章结界",
       "is_global": false,
+      "message": "识别到一勋章结界",
       "is_challenge_start": false
+    },
+    "wu_xunzang": {
+      "path": "wu_xunzang.png",
+      "click_type": "image",
+      "next_image": "jingong",
+      "message": "识别到五勋章结界",
+      "is_global": false
     },
     "si_xunzang": {
       "path": "si_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
-      "message": "【debug】 识别到四勋章结界",
       "is_global": false
     },
     "san_xunzang": {
       "path": "san_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
-      "message": "【debug】 识别到三勋章结界",
       "is_global": false,
+      "message": "识别到三勋章结界",
       "is_challenge_start": false
     },
     "er_xunzang": {
       "path": "er_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
-      "message": "【debug】 识别到二勋章结界",
+      "message": "识别到二勋章结界",
       "is_global": false
     },
     "jingong": {
       "path": "jingong.png",
       "click_type": "image",
       "is_global": false,
-      "message": "【debug】 进攻",
       "is_challenge_start": true
     },
     "image": {
@@ -53,8 +58,7 @@
         200,
         400
       ],
-      "is_global": false,
-      "message": "【debug】 已选择最后一个目标"
+      "is_global": false
     },
     "baocang": {
       "path": "baocang.png",
