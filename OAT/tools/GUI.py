@@ -1094,13 +1094,13 @@ class UiDialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.新增自定义后台图像捕获方式</span>
+                <span style="margin: 0;">1.新增结界突破功能(推荐使用前台模式)</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.修复PrintWindow方法出现CreateCompatibleDC failed的问题</span>
+                <span style="margin: 0;">2.自定义模式增加图形化配置界面(入口：设置-常规设置-编辑模式和图像)</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.修复游戏检测提示不准确的问题</span>
+                <span style="margin: 0;">3.图像识别增加更多可选项</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.优化部分错误提示信息</span>
+                <span style="margin: 0;">4.优化错误提示</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">5.修复已知问题</span>
             </div>
