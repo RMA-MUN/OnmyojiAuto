@@ -37,13 +37,15 @@ class OCRManager:
                 print("请安装Visual C++ Redistributable或使用CPU版本的PyTorch")
                 self.reader = None
     
-    def find_text_offline(self, image_input, target_text: str):
+    def find_text_offline(self, image_input, target_text: str, debug: bool = False, confidence_threshold: float = 0.5):
         """
         OCR：查找图片中的指定文字
         
         参数:
             image_input: 图片文件路径（字符串）或图像对象（numpy数组）
             target_text: 要查找的目标文字
+            debug: 是否启用调试输出，默认为False
+            confidence_threshold: 置信度阈值，默认为0.5
             
         返回:
             tuple: (是否找到, 文字区域坐标, 文字内容)
@@ -91,15 +93,50 @@ class OCRManager:
         found = False
         text_area = None
         real_text = None
+        # 统计达到阈值的文字数量
+        threshold_count = 0
+        # 存储达到阈值的文字信息
+        threshold_texts = []
 
         # 遍历所有文字
         for (box, text, conf) in results:
             # box = 文字区域四个坐标 [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+            
+            # 调试输出：显示识别到的文字及其置信度
+            if debug:
+                print(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}")
+            
+            # 检查是否达到置信度阈值
+            if conf >= confidence_threshold:
+                threshold_count += 1
+                threshold_texts.append({
+                    'text': text,
+                    'confidence': conf,
+                    'area': box
+                })
+                
+            # 检查是否找到目标文字
             if target_text in text:
                 found = True
                 real_text = text
                 text_area = box  # 文字区域坐标
+                if debug:
+                    print(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
                 break
+
+        # 调试输出：统计信息
+        if debug:
+            print(f"[OCR Debug] 总识别到 {len(results)} 个文字")
+            print(f"[OCR Debug] 达到置信度阈值({confidence_threshold})的文字数量: {threshold_count}")
+            if threshold_count > 0:
+                print(f"[OCR Debug] 达到阈值的文字详情:")
+                for idx, item in enumerate(threshold_texts, 1):
+                    # 计算区域边界
+                    x_coords = [point[0] for point in item['area']]
+                    y_coords = [point[1] for point in item['area']]
+                    min_x, max_x = min(x_coords), max(x_coords)
+                    min_y, max_y = min(y_coords), max(y_coords)
+                    print(f"  {idx}. 文字: '{item['text']}'，置信度: {item['confidence']:.4f}，区域: [x: {min_x:.1f}-{max_x:.1f}, y: {min_y:.1f}-{max_y:.1f}]")
 
         # 输出结果（仅在找到文字时打印）
         # if found:
