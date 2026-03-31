@@ -18,6 +18,7 @@ from .GetDC import WindowCapture
 from . import settings
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
+from OAT.utils.OCRService import ocr_service
 
 
 class OnmyojiAutomation:
@@ -193,6 +194,93 @@ class OnmyojiAutomation:
             return True
         
         return False
+    
+    def find_text_ocr(self, target_text: str) -> tuple:
+        """
+        使用OCR识别文字（异步执行）
+        
+        参数:
+            target_text: 要识别的目标文字
+            
+        返回:
+            tuple: (是否找到, 文字区域坐标, 文字内容)
+        """
+        import threading
+        import queue
+        
+        # 创建队列用于接收OCR结果
+        result_queue = queue.Queue()
+        
+        def ocr_task():
+            """OCR识别任务，在单独线程中执行"""
+            start_time = time.time()
+            
+            try:
+                # 获取窗口截图
+                screenshot = None
+                if self.window_capture:
+                    # 使用隐藏窗口捕获
+                    screenshot = self.window_capture.capture_window()
+                else:
+                    # 使用pyautogui截图
+                    screenshot = pyautogui.screenshot(region=self.area)
+                    # 转换为OpenCV格式
+                    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+                
+                if screenshot is None:
+                    result_queue.put((False, None, None))
+                    return
+                
+                # 使用OCR服务识别文字
+                found, text_area, real_text = ocr_service.find_text(screenshot, target_text)
+                
+                # 记录识别时间（仅在找到文字时打印）
+                elapsed_time = time.time() - start_time
+                if found:
+                    print(f"OCR识别成功: '{target_text}'，耗时: {elapsed_time:.3f}秒")
+                    
+                    # 如果有窗口句柄，将OCR坐标转换为客户区坐标
+                    if self.hwnd and text_area:
+                        try:
+                            # 获取窗口信息
+                            window_rect = win32gui.GetWindowRect(self.hwnd)
+                            client_rect = win32gui.GetClientRect(self.hwnd)
+                            
+                            # 计算标题栏高度（窗口高度 - 客户区高度）
+                            window_height = window_rect[3] - window_rect[1]
+                            client_height = client_rect[3] - client_rect[1]
+                            title_bar_height = window_height - client_height
+                            
+                            # 将OCR坐标（包含标题栏）转换为客户区坐标
+                            converted_text_area = []
+                            for point in text_area:
+                                x, y = point
+                                # 减去标题栏高度
+                                converted_text_area.append([x, y - title_bar_height])
+                            
+                            text_area = converted_text_area
+                        except Exception:
+                            # 如果转换失败，使用原始坐标
+                            pass
+                
+                result_queue.put((found, text_area, real_text))
+            except pyautogui.FailSafeException:
+                print("OCR识别失败: 触发了PyAutoGUI安全模式")
+                result_queue.put((False, None, None))
+            except Exception as e:
+                print(f"OCR识别发生错误: {str(e)}")
+                result_queue.put((False, None, None))
+        
+        # 创建并启动线程
+        ocr_thread = threading.Thread(target=ocr_task, daemon=True)
+        ocr_thread.start()
+        
+        # 等待结果，设置超时时间避免无限等待
+        try:
+            return result_queue.get(timeout=15.0)  # 15秒超时，适应OCR识别耗时
+        except queue.Empty:
+            print("OCR识别超时")
+            return False, None, None
 
     def _move_mouse(self, x: int, y: int) -> None:
         """鼠标移动（基础方法）"""
@@ -240,7 +328,7 @@ class OnmyojiAutomation:
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param)
         
         # 增加鼠标按下时长，确保点击被正确识别
-        time.sleep(0.5)
+        time.sleep(0.2)
         
         # 发送鼠标左键释放消息
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
@@ -253,6 +341,8 @@ class OnmyojiAutomation:
                        sync_mode: bool = False,
                        click_type: str = "image",
                        click_area: list = None,
+                       ocr_enabled: bool = False,
+                       ocr_target_text: str = "",
                        # sync_type: str = "完全同步"
                        ) -> bool:
         """
@@ -263,6 +353,8 @@ class OnmyojiAutomation:
         :param sync_mode: 是否同步执行
         :param click_type: 点击方式：image（图片区域）、coordinate（指定坐标）
         :param click_area: 当click_type为coordinate时的点击区域 [x1, x2, y1, y2]
+        :param ocr_enabled: 是否启用OCR识别
+        :param ocr_target_text: OCR目标文字
         :param sync_type: 同步类型，可选值："完全同步"、"点击同步"
         :return: 是否成功执行操作
         """
@@ -270,6 +362,30 @@ class OnmyojiAutomation:
             # 使用设置中的阈值作为默认值
             if threshold is None:
                 threshold = self.default_confidence
+                
+            # 如果启用了OCR，先尝试OCR识别
+            if ocr_enabled and ocr_target_text:
+                found, text_area, real_text = self.find_text_ocr(ocr_target_text)
+                if found and text_area:
+                    # 在文字区域内随机点击
+                    x, y = ocr_service.get_random_point_in_area(text_area)
+                    if hidden_window:
+                        # 隐藏窗口模式下使用相对坐标
+                        self._send_click_messages(int(x), int(y), sync_mode)
+                    else:
+                        # 普通模式下转换为绝对坐标
+                        absolute_x = self.x1 + int(x)
+                        absolute_y = self.y1 + int(y)
+                        with self.lock:
+                            self._complex_move(target_x=absolute_x, target_y=absolute_y)
+                            self._win32_double_click()
+                            if sync_mode and self.synchronizer.sync_enabled:
+                                self.synchronizer.sync_controller()
+                            time.sleep(random.uniform(1.5, 3.0))
+                    return True
+                # 如果OCR未识别到文字，不输出错误信息，直接尝试图像识别
+            
+            # 如果OCR未启用或识别失败，使用常规图像识别
             if hidden_window:
                 return self._perform_action_hidden_window(logo, threshold, sync_mode, click_type, click_area)
             else:
@@ -321,9 +437,35 @@ class OnmyojiAutomation:
                 else:
                     # 从区域范围中计算中心点坐标
                     (x1, x2), (y1, y2) = position
+                    
                     # 计算区域中心
                     center_x = (x1 + x2) // 2
                     center_y = (y1 + y2) // 2
+                    
+                    # 计算标题栏高度并转换坐标（后台模式下，图像识别返回的坐标包含标题栏）
+                    try:
+                        # 获取窗口信息
+                        window_rect = win32gui.GetWindowRect(self.hwnd)
+                        client_rect = win32gui.GetClientRect(self.hwnd)
+                        
+                        # 计算标题栏高度（窗口高度 - 客户区高度）
+                        window_height = window_rect[3] - window_rect[1]
+                        client_height = client_rect[3] - client_rect[1]
+                        title_bar_height = window_height - client_height
+                        
+                        # 将包含标题栏的坐标转换为客户区坐标
+                        center_y = center_y - title_bar_height
+                        y1 = y1 - title_bar_height
+                        y2 = y2 - title_bar_height
+                        
+                        # 确保坐标在客户区内
+                        center_y = max(0, center_y)
+                        y1 = max(0, y1)
+                        y2 = max(0, y2)
+                    except Exception:
+                        # 如果转换失败，使用原始坐标
+                        pass
+                    
                     # 计算区域的1/3大小作为随机范围，使点击更靠近中心
                     range_x = (x2 - x1) // 3
                     range_y = (y2 - y1) // 3
