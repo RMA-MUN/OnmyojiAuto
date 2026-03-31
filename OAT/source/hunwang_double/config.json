@@ -5,10 +5,14 @@
     },
     "tiaozhan": {
       "path": "tiaozhan.png",
-      "ocr_enabled": true,
+      "ocr_enabled": false,
       "ocr_target_text": "挑战",
       "ocr_confidence_threshold": 0.8,
-      "is_challenge_start": true
+      "is_challenge_start": true,
+      "message": "",
+      "is_global": false,
+      "next_image": "",
+      "ocr_action": "点击文字所在区域"
     },
     "xiezhu": {
       "path": "xiezhu.png",
@@ -20,7 +24,13 @@
     "kaishi": {
       "path": "kaishi.png",
       "message": "已开始挑战",
-      "is_challenge_start": true
+      "is_challenge_start": true,
+      "is_global": false,
+      "next_image": "",
+      "ocr_enabled": false,
+      "ocr_target_text": "",
+      "ocr_confidence_threshold": 0.8,
+      "ocr_action": "点击文字所在区域"
     }
   }
 }
