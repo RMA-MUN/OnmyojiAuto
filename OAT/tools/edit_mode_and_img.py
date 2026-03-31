@@ -112,6 +112,47 @@ class ImageConfigDialog(QDialog):
         
         main_layout.addWidget(click_area_group)
         
+        # OCR配置
+        ocr_group = QtWidgets.QGroupBox("OCR配置")
+        ocr_layout = QVBoxLayout(ocr_group)
+        
+        # 是否启用OCR
+        self.is_ocr_enabled_checkbox = QtWidgets.QCheckBox("是否启用OCR")
+        self.is_ocr_enabled_checkbox.setChecked(self.config_data.get("ocr_enabled", False))
+        ocr_layout.addWidget(self.is_ocr_enabled_checkbox)
+        
+        # OCR识别文本
+        ocr_text_layout = QHBoxLayout()
+        ocr_text_label = QLabel("OCR识别文本:")
+        self.ocr_text_edit = QLineEdit(self.config_data.get("ocr_target_text", ""))
+        ocr_text_layout.addWidget(ocr_text_label)
+        ocr_text_layout.addWidget(self.ocr_text_edit)
+        ocr_layout.addLayout(ocr_text_layout)
+        
+        # OCR识别阈值
+        ocr_threshold_layout = QHBoxLayout()
+        ocr_threshold_label = QLabel("OCR识别阈值:")
+        self.ocr_threshold_edit = QLineEdit(str(self.config_data.get("ocr_confidence_threshold", 0.8)))
+        ocr_threshold_layout.addWidget(ocr_threshold_label)
+        ocr_threshold_layout.addWidget(self.ocr_threshold_edit)
+        ocr_layout.addLayout(ocr_threshold_layout)
+        
+        # OCR识别后的操作
+        ocr_action_layout = QHBoxLayout()
+        ocr_action_label = QLabel("OCR识别后的操作:")
+        self.ocr_action_combo = QtWidgets.QComboBox()
+        self.ocr_action_combo.addItem("点击文字所在区域")
+        self.ocr_action_combo.addItem("点击点击区域设置的区域")
+        current_action = self.config_data.get("ocr_action", "点击文字所在区域")
+        index = self.ocr_action_combo.findText(current_action)
+        if index != -1:
+            self.ocr_action_combo.setCurrentIndex(index)
+        ocr_action_layout.addWidget(ocr_action_label)
+        ocr_action_layout.addWidget(self.ocr_action_combo)
+        ocr_layout.addLayout(ocr_action_layout)
+        
+        main_layout.addWidget(ocr_group)
+        
         # 按钮
         button_layout = QHBoxLayout()
         self.save_btn = QPushButton("保存")
@@ -161,6 +202,22 @@ class ImageConfigDialog(QDialog):
             except:
                 # 使用默认值
                 self.config_data["click_area"] = [100, 200, 200, 400]
+        
+        # 保存OCR配置
+        self.config_data["ocr_enabled"] = self.is_ocr_enabled_checkbox.isChecked()
+        
+        # OCR识别文本
+        self.config_data["ocr_target_text"] = self.ocr_text_edit.text()
+        
+        # OCR识别阈值
+        try:
+            threshold = float(self.ocr_threshold_edit.text())
+            self.config_data["ocr_confidence_threshold"] = threshold
+        except:
+            self.config_data["ocr_confidence_threshold"] = 0.8
+        
+        # OCR识别后的操作
+        self.config_data["ocr_action"] = self.ocr_action_combo.currentText()
         
         # 保存到文件
         if self.config_path:
@@ -861,6 +918,16 @@ class ModeEditorDialog(QDialog):
 <ul style="margin-left: 20px;">
 <li>点击图片区域：点击识别到的图像区域</li>
 <li>点击自定义区域：点击指定的坐标区域，格式为[left, top, width, height]</li>
+</ul>
+</li>
+<li><strong>OCR配置</strong>：
+<ul style="margin-left: 20px;">
+<br>
+<strong><span style="color: #d9534f;">关于OCR：OCR是文字识别技术，在这里主要是识别游戏窗口内出现的文字内容，用于提高识别的精准度，但是会增加识别时间，建议在图像识别无法识别到时使用OCR</span></strong>
+<li>是否启用OCR：启用后会进行文字识别，默认值根据配置文件中的ocr_enabled字段</li>
+<li>OCR识别文本：需要识别的单个文本内容</li>
+<li>OCR识别阈值：OCR识别的置信度阈值，默认值为0.8</li>
+<li>OCR识别后的操作：识别到文本后执行的操作（点击文字所在区域、点击点击区域设置的区域）</li>
 </ul>
 </li>
 </ol>
