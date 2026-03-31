@@ -2,6 +2,9 @@
   "image_paths": {
     "tiaozhan": {
       "path": "tiaozhan.png",
+      "ocr_enabled": true,
+      "ocr_target_text": "挑战",
+      "ocr_confidence_threshold": 0.8,
       "is_challenge_start": true
     },
     "xiezhu": {

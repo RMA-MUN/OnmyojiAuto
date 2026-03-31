@@ -82,7 +82,10 @@ class CommonChallenge:
                     'click_type': v.get('click_type', 'image'),
                     'click_area': v.get('click_area', None),
                     'next_image': v.get('next_image', None),
-                    'is_global': v.get('is_global', False)
+                    'is_global': v.get('is_global', False),
+                    'ocr_enabled': v.get('ocr_enabled', False),
+                    'ocr_target_text': v.get('ocr_target_text', ''),
+                    'ocr_confidence_threshold': v.get('ocr_confidence_threshold', 0.8)
                 }
             else:
                 # 兼容旧格式
@@ -93,7 +96,10 @@ class CommonChallenge:
                     'click_type': 'image',
                     'click_area': None,
                     'next_image': None,
-                    'is_global': False
+                    'is_global': False,
+                    'ocr_enabled': False,
+                    'ocr_target_text': '',
+                    'ocr_confidence_threshold': 0.8
                 }
             
             self.image_paths[k] = path
@@ -119,7 +125,7 @@ class CommonChallenge:
             # 跟踪开始识别下一个图片的时间
             next_image_start_time = None
             # 超时时间（秒）
-            NEXT_IMAGE_TIMEOUT = 30
+            NEXT_IMAGE_TIMEOUT = 15
 
             while i < self.times:
                 # 优先检测全局图片
@@ -133,7 +139,9 @@ class CommonChallenge:
                             hidden_window=self.hidden_window, 
                             sync_mode=self.sync_mode,
                             click_type=info['click_type'],
-                            click_area=info['click_area']
+                            click_area=info['click_area'],
+                            ocr_enabled=info['ocr_enabled'],
+                            ocr_target_text=info['ocr_target_text']
                         ):
                             if info['message']:
                                 print(info['message'])
@@ -150,7 +158,7 @@ class CommonChallenge:
                     # 记录开始时间
                     if next_image_start_time is None:
                         next_image_start_time = time.time()
-                        print(f"开始识别下一个图片: {current_next_image}")
+                        # print(f"开始识别下一个图片: {current_next_image}")
                     
                     # 检查是否超时
                     if time.time() - next_image_start_time > NEXT_IMAGE_TIMEOUT:
@@ -169,7 +177,9 @@ class CommonChallenge:
                                     hidden_window=self.hidden_window, 
                                     sync_mode=self.sync_mode,
                                     click_type=info['click_type'],
-                                    click_area=info['click_area']
+                                    click_area=info['click_area'],
+                                    ocr_enabled=info['ocr_enabled'],
+                                    ocr_target_text=info['ocr_target_text']
                                 ):
                                     # 增加连续出现次数
                                     consecutive_count[current_next_image] = consecutive_count.get(current_next_image, 0) + 1
@@ -225,7 +235,9 @@ class CommonChallenge:
                                         hidden_window=self.hidden_window, 
                                         sync_mode=self.sync_mode,
                                         click_type=info['click_type'],
-                                        click_area=info['click_area']
+                                        click_area=info['click_area'],
+                                        ocr_enabled=info['ocr_enabled'],
+                                        ocr_target_text=info['ocr_target_text']
                                     ):
                                         # 增加连续出现次数
                                         consecutive_count[key] = consecutive_count.get(key, 0) + 1
@@ -269,7 +281,7 @@ class CommonChallenge:
                                     pass
 
                 # 在两次识别之间添加随机休眠时间
-                time.sleep(random.uniform(1.0, 3.0))
+                time.sleep(random.uniform(1.0, 2.0))
 
             print(f"挑战完成！共执行{self.times}次挑战")
             

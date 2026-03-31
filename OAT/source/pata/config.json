@@ -5,7 +5,10 @@
     },
     "tiaozhan": {
       "path": "tiaozhan.png",
-      "is_challenge_start": true
+      "is_challenge_start": true,
+      "ocr_enabled": true,
+      "ocr_target_text": "挑战",
+      "ocr_confidence_threshold": 0.5
     },
     "xiezhu": {
       "path": "xiezhu.png",

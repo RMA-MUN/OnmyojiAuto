@@ -26,6 +26,7 @@
       "path": "si_xunzang.png",
       "click_type": "image",
       "next_image": "jingong",
+      "message": "识别到四勋章结界",
       "is_global": false
     },
     "san_xunzang": {
@@ -47,7 +48,10 @@
       "path": "jingong.png",
       "click_type": "image",
       "is_global": false,
-      "is_challenge_start": true
+      "is_challenge_start": true,
+      "ocr_enabled": true,
+      "ocr_target_text": "进攻",
+      "ocr_confidence_threshold": 0.8
     },
     "image": {
       "path": "image.png",
