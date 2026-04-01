@@ -1094,15 +1094,15 @@ class UiDialog(object):
     def get_text(self): 
          text = '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.新增结界突破功能(推荐使用前台模式)</span>
+                <span style="margin: 0;">1.增加OCR文字识别功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.自定义模式增加图形化配置界面(入口：设置-常规设置-编辑模式和图像)</span>
+                <span style="margin: 0;">2.增加结界突破功能，修复后台交互的bug</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.图像识别增加更多可选项</span>
+                <span style="margin: 0;">3.可视化编辑配置界面增加OCR选项</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.优化错误提示</span>
+                <span style="margin: 0;">4.修复后台模式的坐标问题</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">5.修复已知问题</span>
+                <span style="margin: 0;">5.优化部分体验</span>
             </div>
          '''
          return text
