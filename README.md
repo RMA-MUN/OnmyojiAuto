@@ -1,7 +1,7 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v2.0.2-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v2.2.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
@@ -15,7 +15,7 @@
 
 | 功能              | 链接                                                                                         |
 | ----------------- |:-------------------------------------------------------------------------------------------|
-| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.1.0/OAT-v2.1.0.zip) |
+| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.2.0/OAT-v2.2.0.zip) |
 | 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest)                             |
 
 ---
@@ -61,13 +61,32 @@ cd OnmyojiAuto
 
 ### 2. 安装依赖
 
-使用项目提供的依赖清单安装所需库：
+使用uv包管理器安装项目依赖（推荐使用uv进行包管理，速度更快且更稳定）：
 
+#### 安装uv（如果尚未安装）
 ```bash
-pip install -r requirements.txt
+pip install uv
 ```
 
-**依赖说明**：`opencv-python`（图像识别）、`PyQt6`（GUI界面）、`pywin32`（窗口控制）等。
+#### 使用uv创建虚拟环境并安装依赖
+```bash
+# 创建并激活虚拟环境
+uv venv
+uv venv activate
+
+# 安装项目依赖
+uv pip install -r requirements.txt
+```
+
+**核心依赖说明**：
+- `opencv-python`：图像识别
+- `PyQt6`：GUI界面开发
+- `pywin32`：Windows窗口控制
+- `rapidocr`：文字识别
+- `pyautogui`：自动化操作
+- `numpy`：数值计算
+- `requests`：网络请求
+- `PyYAML`：配置文件解析
 
 ### 3. 环境配置
 
