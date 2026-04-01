@@ -1,10 +1,6 @@
 import os
-import warnings
 import cv2
-
-# 抑制 PyTorch pin_memory 警告
-warnings.filterwarnings("ignore", message="'pin_memory' argument is set as true but no accelerator is found")
-
+from rapidocr import RapidOCR
 
 class OCRManager:
     """
@@ -14,27 +10,23 @@ class OCRManager:
     
     def __init__(self):
         """初始化OCR管理器"""
-        # 模型存储路径（离线使用）
-        self.MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "ocr")
-        os.makedirs(self.MODEL_PATH, exist_ok=True)
         self.reader = None
     
     def _init_reader(self):
         """延迟初始化OCR reader"""
         if self.reader is None:
             try:
-                import easyocr
-                # 初始化离线OCR（中英文，CPU运行）
-                self.reader = easyocr.Reader(
-                    ['ch_sim', 'en'],  # 简体中文+英文
-                    gpu=False,        # 使用 CPU 模式，避免CUDA问题
-                    model_storage_directory=self.MODEL_PATH,  # 手动指定模型路径
-                    download_enabled=False,  # 关闭联网下载
-                    verbose=False
+                # 初始化RapidOCR（支持中英文识别）
+                self.reader = RapidOCR(
+                    params={
+                        "Det.box_thresh": 0.8,  # 文本检测阈值，取值：0.1~0.9 | 越大=越严格（只框清晰文字）| 越小=越宽松（容易框背景）
+                        "Det.unclip_ratio": 1.8,  # 增大文本框大小，取值：1.0~2.5 | 越大=框越大 | 越小=框紧贴文字
+                        "Global.text_score": 0.7,  # 文字识别置信度阈值， 取值：0.1~0.9 | 低于该值的识别结果会被丢弃
+                        "Det.max_side_len": 960  # 设置最大边长，避免图像过大
+                    }
                 )
             except Exception as e:
                 print(f"OCR初始化失败: {str(e)}")
-                print("请安装Visual C++ Redistributable或使用CPU版本的PyTorch")
                 self.reader = None
     
     def find_text_offline(self, image_input, target_text: str, debug: bool = False, confidence_threshold: float = 0.5):
@@ -79,16 +71,8 @@ class OCRManager:
         if self.reader is None:
             return False, None, None
         
-        # 离线识别（detail=1 返回坐标+文字）
-        # 调整参数以提高垂直文字识别率
-        results = self.reader.readtext(
-            img,
-            detail=1,
-            paragraph=False,  # 不合并段落，有助于识别垂直文字
-            contrast_ths=0.1,  # 降低对比度阈值，提高识别率
-            adjust_contrast=1.5,  # 进一步增强对比度
-            min_size=10  # 最小文字大小，根据实际情况调整
-        )
+        # 使用RapidOCR进行识别
+        results = self.reader(img)
 
         found = False
         text_area = None
@@ -98,42 +82,65 @@ class OCRManager:
         # 存储达到阈值的文字信息
         threshold_texts = []
 
-        # 遍历所有文字
-        for (box, text, conf) in results:
-            # box = 文字区域四个坐标 [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-            
-            # 调试输出：显示识别到的文字及其置信度
+        # 获取识别结果数据（RapidOCR返回的是RapidOCROutput对象）
+        if hasattr(results, 'txts'):
             if debug:
-                print(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}")
+                print(f"[OCR Debug] 识别到的文字数量: {len(results.txts)}")
             
-            # 检查是否达到置信度阈值
-            if conf >= confidence_threshold:
-                threshold_count += 1
-                threshold_texts.append({
-                    'text': text,
-                    'confidence': conf,
-                    'area': box
-                })
+            # 遍历所有文字
+            for i in range(len(results.txts)):
+                text = results.txts[i]
+                conf = results.scores[i]
+                box = results.boxes[i]
                 
-            # 检查是否找到目标文字
-            if target_text in text:
-                found = True
-                real_text = text
-                text_area = box  # 文字区域坐标
+                # 调试输出：显示识别到的文字及其置信度
                 if debug:
-                    print(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
-                break
+                    # 将numpy数组转换为列表以便打印
+                    box_list = box.tolist() if hasattr(box, 'tolist') else box
+                    print(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}，区域: {box_list}")
+                
+                # 检查是否达到置信度阈值
+                if conf >= confidence_threshold:
+                    threshold_count += 1
+                    threshold_texts.append({
+                        'text': text,
+                        'confidence': conf,
+                        'area': box
+                    })
+                    
+                # 检查是否找到目标文字
+                if target_text in text:
+                    found = True
+                    real_text = text
+                    # 将numpy数组转换为Python列表
+                    text_area = box.tolist() if hasattr(box, 'tolist') else box  # 文字区域坐标
+                    if debug:
+                        print(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
+                    break
+        else:
+            if debug:
+                print("[OCR Debug] RapidOCR未返回txts属性")
 
         # 调试输出：统计信息
         if debug:
-            print(f"[OCR Debug] 总识别到 {len(results)} 个文字")
+            if hasattr(results, 'txts'):
+                print(f"[OCR Debug] 总识别到 {len(results.txts)} 个文字")
+            else:
+                print(f"[OCR Debug] 未识别到文字")
             print(f"[OCR Debug] 达到置信度阈值({confidence_threshold})的文字数量: {threshold_count}")
             if threshold_count > 0:
                 print(f"[OCR Debug] 达到阈值的文字详情:")
                 for idx, item in enumerate(threshold_texts, 1):
                     # 计算区域边界
-                    x_coords = [point[0] for point in item['area']]
-                    y_coords = [point[1] for point in item['area']]
+                    area = item['area']
+                    # 将numpy数组转换为列表以便处理
+                    if hasattr(area, 'tolist'):
+                        area_list = area.tolist()
+                        x_coords = [point[0] for point in area_list]
+                        y_coords = [point[1] for point in area_list]
+                    else:
+                        x_coords = [point[0] for point in area]
+                        y_coords = [point[1] for point in area]
                     min_x, max_x = min(x_coords), max(x_coords)
                     min_y, max_y = min(y_coords), max(y_coords)
                     print(f"  {idx}. 文字: '{item['text']}'，置信度: {item['confidence']:.4f}，区域: [x: {min_x:.1f}-{max_x:.1f}, y: {min_y:.1f}-{max_y:.1f}]")
@@ -150,10 +157,13 @@ if __name__ == "__main__":
     # 创建OCR管理器实例
     ocr_manager = OCRManager()
     
-    # 测试图片路径
-    IMG_PATH = "window_preview_2951628.png"
+    # 测试图片路径（使用OAT/tools/image.png）
+    import os
+    IMG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "image.png")
     # 测试目标文字
-    TARGET = "式神录"
+    TARGET = "进攻"
     
     # 执行离线查找
-    found, text_area, real_text = ocr_manager.find_text_offline(IMG_PATH, TARGET)
+    found, text_area, real_text = ocr_manager.find_text_offline(IMG_PATH, TARGET, debug=True)
+    print(f"测试结果：找到={found}，文字={real_text}，区域={text_area}")
+    print(f"text_area类型: {type(text_area)}")
