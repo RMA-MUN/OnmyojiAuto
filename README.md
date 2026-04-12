@@ -75,7 +75,7 @@ uv venv
 uv venv activate
 
 # 安装项目依赖
-uv pip install -r requirements.txt
+uv sync
 ```
 
 **核心依赖说明**：
