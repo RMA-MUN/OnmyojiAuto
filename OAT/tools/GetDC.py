@@ -48,6 +48,21 @@ class WindowCapture:
         self.client_height = self.client_rect[3] - self.client_rect[1]
         # 记录上次使用的捕获模式
         self.last_capture_mode = None
+        # 冷却机制：防止窗口最小化或捕获失败后连续弹窗
+        self._capture_cooldown = False  # 冷却标志
+        self._cooldown_duration = 30.0  # 冷却时间（秒）
+        self._last_capture_failure = 0.0  # 上次捕获失败的时间戳
+
+    def reset_cooldown(self):
+        """
+        重置捕获冷却状态，允许重新捕获
+
+        说明：
+            在窗口恢复后调用此方法可以重置冷却状态，
+            使程序能够继续正常的捕获操作
+        """
+        self._capture_cooldown = False
+        self._last_capture_failure = 0.0
 
     def get_window_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
         """获取窗口的位置和尺寸信息"""
@@ -113,7 +128,7 @@ class WindowCapture:
         try:
             # 确保窗口可见
             if win32gui.IsIconic(self.hwnd):
-                print("窗口最小化，无法使用BitBlt捕获")
+                warning_box("窗口最小化，无法使用BitBlt捕获")
                 return None
 
             # 重新获取客户区尺寸
@@ -137,7 +152,7 @@ class WindowCapture:
                 left, top = 0, 0
                 width, height = self.client_width, self.client_height
 
-            # 获取窗口DC - 与GitHub代码保持一致的方式
+            # 获取窗口DC
             hWndDC = win32gui.GetDC(self.hwnd)
             mfcDC = win32ui.CreateDCFromHandle(hWndDC)
             saveDC = mfcDC.CreateCompatibleDC()
@@ -186,6 +201,33 @@ class WindowCapture:
         Returns:
             成功时返回捕获的图像数组，失败时返回None
         """
+        # 检查冷却状态，如果在冷却期内则直接返回None
+        if self._capture_cooldown:
+            return None
+
+        # 检查窗口是否最小化
+        if self.is_window_minimized():
+            print("窗口处于最小化状态，无法捕获图像")
+            
+            # 记录失败时间戳并进入冷却状态，防止连续弹窗
+            import time
+            current_time = time.time()
+            if current_time - self._last_capture_failure < self._cooldown_duration:
+                # 距离上次失败时间过短，不再弹窗直接返回None
+                self._capture_cooldown = True
+                return None
+
+            self._last_capture_failure = current_time
+            self._capture_cooldown = True
+
+            # 弹窗提醒用户
+            try:
+                warning_box("窗口处于最小化状态，无法捕获图像，请恢复窗口后再操作。")
+            except Exception as e:
+                print(f"显示错误弹窗失败: {e}")
+            
+            return None
+
         # 如果未指定捕获模式，使用配置文件中的设置
         if capture_mode is None:
             capture_mode = settings.BACKEND_GET_IMG_MODE
@@ -223,11 +265,23 @@ class WindowCapture:
 
         # 如果都失败，显示错误弹窗并返回None
         print("所有捕获方法失败")
-        try: 
+
+        # 记录失败时间戳并进入冷却状态，防止连续弹窗
+        import time
+        current_time = time.time()
+        if current_time - self._last_capture_failure < self._cooldown_duration:
+            # 距离上次失败时间过短，不再弹窗直接返回None
+            self._capture_cooldown = True
+            return None
+
+        self._last_capture_failure = current_time
+        self._capture_cooldown = True
+
+        try:
             warning_box("所有窗口捕获方法都失败了，请检查窗口状态或尝试重启程序。")
         except Exception as e:
             print(f"显示错误弹窗失败: {e}")
-        
+
         return None
 
     def capture_window_printwindow(self, region: Optional[Tuple[int, int, int, int]] = None) -> Optional[np.ndarray]:
