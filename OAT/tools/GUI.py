@@ -1100,9 +1100,9 @@ class UiDialog(object):
             <div style="line-height: 1.0; margin: 0; padding: 0;">
                 <span style="margin: 0;">1.增加OCR文字识别功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.增加结界突破功能，修复后台交互的bug</span>
+                <span style="margin: 0;">2.优化日志系统，提供更分明的日志级别过滤</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.可视化编辑配置界面增加OCR选项</span>
+                <span style="margin: 0;">3.修复部分情况下warning_box无限弹窗的恶性bug</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">4.修复后台模式的坐标问题</span>
                 <br style="margin: 0;"/>
