@@ -2,6 +2,7 @@ import requests
 from urllib3.exceptions import InsecureRequestWarning
 
 from OAT.tools.settings import APP_VERSION
+from OAT.utils.logging import logger
 
 
 class UpdateChecker:
@@ -55,10 +56,10 @@ class UpdateChecker:
             return info
 
         except requests.exceptions.RequestException as e:
-            print(f"网络请求失败: {e}")
+            logger.error(f"网络请求失败: {e}")
             return None
         except KeyError:
-            print("未找到tag_name字段，请检查仓库是否有release")
+            logger.error("未找到tag_name字段，请检查仓库是否有release")
             return None
 
     @staticmethod

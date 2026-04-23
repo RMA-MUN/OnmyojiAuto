@@ -12,6 +12,7 @@ import win32con
 import pywintypes
 from typing import Optional, Tuple
 
+from OAT.utils.logging import logger
 from OAT.utils.warning_box import warning_box
 
 
@@ -36,7 +37,7 @@ class WindowChecker:
         返回值格式：((左上角 x, 左上角 y), (右下角 x, 右下角 y), (宽度, 高度))
         """
         if not self.window_handle and not self.window_title:
-            print('窗口标题未设置且未提供窗口句柄')
+            logger.error('窗口标题未设置且未提供窗口句柄')
             return None
 
         if not self.window_handle:
@@ -50,7 +51,7 @@ class WindowChecker:
             width = right - left
             height = bottom - top
             return (left, top), (right, bottom), (width, height)
-        print('未找到指定客户端窗口')
+        logger.error('未找到指定客户端窗口')
         return None
         
     def get_client_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
@@ -59,7 +60,7 @@ class WindowChecker:
         返回值格式：((客户区域左上角 x, 客户区域左上角 y), (客户区域右下角 x, 客户区域右下角 y), (客户区域宽度, 客户区域高度))
         """
         if not self.window_handle and not self.window_title:
-            print('窗口标题未设置且未提供窗口句柄')
+            logger.error('窗口标题未设置且未提供窗口句柄')
             return None
 
         if not self.window_handle:
@@ -80,7 +81,7 @@ class WindowChecker:
             client_screen_right, client_screen_bottom = win32gui.ClientToScreen(hwnd, (client_right, client_bottom))
             
             return (client_screen_left, client_screen_top), (client_screen_right, client_screen_bottom), (client_width, client_height)
-        print('未找到指定客户端窗口')
+        logger.error('未找到指定客户端窗口')
         return None
 
     def resize_window(self, width: int, height: int, hwnd: Optional[int] = None):
@@ -91,7 +92,7 @@ class WindowChecker:
                 elif self.window_title:
                     hwnd = win32gui.FindWindow(None, self.window_title)
                 else:
-                    print('窗口标题未设置且未提供窗口句柄')
+                    logger.error('窗口标题未设置且未提供窗口句柄')
                     return
 
             if hwnd:
@@ -101,21 +102,21 @@ class WindowChecker:
                     return True
                 except pywintypes.error as e:
                     if e.winerror == 5:  # 错误代码5表示访问被拒绝
-                        print(f'无法调整窗口大小（访问被拒绝）。请确保程序以管理员身份运行，或手动调整窗口大小为{width}x{height}。')
+                        logger.error(f'无法调整窗口大小（访问被拒绝）。请确保程序以管理员身份运行，或手动调整窗口大小为{width}x{height}。')
                     else:
-                        print(f'调整窗口大小时发生错误：{e}')
+                        logger.error(f'调整窗口大小时发生错误：{e}')
                     return False
             else:
-                print('未找到指定客户端窗口')
+                logger.error('未找到指定客户端窗口')
                 return False
         except Exception as e:
-            print(f'调整窗口大小时发生未知错误：{e}')
+            logger.error(f'调整窗口大小时发生未知错误：{e}')
             return False
 
     def connect_all(self, target_width: int = 1404, target_height: int = 834) -> None:
         """执行完整窗口连接流程"""
         if not self.window_title:
-            print('窗口标题未设置')
+            logger.error('窗口标题未设置')
             return
 
         # 获取窗口句柄

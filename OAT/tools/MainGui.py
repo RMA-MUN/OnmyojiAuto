@@ -25,7 +25,7 @@ from ..source import *
 from ..source import MODE_MAPPING
 from ..tools import *
 from ..utils.error_handler import setup_global_exception_handler, LOG_FILE, log_error
-from ..utils.logging import LogRedirect
+from ..utils.logging import LogRedirect, logger
 from ..utils.warning_box import warning_box
 from ..utils.error_box import error_box
 from OAT.tools.settings import APP_VERSION
@@ -54,7 +54,7 @@ class MainWindow(QtWidgets.QDialog):
                 settings_data = json.load(f)
                 self.sync_mode_value = settings_data.get('sync_mode', 'exactly_sync')
         except Exception as e:
-            print(f"读取设置文件失败：{e}")
+            logger.error(f"读取设置文件失败：{e}")
             self.sync_mode_value = 'exactly_sync'
 
         self.sync = WindowSynchronizer(sync_mode=self.sync_mode_value)
@@ -110,6 +110,8 @@ class MainWindow(QtWidgets.QDialog):
         # 定向输出print
         self.log_redirect = LogRedirect(self.ui.textBrowser)
         builtins.print = self.log_redirect.print
+        # 设置logger的textBrowser，确保日志在UI中显示
+        logger.set_text_browser(self.ui.textBrowser)
 
         # 线程管理
         self.active_threads = []
@@ -136,7 +138,7 @@ class MainWindow(QtWidgets.QDialog):
         # 根据下拉菜单的选择更新 window_title
         selected_client = self.ui.client_choose.currentText()
         self.window_title = selected_client
-        print(f"选择客户端为:{self.window_title}")
+        logger.info(f"选择客户端为:{self.window_title}")
 
     # 刷新窗口按钮
     def refresh_window(self):
@@ -166,10 +168,10 @@ class MainWindow(QtWidgets.QDialog):
 
     @staticmethod
     def handle_mode_change(mode: str):
-        print(f"选择模式：{mode}")
+        logger.info(f"选择模式：{mode}")
 
     def window_detection(self, *args):
-        print("客户端窗口检测：")
+        logger.info("客户端窗口检测：")
         # 使用更新后的 window_title
         automation = OnmyojiAutomation(self.window_title)
         # 先检测窗口是否存在
@@ -184,7 +186,7 @@ class MainWindow(QtWidgets.QDialog):
         checker.set_window_title(self.window_title)
         window_size = checker.get_window_info()
         if window_size:
-            print(f"当前客户端大小：宽度 {window_size[2][0]}，高度 {window_size[2][1]}")
+            logger.info(f"当前客户端大小：宽度 {window_size[2][0]}，高度 {window_size[2][1]}")
         # 调用 connect_all 函数，检查并调整窗口大小
         checker.connect_all()
 
@@ -213,31 +215,31 @@ class MainWindow(QtWidgets.QDialog):
             # 检查哪个单选按钮被选中
             if self.ui.radioButton1.isChecked():
                 sub_mode = self.ui.radioButton1.text()
-                print(f"选择：{mode}, {sub_mode}")
+                logger.info(f"选择：{mode}, {sub_mode}")
             elif self.ui.radioButton2.isChecked():
                 sub_mode = self.ui.radioButton2.text()
-                print(f"选择：{mode}, {sub_mode}")
+                logger.info(f"选择：{mode}, {sub_mode}")
 
         # 获取隐藏窗口捕获复选框状态
         if self.ui.hidden_window_checkbox.isChecked():
             hidden_window = True
-            print("="*50)
-            print("       已启用后台运行模式      ")
-            print("  后台模式只要不将窗口最小化就不会影响程序的运行")
-            print("     后台模式不支持模拟器，请前往桌面版使用    ")
-            print("="*50)
+            logger.info("="*50)
+            logger.info("       已启用后台运行模式      ")
+            logger.info("  后台模式只要不将窗口最小化就不会影响程序的运行")
+            logger.info("     后台模式不支持模拟器，请前往桌面版使用    ")
+            logger.info("="*50)
         else:
             hidden_window = False
 
         # 检查是否启动同步模式
         if self.sync_mode is True:
-            print("="*50)
-            print("       已启用窗口同步模式      ")
-            print("  窗口同步模式下，程序会自动同步主窗口的点击内容到副窗口")
-            print("="*50)
+            logger.info("="*50)
+            logger.info("       已启用窗口同步模式      ")
+            logger.info("  窗口同步模式下，程序会自动同步主窗口的点击内容到副窗口")
+            logger.info("="*50)
 
 
-        print(f"获取挑战次数：{times}，模式：{mode}")
+        logger.info(f"获取挑战次数：{times}，模式：{mode}")
 
         try:
             # 创建并管理线程
@@ -249,7 +251,7 @@ class MainWindow(QtWidgets.QDialog):
                 self.active_threads.append(thread)
             thread.start()
         except ValueError:
-            print("请输入有效的整数挑战次数。")
+            logger.info("请输入有效的整数挑战次数。")
 
     # 用锁来确保模式的选择只会选择一个
     def safe_mode_choice(self,
@@ -288,11 +290,11 @@ class MainWindow(QtWidgets.QDialog):
                         else:
                             folder_name = mode_data
                     else:
-                        print('暂不支持此模式，敬请期待！')
+                        logger.info('暂不支持此模式，敬请期待！')
                         return
                 except Exception as e:
-                    print(f"读取mode.json文件失败: {e}")
-                    print('暂不支持此模式，敬请期待！')
+                    logger.error(f"读取mode.json文件失败: {e}")
+                    logger.info('暂不支持此模式，敬请期待！')
                     return
             else:
                 # 从MODE_MAPPING中获取模式信息
@@ -314,16 +316,13 @@ class MainWindow(QtWidgets.QDialog):
                             sync_mode_value=self.sync_mode_value)
             else:
                 error_msg = f"读取 {sub_config_path} 配置文件失败。"
-                print(error_msg)
+                logger.error(error_msg)
                 error_box(error_msg)
 
         except Exception as e:
             error_msg = f"执行挑战时出现异常: {e}"
-            print(error_msg)
-            self.log_redirect.log_to_file(error_msg)
-            # 修改日志文件路径
-            with open(LOG_FILE, 'a', encoding='utf-8') as f:
-                f.write(traceback.format_exc() + '\n')
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             error_box(f"执行挑战时出现异常: {e}，请检查日志文件。")
 
         finally:
@@ -339,18 +338,18 @@ class MainWindow(QtWidgets.QDialog):
             if thread.is_alive():
                 thread.join(timeout=0.5)
                 if thread.is_alive():
-                    print(f"警告：线程 {thread.ident} 无法正常终止")
-        print("紧急停止，退出窗口")
+                    logger.warn(f"警告：线程 {thread.ident} 无法正常终止")
+        logger.info("紧急停止，退出窗口")
 
         with self.lock:
             self.shutdown_flag = True
-            print("正在终止所有进程... ...")
+            logger.info("正在终止所有进程... ...")
             # 终止所有活动线程
             for thread in self.active_threads:
                 if thread.is_alive():
                     thread.join(timeout=0.5)
                     if thread.is_alive():
-                        print(f"警告：线程 {thread.ident} 无法正常终止")
+                        logger.warn(f"警告：线程 {thread.ident} 无法正常终止")
 
         # 关闭窗口
         QtWidgets.QApplication.quit()
@@ -410,7 +409,7 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.window_table.setColumnWidth(3, 100)  # 预览列
         # 显示表格
         self.ui.window_table.show()
-        print("表格已刷新")
+        logger.info("表格已刷新")
 
     def preview_window(self, hwnd: int, title: str):
         """
@@ -442,10 +441,10 @@ class MainWindow(QtWidgets.QDialog):
 
                 # print(f"窗口截图已保存: {temp_file_path}")
             else:
-                print(f"无法捕获窗口 {title} ({hwnd}) 的图像")
+                logger.error(f"无法捕获窗口 {title} ({hwnd}) 的图像")
                 self.show_error_message("截图失败", "无法捕获窗口图像")
         except Exception as e:
-            print(f"预览窗口时出错: {str(e)}")
+            logger.error(f"预览窗口时出错: {str(e)}")
             self.show_error_message("预览错误", f"发生错误: {str(e)}")
     
     def show_preview_dialog(self, title: str, image_path: str):
@@ -548,7 +547,7 @@ class MainWindow(QtWidgets.QDialog):
         selected_rows = self.get_selected_rows()
 
         if len(selected_rows) != 1:
-            print("主窗口能且仅能设置一个！\n")
+            logger.info("主窗口能且仅能设置一个！\n")
             return
 
         row = selected_rows[0]
@@ -556,7 +555,7 @@ class MainWindow(QtWidgets.QDialog):
         self.main_window = hwnd
         # 输出表格里的row2和row1的内容
         for row in self.get_selected_rows():
-            print(f"已设置主窗口为: {self.ui.window_table.item(row, 2).text()}， {self.ui.window_table.item(row, 1).text()} \n")
+            logger.info(f"已设置主窗口为: {self.ui.window_table.item(row, 2).text()}， {self.ui.window_table.item(row, 1).text()} \n")
             self.main_window_title = self.ui.window_table.item(row, 1).text()
         return self.main_window, self.main_window_title
 
@@ -568,7 +567,7 @@ class MainWindow(QtWidgets.QDialog):
         selected_rows = self.get_selected_rows()
 
         if len(selected_rows) == 0:
-            print("注意：没有选择副窗口！\n")
+            logger.info("注意：没有选择副窗口！\n")
             return
         # 获取所有选中窗口的句柄
         sub_windows_hwnd = [self.ui.window_table.item(row, 2).text() for row in selected_rows]
@@ -577,7 +576,7 @@ class MainWindow(QtWidgets.QDialog):
 
         # 用for循环输出被设置为副窗口的所有窗口名称和句柄
         for row in self.get_selected_rows():
-            print(f"已设置副窗口为: {self.ui.window_table.item(row, 2).text()}， {self.ui.window_table.item(row, 1).text()} \n")
+            logger.info(f"已设置副窗口为: {self.ui.window_table.item(row, 2).text()}， {self.ui.window_table.item(row, 1).text()} \n")
 
         return self.sub_windows, self.sub_windows_title
 
@@ -601,18 +600,18 @@ class MainWindow(QtWidgets.QDialog):
                         # 获取最新的窗口大小设置
                         target_width = settings_data.get('custom_res_width', 1404)
                         target_height = settings_data.get('custom_res_height', 834)
-                        print(f"从设置文件读取窗口尺寸: {target_width}x{target_height}")
+                        logger.info(f"从设置文件读取窗口尺寸: {target_width}x{target_height}")
                 except Exception as e:
-                    print(f"读取设置文件失败：{e}")
+                    logger.error(f"读取设置文件失败：{e}")
                     # 使用默认值
                     target_width = 1404
                     target_height = 834
-                    print(f"使用默认窗口尺寸: {target_width}x{target_height}")
+                    logger.info(f"使用默认窗口尺寸: {target_width}x{target_height}")
                 
                 for hwnd in window_handles:
                     try:
                         # 使用获取到的窗口大小来调整窗口
-                        print(f"使用窗口尺寸: {target_width}x{target_height}")
+                        logger.info(f"使用窗口尺寸: {target_width}x{target_height}")
                         
                         wc.set_window_handle(hwnd)
                         current_size = wc.get_window_info()
@@ -626,7 +625,7 @@ class MainWindow(QtWidgets.QDialog):
                                 if updated_size and updated_size[2] != (target_width, target_height):
                                     raise ValueError(f"窗口(句柄:{hwnd})尺寸调整失败，当前尺寸：{updated_size[2]}")
                     except Exception as e:
-                        print(e)
+                        logger.error(str(e))
 
                 # 重新从设置中读取同步模式，确保使用最新的设置
                 settings_file_path = os.path.join(os.path.dirname(__file__), 'settings.json')
@@ -635,7 +634,7 @@ class MainWindow(QtWidgets.QDialog):
                         settings_data = json.load(f)
                         latest_sync_mode = settings_data.get('sync_mode', 'exactly_sync')
                 except Exception as e:
-                    print(f"读取设置文件失败：{e}")
+                    logger.error(f"读取设置文件失败：{e}")
                     latest_sync_mode = 'exactly_sync'
                 
                 self.sync = WindowSynchronizer(sync_mode=latest_sync_mode)
@@ -653,16 +652,16 @@ class MainWindow(QtWidgets.QDialog):
                     "input_sync": "键鼠同步"
                 }
                 current_mode = sync_mode_reverse_map.get(current_mode, current_mode)
-                print(f"当前同步模式: {current_mode}")
+                logger.info(f"当前同步模式: {current_mode}")
                 # 启动鼠标和键盘监听器
                 self.sync.sync_controller()
                 self.sync_mode = True
 
-                print("窗口同步已启动")
+                logger.info("窗口同步已启动")
                 
             except Exception as e:
-                print(f"同步失败: {str(e)}")
-                self.log_redirect.log_to_file(f"同步异常: {traceback.format_exc()}")
+                logger.error(f"同步失败: {str(e)}")
+                logger.error(f"同步异常: {traceback.format_exc()}")
             finally:
                 # 将主窗口通过句柄激活到前台
                 if hasattr(self, 'main_window'):
@@ -687,7 +686,7 @@ class MainWindow(QtWidgets.QDialog):
         if self.sync_mode:
             self.sync.stop_all_sync()
             self.sync_mode = False
-            print("窗口同步已停止")
+            logger.info("窗口同步已停止")
 
     def arrange_connect(self):
         # 创建线程来执行窗口排列操作，避免阻塞UI线程
@@ -709,8 +708,8 @@ class MainWindow(QtWidgets.QDialog):
                     self.sync.set_main_and_sub_windows(self.main_window_title, self.sub_windows_title, main_hwnd, sub_hwnds)
                     self.sync.arrange_windows(main_window_hwnd, sub_window_hwnd)
             except Exception as e:
-                print(f"窗口排列失败: {str(e)}")
-                self.log_redirect.log_to_file(f"窗口排列异常: {traceback.format_exc()}")
+                logger.error(f"窗口排列失败: {str(e)}")
+                logger.error(f"窗口排列异常: {traceback.format_exc()}")
 
         # 启动窗口排列线程
         arrange_thread = threading.Thread(target=arrange_thread_func)
@@ -1181,7 +1180,7 @@ class MainWindow(QtWidgets.QDialog):
             self.checking_msg = None
         
         # 记录错误并显示友好提示
-        print(f"检查更新时出错: {error_msg}")
+        logger.error(f"检查更新时出错: {error_msg}")
         error_msg_box = QMessageBox(self)
         error_msg_box.setWindowTitle("检查更新失败")
         error_msg_box.setText("检查更新时发生错误，请稍后重试")

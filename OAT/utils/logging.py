@@ -12,11 +12,19 @@ if not os.path.exists(LOGS_DIR):
 # 日志文件路径
 LOG_FILE = os.path.join(LOGS_DIR, 'log.log')
 
+# 日志级别常量
+LOG_LEVELS = {
+    'DEBUG': 10,
+    'INFO': 20,
+    'WARNING': 30,
+    'ERROR': 40,
+}
+
 
 class LogRedirect(QtCore.QObject):
     append_log = QtCore.pyqtSignal(str)
 
-    def __init__(self, text_browser):
+    def __init__(self, text_browser=None):
         super().__init__()
         self.text_browser = text_browser
         self.append_log.connect(self._safe_append)
@@ -26,11 +34,30 @@ class LogRedirect(QtCore.QObject):
         self.log_threshold = 10  # 日志去重时间阈值（秒）
         # 日志文件清理设置
         self.max_log_size = 50 * 1024 * 1024  # 最大日志文件大小（50MB）
+        # 日志级别控制（只显示 >= 此级别的日志）
+        # DEBUG(10) - 显示所有日志
+        # INFO(20) - 显示INFO、WARNING、ERROR（默认）
+        # WARNING(30) - 显示WARNING、ERROR
+        # ERROR(40) - 只显示ERROR
+        self.log_level = 'INFO'
+
+    def set_text_browser(self, text_browser):
+        """
+        设置文本浏览器用于显示日志
+        :param text_browser: QTextBrowser 实例
+        """
+        self.text_browser = text_browser
 
     # 将print函数输出的内容定向写入到textBrowser中
     def _safe_append(self, text):
         if self.text_browser:
-            self.text_browser.append(text)
+            # 检查text是否包含HTML标记
+            if '<font' in text:
+                # 如果是HTML，使用insertHtml
+                self.text_browser.insertHtml(text + '<br>')
+            else:
+                # 如果是普通文本，使用append
+                self.text_browser.append(text)
             scroll_bar = self.text_browser.verticalScrollBar()
             scroll_bar.setValue(scroll_bar.maximum())
 
@@ -59,6 +86,12 @@ class LogRedirect(QtCore.QObject):
         return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def log(self, message, level='INFO'):
+        # 检查日志级别过滤
+        current_level_value = LOG_LEVELS.get(level, 20)
+        min_level_value = LOG_LEVELS.get(self.log_level, 20)
+        if current_level_value < min_level_value:
+            return  # 日志级别低于设置级别，跳过显示
+
         current_time = datetime.datetime.now().timestamp()
         
         # 检查是否是重复消息
@@ -71,8 +104,17 @@ class LogRedirect(QtCore.QObject):
         
         timestamp = self.get_timestamp()
         caller_info = self.get_caller_info()
-        # 文本浏览器显示格式（保持可读性）
-        display_text = f"{timestamp} - {message}"
+        
+        # 根据级别设置不同的颜色
+        color_map = {
+            'INFO': '#666666',  # 灰色
+            'WARN': '#FFC107',  # 黄色
+            'ERROR': '#F44336',  # 红色
+        }
+        color = color_map.get(level, '#666666')  # 默认灰色
+        
+        # 文本浏览器显示格式（带颜色）
+        display_text = f"<font color='{color}'>{timestamp} - [{level}] {message}</font>"
         self.append_log.emit(display_text)
 
         # 日志文件JSON格式（便于后续分析）
@@ -147,3 +189,6 @@ class LogRedirect(QtCore.QObject):
                 f.write('\n')
         except Exception as e:
             print(f"清理日志文件失败: {e}")
+
+
+logger = LogRedirect()

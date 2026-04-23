@@ -2,6 +2,9 @@ import win32gui
 import win32con
 import pygetwindow as gw
 
+from OAT.utils.logging import logger
+
+
 def is_window_visible(hwnd):
     """检查窗口是否可见"""
     return win32gui.IsWindowVisible(hwnd) and hwnd != win32gui.GetDesktopWindow()
@@ -38,7 +41,7 @@ def arrange_windows_diagonally_fixed_size():
     # 获取所有可见窗口
     windows = get_all_visible_windows()
     if not windows:
-        print("没有找到可见窗口")
+        logger.info("没有找到可见窗口")
         return
 
     num_windows = len(windows)
@@ -46,7 +49,7 @@ def arrange_windows_diagonally_fixed_size():
         # 只有一个窗口时最大化
         hwnd, title, _, _ = windows[0]
         win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-        print(f"已最大化窗口: {title}")
+        logger.info(f"已最大化窗口: {title}")
         return
 
     # 计算对角线步长（基于屏幕大小和窗口数量）
@@ -75,6 +78,6 @@ def arrange_windows_diagonally_fixed_size():
             0, 0,  # 宽度和高度设为0表示保持原有大小
             win32con.SWP_NOSIZE | win32con.SWP_NOZORDER | win32con.SWP_SHOWWINDOW
         )
-        print(f"已排列窗口: {title} 位置: ({x}, {y}) 大小: ({width}, {height})")
+        logger.info(f"已排列窗口: {title} 位置: ({x}, {y}) 大小: ({width}, {height})")
 
 

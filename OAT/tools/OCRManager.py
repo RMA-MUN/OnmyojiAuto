@@ -2,6 +2,9 @@ import os
 import cv2
 from rapidocr import RapidOCR
 
+from OAT.utils.logging import logger
+
+
 class OCRManager:
     """
     OCR管理器类：提供离线文字识别功能
@@ -26,7 +29,7 @@ class OCRManager:
                     }
                 )
             except Exception as e:
-                print(f"OCR初始化失败: {str(e)}")
+                logger.error(f"OCR初始化失败: {str(e)}")
                 self.reader = None
     
     def find_text_offline(self, image_input, target_text: str, debug: bool = False, confidence_threshold: float = 0.5):
@@ -49,13 +52,13 @@ class OCRManager:
         if isinstance(image_input, str):
             # 检查图片文件是否存在
             if not os.path.exists(image_input):
-                print(f"图片不存在：{image_input}")
+                logger.error(f"图片不存在：{image_input}")
                 return False, None, None
             
             # 读取图片
             img = cv2.imread(image_input)
             if img is None:
-                print(f"无法读取图片：{image_input}")
+                logger.error(f"无法读取图片：{image_input}")
                 return False, None, None
         else:
             # 直接使用图像对象
@@ -85,7 +88,7 @@ class OCRManager:
         # 获取识别结果数据（RapidOCR返回的是RapidOCROutput对象）
         if hasattr(results, 'txts'):
             if debug:
-                print(f"[OCR Debug] 识别到的文字数量: {len(results.txts)}")
+                logger.info(f"[OCR Debug] 识别到的文字数量: {len(results.txts)}")
             
             # 遍历所有文字
             for i in range(len(results.txts)):
@@ -97,7 +100,7 @@ class OCRManager:
                 if debug:
                     # 将numpy数组转换为列表以便打印
                     box_list = box.tolist() if hasattr(box, 'tolist') else box
-                    print(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}，区域: {box_list}")
+                    logger.info(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}，区域: {box_list}")
                 
                 # 检查是否达到置信度阈值
                 if conf >= confidence_threshold:
@@ -115,21 +118,21 @@ class OCRManager:
                     # 将numpy数组转换为Python列表
                     text_area = box.tolist() if hasattr(box, 'tolist') else box  # 文字区域坐标
                     if debug:
-                        print(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
+                        logger.info(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
                     break
         else:
             if debug:
-                print("[OCR Debug] RapidOCR未返回txts属性")
+                logger.info("[OCR Debug] RapidOCR未返回txts属性")
 
         # 调试输出：统计信息
         if debug:
             if hasattr(results, 'txts'):
-                print(f"[OCR Debug] 总识别到 {len(results.txts)} 个文字")
+                logger.info(f"[OCR Debug] 总识别到 {len(results.txts)} 个文字")
             else:
-                print(f"[OCR Debug] 未识别到文字")
-            print(f"[OCR Debug] 达到置信度阈值({confidence_threshold})的文字数量: {threshold_count}")
+                logger.info(f"[OCR Debug] 未识别到文字")
+            logger.info(f"[OCR Debug] 达到置信度阈值({confidence_threshold})的文字数量: {threshold_count}")
             if threshold_count > 0:
-                print(f"[OCR Debug] 达到阈值的文字详情:")
+                logger.info(f"[OCR Debug] 达到阈值的文字详情:")
                 for idx, item in enumerate(threshold_texts, 1):
                     # 计算区域边界
                     area = item['area']
@@ -143,7 +146,7 @@ class OCRManager:
                         y_coords = [point[1] for point in area]
                     min_x, max_x = min(x_coords), max(x_coords)
                     min_y, max_y = min(y_coords), max(y_coords)
-                    print(f"  {idx}. 文字: '{item['text']}'，置信度: {item['confidence']:.4f}，区域: [x: {min_x:.1f}-{max_x:.1f}, y: {min_y:.1f}-{max_y:.1f}]")
+                    logger.info(f"  {idx}. 文字: '{item['text']}'，置信度: {item['confidence']:.4f}，区域: [x: {min_x:.1f}-{max_x:.1f}, y: {min_y:.1f}-{max_y:.1f}]")
 
         # 输出结果（仅在找到文字时打印）
         # if found:

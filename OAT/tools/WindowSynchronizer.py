@@ -9,6 +9,7 @@ from pynput import mouse, keyboard
 from typing import List, Tuple, Optional
 from OAT.tools.WindowChecker import WindowChecker
 from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT, WINDOW_ARRANGE_MODE, WINDOWS_PER_ROW
+from OAT.utils.logging import logger
 
 
 class WindowSynchronizer:
@@ -143,11 +144,11 @@ class WindowSynchronizer:
         try:
             # 验证输入参数
             if not main_window_title:
-                print("主窗口标题不能为空")
+                logger.error("主窗口标题不能为空")
                 return []
-                
+
             if screen_x < 0 or screen_y < 0:
-                print("屏幕坐标不能为负数")
+                logger.error("屏幕坐标不能为负数")
                 return []
             
             # 获取主窗口信息
@@ -157,7 +158,7 @@ class WindowSynchronizer:
             main_window_info = main_checker.get_client_info()
 
             if not main_window_info:
-                print(f"未找到标题为 {main_window_title} 的主窗口")
+                logger.error(f"未找到标题为 {main_window_title} 的主窗口")
                 return []
 
             main_left, main_top, main_right, main_bottom = main_window_info[0][0], main_window_info[0][1], main_window_info[1][0], main_window_info[1][1]
@@ -166,7 +167,7 @@ class WindowSynchronizer:
             
             # 检查主窗口尺寸是否有效
             if main_width <= 0 or main_height <= 0:
-                print(f"主窗口尺寸无效: 宽={main_width}, 高={main_height}")
+                logger.error(f"主窗口尺寸无效: 宽={main_width}, 高={main_height}")
                 return []
 
             # 计算主窗口内的相对位置
@@ -182,14 +183,14 @@ class WindowSynchronizer:
                 with self.lock:
                     # 检查副窗口列表是否为空
                     if not self.sub_windows:
-                        print("副窗口列表为空")
+                        logger.error("副窗口列表为空")
                         return []
                         
                     # 使用已识别的副窗口列表
                     for hwnd, title in self.sub_windows:
                         # 检查窗口句柄是否有效
                         if not win32gui.IsWindow(hwnd):
-                            print(f"窗口句柄无效: {hwnd}")
+                            logger.error(f"窗口句柄无效: {hwnd}")
                             # 从缓存中移除无效窗口
                             if hwnd in self.window_info_cache:
                                 del self.window_info_cache[hwnd]
@@ -209,7 +210,7 @@ class WindowSynchronizer:
                                 
                                 # 检查副窗口尺寸是否有效
                                 if sub_client_width <= 0 or sub_client_height <= 0:
-                                    print(f"副窗口尺寸无效: 宽={sub_client_width}, 高={sub_client_height}")
+                                    logger.error(f"副窗口尺寸无效: 宽={sub_client_width}, 高={sub_client_height}")
                                     continue
                                 
                                 # 计算相对比例
@@ -236,14 +237,14 @@ class WindowSynchronizer:
                                 # 添加到结果列表
                                 sub_relative_positions.append((sub_absolute_x, sub_absolute_y))
                             else:
-                                print(f"未找到句柄为 {hwnd} 的副窗口")
+                                logger.error(f"未找到句柄为 {hwnd} 的副窗口")
                         except Exception as e:
-                            print(f"处理副窗口 {hwnd} 时出错: {e}")
+                            logger.error(f"处理副窗口 {hwnd} 时出错: {e}")
                             continue
             
             return sub_relative_positions
         except Exception as e:
-            print(f"计算坐标时出错: {e}")
+            logger.error(f"计算坐标时出错: {e}")
             return []
 
     def send_mouse_move(self, hwnd: int, relative_x: int, relative_y: int) -> None:
@@ -501,7 +502,7 @@ class WindowSynchronizer:
                 # 发送按键按下消息到所有副窗口
                 self.send_key_message_to_all(key_code, is_pressed=True)
         except Exception as e:
-            print(f"处理键盘按下事件时出错: {e}")
+            logger.error(f"处理键盘按下事件时出错: {e}")
 
     def on_key_release(self, key: keyboard.Key | keyboard.KeyCode) -> None:
         """
@@ -527,7 +528,7 @@ class WindowSynchronizer:
                 # 发送按键松开消息到所有副窗口
                 self.send_key_message_to_all(key_code, is_pressed=False)
         except Exception as e:
-            print(f"处理键盘松开事件时出错: {e}")
+            logger.error(f"处理键盘松开事件时出错: {e}")
 
     def _get_vk_code(self, key: keyboard.Key | keyboard.KeyCode) -> Optional[int]:
         """
@@ -542,7 +543,7 @@ class WindowSynchronizer:
             elif isinstance(key, keyboard.Key):
                 return key.value.vk if hasattr(key, 'value') else None
         except Exception as e:
-            print(f"转换按键 {key} 为虚拟键码失败：{e}")
+            logger.error(f"转换按键 {key} 为虚拟键码失败：{e}")
             return None
         return None
 
@@ -555,9 +556,9 @@ class WindowSynchronizer:
                 self.keyboard_listener.stop()
                 self.keyboard_listener = None
                 self.keyboard_listener_thread = None
-                print("键盘监听器已停止")
+                logger.info("键盘监听器已停止")
             else:
-                print("键盘监听器未启动")
+                logger.info("键盘监听器未启动")
 
     def stop_all_sync(self):
         """
@@ -567,7 +568,7 @@ class WindowSynchronizer:
         self.sync_enabled = False
         self.stop_mouse_sync()
         self.stop_keyboard_sync()
-        print("所有同步已停止")
+        logger.info("所有同步已停止")
 
     def mouse_sync(self):
         """
@@ -616,9 +617,9 @@ class WindowSynchronizer:
             self.mouse_listener = None
             # 仅设置同步禁用标志，不设置全局关闭标志
             self.sync_enabled = False
-            print("鼠标监听器已停止")
+            logger.info("鼠标监听器已停止")
         else:
-            print("鼠标监听器未启动")
+            logger.info("鼠标监听器未启动")
 
     def set_true_enable(self):
         """设置同步启用"""
@@ -658,7 +659,7 @@ class WindowSynchronizer:
             # 更新上次鼠标位置
             self.last_mouse_pos = (x, y)
         except Exception as e:
-            print(f"处理鼠标移动事件时出错: {e}")
+            logger.error(f"处理鼠标移动事件时出错: {e}")
     
     def where_click(self, x: int, y: int, button, pressed) -> None:
         """
@@ -699,7 +700,7 @@ class WindowSynchronizer:
                         # 更新鼠标按下状态
                         self.mouse_pressed = False
         except Exception as e:
-            print(f"处理鼠标点击事件时出错: {e}")
+            logger.error(f"处理鼠标点击事件时出错: {e}")
             # 出错时重置鼠标状态
             if not pressed:
                 self.mouse_pressed = False
@@ -710,7 +711,7 @@ class WindowSynchronizer:
         :param main_window_hwnd: 主窗口句柄
         :param sub_window_hwnd: 副窗口句柄列表
         """
-        print("对角线排列窗口开始: ")
+        logger.info("对角线排列窗口开始: ")
         # 获取窗口的数目
         sub_window_count = len(sub_window_hwnd)
         window_count = sub_window_count + 1
@@ -737,20 +738,20 @@ class WindowSynchronizer:
                 continue
             result = win32gui.SetWindowPos(hwnd, win32con.HWND_TOP, x_position, y_position, 0, 0, win32con.SWP_NOSIZE)
             win32gui.SetForegroundWindow(hwnd)
-            print(f"设置副窗口位置成功: HWND={hwnd}, x={x_position}, y={y_position}")
+            logger.info(f"设置副窗口位置成功: HWND={hwnd}, x={x_position}, y={y_position}")
             if not result:
-                print(f"设置窗口位置失败: HWND={hwnd}")
+                logger.error(f"设置窗口位置失败: HWND={hwnd}")
             x_position += wide_add
             y_position += high_add
 
         if win32gui.IsWindow(main_window_hwnd):
             win32gui.SetWindowPos(main_window_hwnd, win32con.HWND_TOP, x_position, y_position, 0, 0, win32con.SWP_NOSIZE)
             win32gui.SetForegroundWindow(main_window_hwnd)
-            print(f"设置主窗口位置成功: HWND={main_window_hwnd}, x={x_position}, y={y_position}")
+            logger.info(f"设置主窗口位置成功: HWND={main_window_hwnd}, x={x_position}, y={y_position}")
         else:
-            print(f"主窗口句柄无效: HWND={main_window_hwnd}")
+            logger.error(f"主窗口句柄无效: HWND={main_window_hwnd}")
 
-        print("对角线排列窗口结束")
+        logger.info("对角线排列窗口结束")
     
     def arrange_windows_tile(self, main_window_hwnd: int, sub_window_hwnd: List[int], windows_per_row: int = 3):
         """
@@ -759,7 +760,7 @@ class WindowSynchronizer:
         :param sub_window_hwnd: 副窗口句柄列表
         :param windows_per_row: 一行排列的窗口数量，默认3个
         """
-        print("平铺排列窗口开始: ")
+        logger.info("平铺排列窗口开始: ")
         # 获取窗口的数目
         sub_window_count = len(sub_window_hwnd)
         total_window_count = sub_window_count + 1  # 包括主窗口
@@ -769,7 +770,7 @@ class WindowSynchronizer:
         screen_width = user32.GetSystemMetrics(0)  # 获取屏幕宽度
         screen_height = user32.GetSystemMetrics(1)  # 获取屏幕高度
         
-        print(f"屏幕分辨率: {screen_width}x{screen_height}")
+        logger.info(f"屏幕分辨率: {screen_width}x{screen_height}")
         
         # 计算窗口位置
         x_position = 10
@@ -792,11 +793,11 @@ class WindowSynchronizer:
             else:
                 # 空间不足，使用最小间距，可能会有轻微遮挡
                 window_spacing = 5
-                print("警告：屏幕宽度不足，窗口可能会有轻微遮挡")
+                logger.warning("警告：屏幕宽度不足，窗口可能会有轻微遮挡")
         else:
             window_spacing = 20  # 只有一个窗口时的默认间距
         
-        print(f"窗口间距: {window_spacing}")
+        logger.info(f"窗口间距: {window_spacing}")
         
         # 计算当前行和列
         current_row = 0
@@ -821,9 +822,9 @@ class WindowSynchronizer:
             
             result = win32gui.SetWindowPos(hwnd, win32con.HWND_TOP, x, y, 0, 0, win32con.SWP_NOSIZE)
             win32gui.SetForegroundWindow(hwnd)
-            print(f"设置副窗口位置成功: HWND={hwnd}, x={x}, y={y}")
+            logger.info(f"设置副窗口位置成功: HWND={hwnd}, x={x}, y={y}")
             if not result:
-                print(f"设置窗口位置失败: HWND={hwnd}")
+                logger.error(f"设置窗口位置失败: HWND={hwnd}")
             
             # 更新行列计数
             current_col += 1
@@ -847,11 +848,11 @@ class WindowSynchronizer:
             
             win32gui.SetWindowPos(main_window_hwnd, win32con.HWND_TOP, x, y, 0, 0, win32con.SWP_NOSIZE)
             win32gui.SetForegroundWindow(main_window_hwnd)
-            print(f"设置主窗口位置成功: HWND={main_window_hwnd}, x={x}, y={y}")
+            logger.info(f"设置主窗口位置成功: HWND={main_window_hwnd}, x={x}, y={y}")
         else:
-            print(f"主窗口句柄无效: HWND={main_window_hwnd}")
+            logger.error(f"主窗口句柄无效: HWND={main_window_hwnd}")
 
-        print("平铺排列窗口结束")
+        logger.info("平铺排列窗口结束")
     
     def arrange_windows(self, main_window_hwnd: int, sub_window_hwnd: List[int]):
         """

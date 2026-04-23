@@ -1,19 +1,22 @@
 from typing import Optional
 import json
 
+from OAT.utils.logging import logger
+
+
 def mode_config(path: str) -> Optional[dict]:
     """读取当前目录下的json文件，获取其中的模式配置并返回"""
 
     try:
         with open(path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            print(f"已成功读取到模式配置文件: {path}")
+            logger.info(f"已成功读取到模式配置文件: {path}")
             return config
     except FileNotFoundError:
-        print(f"文件未找到: {path}")
+        logger.error(f"文件未找到: {path}")
         return None
     except json.JSONDecodeError:
-        print(f"JSON解析错误: {path}")
+        logger.error(f"JSON解析错误: {path}")
         return None
 
 def mode_choice(path: str) -> Optional[list]:

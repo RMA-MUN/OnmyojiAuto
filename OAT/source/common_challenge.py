@@ -9,6 +9,7 @@ import random
 from OAT.tools.OnmyojiAuto import OnmyojiAutomation
 from OAT.tools import settings
 from OAT.utils.do_after_challenge import do_after_challenge
+from OAT.utils.logging import logger
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
 
@@ -68,7 +69,7 @@ class CommonChallenge:
     
     def _preload_images(self):
         """预加载所有图像模板"""
-        print(f"当前使用的识别模式: {self.find_mode}")
+        logger.info(f"当前使用的识别模式: {self.find_mode}")
         
         for k, v in self.config['image_paths'].items():
             # 支持两种配置格式：
@@ -106,7 +107,7 @@ class CommonChallenge:
             # 预加载图像以提高后续识别速度
             self.automation_obj.preload_image(path)
         
-        print(f"已预加载 {len(self.image_paths)} 张图像模板")
+        logger.info(f"已预加载 {len(self.image_paths)} 张图像模板")
     
     def run(self) -> bool:
         """
@@ -144,7 +145,7 @@ class CommonChallenge:
                             ocr_target_text=info['ocr_target_text']
                         ):
                             if info['message']:
-                                print(info['message'])
+                                logger.info(info['message'])
                             # 重置连续出现次数，因为全局图片处理不影响正常流程
                             consecutive_count = {}
                             retry_count = 0
@@ -162,7 +163,7 @@ class CommonChallenge:
                     
                     # 检查是否超时
                     if time.time() - next_image_start_time > NEXT_IMAGE_TIMEOUT:
-                        print(f"识别超时：{current_next_image} 在 {NEXT_IMAGE_TIMEOUT} 秒内未找到，回到默认识别模式")
+                        logger.warn(f"识别超时：{current_next_image} 在 {NEXT_IMAGE_TIMEOUT} 秒内未找到，回到默认识别模式")
                         current_next_image = None
                         next_image_start_time = None
                         consecutive_count = {}
@@ -187,25 +188,25 @@ class CommonChallenge:
                                     
                                     # 检查连续出现次数
                                     if count == 2:
-                                        print(f"警告：图片 {current_next_image} 已连续出现2次，开始计数重试")
+                                        logger.warn(f"警告：图片 {current_next_image} 已连续出现2次，开始计数重试")
                                         retry_count = 1
                                     elif count >= 5:
-                                        print(f"错误：图片 {current_next_image} 已连续出现5次，强制停止挑战")
+                                        logger.error(f"错误：图片 {current_next_image} 已连续出现5次，强制停止挑战")
                                         return False
                                     
                                     # 检查重试次数
                                     if retry_count > 0:
-                                        print(f"重试次数：{retry_count}/5")
+                                        logger.info(f"重试次数：{retry_count}/5")
                                         if retry_count >= 5:
-                                            print(f"错误：重试5次后图片 {current_next_image} 仍然存在，结束挑战")
+                                            logger.error(f"错误：重试5次后图片 {current_next_image} 仍然存在，结束挑战")
                                             return False
                                         retry_count += 1
                                     
                                     if info['message']:
-                                        print(info['message'])
+                                        logger.info(info['message'])
                                     if info['is_challenge_start']:
                                         i += 1
-                                        print(f"还剩{self.times - i}次挑战")
+                                        logger.info(f"还剩{self.times - i}次挑战")
                                         # 挑战开始时重置连续出现次数
                                         consecutive_count = {}
                                         retry_count = 0
@@ -245,25 +246,25 @@ class CommonChallenge:
                                         
                                         # 检查连续出现次数
                                         if count == 2:
-                                            print(f"警告：图片 {key} 已连续出现2次，开始计数重试")
+                                            logger.warn(f"警告：图片 {key} 已连续出现2次，开始计数重试")
                                             retry_count = 1
                                         elif count >= 5:
-                                            print(f"错误：图片 {key} 已连续出现5次，强制停止挑战")
+                                            logger.error(f"错误：图片 {key} 已连续出现5次，强制停止挑战")
                                             return False
                                         
                                         # 检查重试次数
                                         if retry_count > 0:
-                                            print(f"重试次数：{retry_count}/5")
+                                            logger.info(f"重试次数：{retry_count}/5")
                                             if retry_count >= 5:
-                                                print(f"错误：重试5次后图片 {key} 仍然存在，结束挑战")
+                                                logger.error(f"错误：重试5次后图片 {key} 仍然存在，结束挑战")
                                                 return False
                                             retry_count += 1
                                         
                                         if info['message']:
-                                            print(info['message'])
+                                            logger.info(info['message'])
                                         if info['is_challenge_start']:
                                             i += 1
-                                            print(f"还剩{self.times - i}次挑战")
+                                            logger.info(f"还剩{self.times - i}次挑战")
                                             # 挑战开始时重置连续出现次数
                                             consecutive_count = {}
                                             retry_count = 0
@@ -283,7 +284,7 @@ class CommonChallenge:
                 # 在两次识别之间添加随机休眠时间
                 time.sleep(random.uniform(1.0, 2.0))
 
-            print(f"挑战完成！共执行{self.times}次挑战")
+            logger.info(f"挑战完成！共执行{self.times}次挑战")
             
             # 挑战完成后执行后续操作
             do_after_challenge(self.automation_obj.hwnd, self.synchronizer, self.sync_mode)

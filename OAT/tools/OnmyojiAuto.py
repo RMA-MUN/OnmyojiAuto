@@ -19,6 +19,7 @@ from . import settings
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
 from OAT.utils.OCRService import ocr_service
+from ..utils.logging import logger
 
 
 class OnmyojiAutomation:
@@ -27,7 +28,7 @@ class OnmyojiAutomation:
         # 窗口信息获取与初始化
         self.hwnd = win32gui.FindWindow(None, window_title)
         if not self.hwnd:
-            print(f"无法找到窗口 {window_title}")
+            logger.error(f"无法找到窗口 {window_title}")
             # 设置默认窗口信息
             self.area = (0, 0, 1920, 1080)  # 默认屏幕尺寸
             self.x1, self.y1, self.width, self.height = self.area
@@ -108,7 +109,7 @@ class OnmyojiAutomation:
 
     def print_window_info(self) -> None:
         """输出窗口信息"""
-        print('已获取到游戏窗口信息\n'
+        logger.info('已获取到游戏窗口信息\n'
               f'窗口左上角的位置是({self.x1},{self.y1})\n'
               f'窗口右下角的位置是({self.x2},{self.y2})\n')
 
@@ -129,7 +130,7 @@ class OnmyojiAutomation:
                     image = image.convert('RGB')
                 self.image_templates[logo_path] = image
             except Exception as e:
-                print(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
+                logger.warning(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
                 return False
         return True
 
@@ -237,7 +238,7 @@ class OnmyojiAutomation:
                 # 记录识别时间（仅在找到文字时打印）
                 elapsed_time = time.time() - start_time
                 if found:
-                    print(f"OCR识别成功: '{target_text}'，耗时: {elapsed_time:.3f}秒")
+                    logger.info(f"OCR识别成功: '{target_text}'，耗时: {elapsed_time:.3f}秒")
                     
                     # 如果有窗口句柄，将OCR坐标转换为客户区坐标
                     if self.hwnd and text_area:
@@ -265,10 +266,10 @@ class OnmyojiAutomation:
                 
                 result_queue.put((found, text_area, real_text))
             except pyautogui.FailSafeException:
-                print("OCR识别失败: 触发了PyAutoGUI安全模式")
+                logger.error("OCR识别失败: 触发了PyAutoGUI安全模式")
                 result_queue.put((False, None, None))
             except Exception as e:
-                print(f"OCR识别发生错误: {str(e)}")
+                logger.error(f"OCR识别发生错误: {str(e)}")
                 result_queue.put((False, None, None))
         
         # 创建并启动线程
@@ -279,7 +280,7 @@ class OnmyojiAutomation:
         try:
             return result_queue.get(timeout=15.0)  # 15秒超时，适应OCR识别耗时
         except queue.Empty:
-            print("OCR识别超时")
+            logger.error("OCR识别超时")
             return False, None, None
 
     def _move_mouse(self, x: int, y: int) -> None:

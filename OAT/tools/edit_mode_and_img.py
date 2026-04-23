@@ -4,6 +4,9 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QPushButton, QLineEdit, QLabel, QFileDialog, QListWidget, QListWidgetItem, QMessageBox, QSplitter
 from PyQt6.QtGui import QPixmap
 
+from OAT.utils.logging import logger
+
+
 class ImageConfigDialog(QDialog):
     def __init__(self, parent=None, image_name="", config_data={}, config_path="", image_list=[]):
         super().__init__(parent)
@@ -289,7 +292,7 @@ class ModeEditorDialog(QDialog):
             with open(self.mode_json_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"加载模式配置失败: {e}")
+            logger.error(f"加载模式配置失败: {e}")
             return {}
     
     def save_mode_config(self):
@@ -301,7 +304,7 @@ class ModeEditorDialog(QDialog):
                 json.dump(self.mode_config_data, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
-            print(f"保存模式配置失败: {e}")
+            logger.error(f"保存模式配置失败: {e}")
             return False
     
     def setup_ui(self):
@@ -501,7 +504,7 @@ class ModeEditorDialog(QDialog):
                         with open(config_path, 'r', encoding='utf-8') as f:
                             config_data = json.load(f)
                     except Exception as e:
-                        print(f"加载配置文件失败: {e}")
+                        logger.error(f"加载配置文件失败: {e}")
                 
                 # 加载图像
                 for file in os.listdir(mode_dir):
@@ -855,7 +858,7 @@ class ModeEditorDialog(QDialog):
                     image_key = os.path.splitext(image_name)[0]
                     config_data = config.get("image_paths", {}).get(image_key, {})
                 except Exception as e:
-                    print(f"加载配置文件失败: {e}")
+                    logger.error(f"加载配置文件失败: {e}")
             
             # 获取当前模式的所有图像名称
             image_list = []

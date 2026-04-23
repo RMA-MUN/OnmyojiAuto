@@ -2,6 +2,9 @@ import sys
 from PyQt6.QtWidgets import QMessageBox, QApplication
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
 
+from OAT.utils.logging import logger
+
+
 class PopupWorker(QObject):
     """弹窗工作类，用于在主线程中显示弹窗"""
     show_warning_signal = pyqtSignal(str)
@@ -55,4 +58,4 @@ def warning_box(message: str):
         # 通过信号在主线程中显示弹窗
         popup_worker.show_warning_signal.emit(message)
     except Exception as e:
-        print(f"显示警告弹窗失败: {e}")
+        logger.error(f"显示警告弹窗失败: {e}")

@@ -10,6 +10,8 @@ import shutil
 import traceback
 from urllib3.exceptions import InsecureRequestWarning
 from tqdm import tqdm
+
+from OAT.utils.logging import logger
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
 
@@ -30,7 +32,7 @@ class UpdateManager:
 
         # 确保文件存在
         if not os.path.exists(update_json_path):
-            print(f"警告：配置文件不存在: {update_json_path}")
+            logger.warn(f"警告：配置文件不存在: {update_json_path}")
             # 创建默认配置
             default_config = {
                 "ignore_versions": []
@@ -38,14 +40,14 @@ class UpdateManager:
             # 保存默认配置
             with open(update_json_path, 'w', encoding='utf-8') as f:
                 json.dump(default_config, f, ensure_ascii=False, indent=2)
-            print(f"已创建默认配置文件: {update_json_path}")
+            logger.info(f"已创建默认配置文件: {update_json_path}")
 
         self.config_reader = ConfigReader(update_json_path)
         self.config_data = self.config_reader.read_config()
 
         # 确保配置数据有效
         if self.config_data is None:
-            print("警告：配置文件读取失败，使用默认配置")
+            logger.warn("警告：配置文件读取失败，使用默认配置")
             self.config_data = {
                 "ignore_versions": []
             }
@@ -98,7 +100,7 @@ class UpdateManager:
 
         # 确保latest_version_tag不为None
         if not latest_version_tag:
-            print("无法获取最新版本信息")
+            logger.error("无法获取最新版本信息")
             return None
 
         # 确保ignore_versions是列表
@@ -107,10 +109,10 @@ class UpdateManager:
 
         # 如果新版本不在忽略列表里， 则返回最新版本
         if latest_version_tag not in self.config_data["ignore_versions"]:
-            print(f"最新版本为{latest_version_tag}")
+            logger.info(f"最新版本为{latest_version_tag}")
             return latest_version_tag
         else:
-            print("当前无新的版本")
+            logger.info("当前无新的版本")
             return None
 
     def ignore_update(self, version: str) -> bool:
@@ -129,13 +131,13 @@ class UpdateManager:
                 # 尝试将最新获取的版本写入到json
                 self.config_data["ignore_versions"].append(version)
                 self.config_reader.write_config(self.config_data)
-                print(f"已忽略更新版本 {version}")
+                logger.info(f"已忽略更新版本 {version}")
                 return True
             else:
-                print(f"版本 {version} 已经在忽略列表中")
+                logger.info(f"版本 {version} 已经在忽略列表中")
                 return True
         except Exception as e:
-            print(f"忽略更新版本 {version} 时出现异常: {e}")
+            logger.error(f"忽略更新版本 {version} 时出现异常: {e}")
             return False
 
     @staticmethod
@@ -166,15 +168,15 @@ class UpdateManager:
                 local_size = os.path.getsize(save_path)
                 
                 if remote_size > 0 and local_size == remote_size:
-                    print(f"本地文件已存在且大小匹配，直接使用: {save_path}")
+                    logger.info(f"本地文件已存在且大小匹配，直接使用: {save_path}")
                     if progress_callback:
                         progress_callback(local_size, remote_size, 0, 0)
                     return save_path
                 else:
-                    print(f"本地文件大小不匹配，删除重新下载: local={local_size}, remote={remote_size}")
+                    logger.info(f"本地文件大小不匹配，删除重新下载: local={local_size}, remote={remote_size}")
                     os.remove(save_path)
             except Exception as e:
-                print(f"检查本地文件时出错，将重新下载: {e}")
+                logger.error(f"检查本地文件时出错，将重新下载: {e}")
                 if os.path.exists(save_path):
                     os.remove(save_path)
         
@@ -191,20 +193,20 @@ class UpdateManager:
                         local_size = os.path.getsize(found_path)
                         
                         if remote_size > 0 and local_size == remote_size:
-                            print(f"在项目目录中找到匹配的文件，直接使用: {found_path}")
+                            logger.info(f"在项目目录中找到匹配的文件，直接使用: {found_path}")
                             # 复制到temp目录
                             shutil.copy2(found_path, save_path)
                             if progress_callback:
                                 progress_callback(local_size, remote_size, 0, 0)
                             return save_path
                     except Exception as e:
-                        print(f"检查找到的文件时出错: {e}")
+                        logger.error(f"检查找到的文件时出错: {e}")
                     break
         
         retry_count = 0
         while retry_count <= max_retries:
             try:
-                print(f"开始下载最新版本，保存路径: {save_path} (尝试 {retry_count + 1}/{max_retries + 1})")
+                logger.info(f"开始下载最新版本，保存路径: {save_path} (尝试 {retry_count + 1}/{max_retries + 1})")
                 
                 # 发送HTTP请求，获取文件大小
                 response = requests.get(url, stream=True, timeout=30, verify=False)
@@ -239,7 +241,7 @@ class UpdateManager:
                                 
                                 last_update_time = current_time
                 
-                print(f"下载完成: {save_path}")
+                logger.info(f"下载完成: {save_path}")
                 return save_path
             except requests.exceptions.HTTPError as e:
                 # 特殊处理5xx服务器错误
@@ -247,10 +249,10 @@ class UpdateManager:
                     retry_count += 1
                     if retry_count <= max_retries:
                         wait_time = 2 ** retry_count  # 指数退避
-                        print(f"服务器错误 ({e.response.status_code})，将在 {wait_time} 秒后重试...")
+                        logger.warn(f"服务器错误 ({e.response.status_code})，将在 {wait_time} 秒后重试...")
                         time.sleep(wait_time)
                         continue
-                print(f"下载最新版本时出现HTTP错误: {e}")
+                logger.error(f"下载最新版本时出现HTTP错误: {e}")
                 if os.path.exists(save_path):
                     os.remove(save_path)
                 return False
@@ -259,15 +261,15 @@ class UpdateManager:
                 retry_count += 1
                 if retry_count <= max_retries:
                     wait_time = 2 ** retry_count  # 指数退避
-                    print(f"网络请求失败: {e}，将在 {wait_time} 秒后重试...")
+                    logger.warn(f"网络请求失败: {e}，将在 {wait_time} 秒后重试...")
                     time.sleep(wait_time)
                     continue
-                print(f"下载最新版本时出现网络错误: {e}")
+                logger.error(f"下载最新版本时出现网络错误: {e}")
                 if os.path.exists(save_path):
                     os.remove(save_path)
                 return False
             except Exception as e:
-                print(f"下载最新版本时出现异常: {e}")
+                logger.error(f"下载最新版本时出现异常: {e}")
                 if os.path.exists(save_path):
                     os.remove(save_path)
                 return False
@@ -310,7 +312,7 @@ class UpdateManager:
                         break
             
             if not updater_path:
-                print(f"未找到更新程序，尝试查找: {updater_exe_names + python_scripts}")
+                logger.error(f"未找到更新程序，尝试查找: {updater_exe_names + python_scripts}")
                 return False
             
             # 构建启动参数
@@ -330,8 +332,8 @@ class UpdateManager:
                 if published_at:
                     args.append(f'/DATE={published_at}')
             
-            print(f"启动更新程序: {updater_path}")
-            print(f"参数: {args}")
+            logger.info(f"启动更新程序: {updater_path}")
+            logger.info(f"参数: {args}")
             
             # 启动更新程序，不等待它完成
             if sys.platform == 'win32':
@@ -344,7 +346,7 @@ class UpdateManager:
             
             return True
         except Exception as e:
-            print(f"启动更新程序时出错: {e}")
+            logger.error(f"启动更新程序时出错: {e}")
             traceback.print_exc()
             return False
 
@@ -364,7 +366,7 @@ class UpdateManager:
             
             # 获取当前工作目录作为安装目标路径
             target_path = os.getcwd()
-            print(f"开始安装最新版本，从 {extract_path} 到 {target_path}")
+            logger.info(f"开始安装最新版本，从 {extract_path} 到 {target_path}")
             
             # 遍历解压目录中的所有文件
             total_files = 0
@@ -417,10 +419,10 @@ class UpdateManager:
                         copied_files += 1
                         bar.update(1)
             
-            print(f"安装完成，共复制 {copied_files} 个文件")
-            print(f"请重新启动应用程序以应用更新")
+            logger.info(f"安装完成，共复制 {copied_files} 个文件")
+            logger.info(f"请重新启动应用程序以应用更新")
         except Exception as e:
-            print(f"安装最新版本时出现异常: {e}")
+            logger.error(f"安装最新版本时出现异常: {e}")
 
 
 

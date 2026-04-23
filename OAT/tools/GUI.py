@@ -14,6 +14,7 @@ from OAT.tools.settings import THEME
 from OAT.tools.edit_mode_and_img import ModeEditorDialog
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
+from OAT.utils.logging import logger
 
 # 获取source目录的绝对路径
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
@@ -180,6 +181,9 @@ class UiDialog(object):
 
         # 初始化窗口列表
         self.initialize_window_list()
+        
+        # 设置日志文本浏览器
+        logger.set_text_browser(self.textBrowser)
 
     def _create_nav_bar(self, main_layout):
         """创建导航栏"""
@@ -1059,7 +1063,7 @@ class UiDialog(object):
 
     def clean_cache(self):
         """清理缓存，删除logs/screen_shot文件夹，然后给log.log里的内容都替换为一个空字符串"""
-        print("cleaning cache")
+        logger.info("cleaning cache")
         try:
             # 获取项目根目录的logs文件夹路径
             logs_dir = os.path.join(project_root, "logs")
@@ -1068,7 +1072,7 @@ class UiDialog(object):
             # 检查temp文件夹是否存在，如果存在，则删除
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
-                print("残留安装包已清理")
+                logger.info("残留安装包已清理")
             # 检查log文件夹是否存在，如果存在，则删除
             if os.path.exists(logs_dir):
                 # 构建screen_shot文件夹路径
@@ -1076,16 +1080,16 @@ class UiDialog(object):
                 # 检查screen_shot文件夹是否存在，如果存在，则删除
                 if os.path.exists(screen_shot_dir):
                     shutil.rmtree(screen_shot_dir)
-                    print("窗口预览缓存已清理")
+                    logger.info("窗口预览缓存已清理")
                 # 构建log.log文件路径
                 log_file_path = os.path.join(logs_dir, "log.log")
                 # 检查log.log文件是否存在，如果存在，则清空内容
                 if os.path.exists(log_file_path):
                     with open(log_file_path, "w", encoding="utf-8") as f:
                         f.write("")
-                    print("log.log文件已清理")
+                    logger.info("log.log文件已清理")
         except Exception as e:
-            print(f"清理缓存时出错: {e}")
+            logger.error(f"清理缓存时出错: {e}")
 
 
     def open_link(self, url):
@@ -1241,14 +1245,14 @@ class UiDialog(object):
                 width = int(width_text)
                 height = int(height_text)
                 # 保存设置
-                print(f"保存窗口尺寸设置: {width}x{height}")
+                logger.info(f"保存窗口尺寸设置: {width}x{height}")
                 self.save_setting('custom_res_width', width)
                 self.save_setting('custom_res_height', height)
             else:
-                print("窗口尺寸输入框为空，不保存设置")
+                logger.warn("窗口尺寸输入框为空，不保存设置")
         except ValueError as e:
             # 如果输入不是有效的整数，不保存
-            print(f"窗口尺寸输入无效: {e}")
+            logger.error(f"窗口尺寸输入无效: {e}")
             pass
 
     def initialize_window_list(self):

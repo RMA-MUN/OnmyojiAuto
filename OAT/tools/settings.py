@@ -6,13 +6,14 @@ import os
 # 加载设置配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
 settings_file_path = os.path.join(current_dir, 'settings.json')
+from ..utils.logging import logger
 
 # 读取配置文件
 try:
     with open(settings_file_path, 'r', encoding='utf-8') as f:
         settings_data = json.load(f)
 except Exception as e:
-    print(f"加载配置文件失败: {str(e)}")
+    logger.error(f"加载配置文件失败: {str(e)}")
     # 使用默认配置
     settings_data = {
         'theme': 'light',
@@ -101,6 +102,6 @@ def update_settings(key, value):
             BACKEND_GET_IMG_MODE = value
         return True
     except Exception as e:
-        print(f"保存配置文件失败: {str(e)}")
+        logger.error(f"保存配置文件失败: {str(e)}")
         return False
 
