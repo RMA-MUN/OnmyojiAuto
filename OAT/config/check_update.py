@@ -56,7 +56,7 @@ class UpdateChecker:
             return info
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"网络请求失败: {e}")
+            logger.error(f"检查更新请求失败: {e}")
             return None
         except KeyError:
             logger.error("未找到tag_name字段，请检查仓库是否有release")
