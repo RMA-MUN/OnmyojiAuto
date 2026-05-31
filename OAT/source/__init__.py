@@ -4,6 +4,8 @@ from typing import Optional
 
 from OAT.source.mode_config import mode_config
 from .common_challenge import common_challenge
+from OAT.pipeline import create_and_run_pipeline
+from OAT.utils.logging import logger
 
 # 获取当前文件所在目录
 current_dir = os.path.dirname(__file__)
@@ -54,4 +56,17 @@ def mode_choice(
         return
 
     # 执行通用挑战函数
-    common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer, sync_mode_value)
+    if 'pipeline' in config:
+        logger.info(f"使用MAA管道模式: {mode} {sub_mode}")
+        create_and_run_pipeline(
+            config=config,
+            script_dir=script_dir,
+            window_title=window_title,
+            hidden_window=hidden_window,
+            sync_mode=sync_mode,
+            synchronizer=synchronizer,
+            sync_mode_value=sync_mode_value,
+            times=times,
+        )
+    else:
+        common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer, sync_mode_value)
