@@ -25,6 +25,8 @@ class WindowSynchronizer:
         self.sync_enabled = False
         # 同步模式：exactly_sync（完全同步）、program_sync（程序同步）、input_sync（键鼠同步）
         self.sync_mode = sync_mode
+        # 管道任务同步：记录 PipelineRunner 当前正在执行的任务名
+        self.pipeline_task_name: Optional[str] = None
 
         # 键盘监听器相关属性
         self.keyboard_listener = None  # 键盘监听器实例
@@ -878,3 +880,7 @@ class WindowSynchronizer:
         返回所有副窗口列表
         """
         return self.sub_windows
+
+    def on_pipeline_task(self, task_name: str) -> None:
+        """由 PipelineRunner 调用，通知同步器当前执行的管道任务"""
+        self.pipeline_task_name = task_name

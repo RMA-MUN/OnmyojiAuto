@@ -7,6 +7,77 @@ from PyQt6.QtGui import QPixmap
 from OAT.utils.logging import logger
 
 
+def _image_paths_to_pipeline_task(name: str, data: dict) -> dict:
+    """将 image_paths 格式的配置项转换为 pipeline.tasks 格式"""
+    task = {"name": name, "template": data.get("path", name + ".png")}
+
+    if data.get("is_challenge_start"):
+        task["is_start"] = True
+    if data.get("is_global"):
+        task["is_global"] = True
+    if data.get("next_image"):
+        task["next"] = data["next_image"]
+
+    ocr_enabled = data.get("ocr_enabled", False)
+    ocr_text = data.get("ocr_target_text", "")
+    if ocr_enabled and ocr_text:
+        task["recognition"] = "template+ocr"
+        task["ocr_text"] = ocr_text
+        task["ocr_confidence"] = data.get("ocr_confidence_threshold", 0.8)
+
+    click_area = data.get("click_area")
+    if click_area and len(click_area) == 4:
+        task["action"] = {
+            "type": "click",
+            "target": "fixed_coord",
+            "x_range": click_area[:2],
+            "y_range": click_area[2:],
+        }
+
+    if data.get("timeout"):
+        task["timeout"] = data["timeout"]
+    if data.get("max_retries"):
+        task["max_retries"] = data["max_retries"]
+
+    return task
+
+
+def _pipeline_task_to_image_paths(task: dict) -> dict:
+    """将 pipeline.tasks 格式转换为 image_paths 格式（用于旧版编辑器）"""
+    data = {
+        "path": task.get("template", task.get("name", "") + ".png"),
+        "is_challenge_start": task.get("is_start", False),
+        "message": task.get("message", ""),
+        "is_global": task.get("is_global", False),
+        "next_image": task.get("next", ""),
+        "is_global": task.get("is_global", False),
+    }
+
+    recognition = task.get("recognition", "template")
+    if recognition == "template+ocr":
+        data["ocr_enabled"] = True
+        data["ocr_target_text"] = task.get("ocr_text", "")
+        data["ocr_confidence_threshold"] = task.get("ocr_confidence", 0.8)
+    else:
+        data["ocr_enabled"] = False
+        data["ocr_target_text"] = ""
+        data["ocr_confidence_threshold"] = 0.8
+    data["ocr_action"] = "点击文字所在区域"
+
+    action = task.get("action", {})
+    if action.get("target") == "fixed_coord":
+        xr = action.get("x_range", [])
+        yr = action.get("y_range", [])
+        if len(xr) == 2 and len(yr) == 2:
+            data["click_area"] = xr + yr
+        else:
+            data.pop("click_area", None)
+    else:
+        data.pop("click_area", None)
+
+    return data
+
+
 class ImageConfigDialog(QDialog):
     def __init__(self, parent=None, image_name="", config_data={}, config_path="", image_list=[]):
         super().__init__(parent)
@@ -235,24 +306,47 @@ class ImageConfigDialog(QDialog):
                     with open(self.config_path, 'r', encoding='utf-8') as f:
                         config = json.load(f)
                 else:
-                    config = {"image_paths": {}}
+                    config = {"image_paths": {}, "pipeline": {"tasks": []}}
                 
-                # 更新image_paths
+                # 更新image_paths（兼容旧格式）
                 if "image_paths" not in config:
                     config["image_paths"] = {}
-                
+
                 # 获取旧的图像键名（去除扩展名）
                 old_image_key = os.path.splitext(self.image_name)[0]
-                
+
                 # 获取新的图像键名（去除扩展名）
                 new_image_key = os.path.splitext(new_name)[0]
-                
+
                 # 如果名称改变，需要删除旧的配置并添加新的
                 if new_image_key != old_image_key:
                     if old_image_key in config["image_paths"]:
                         del config["image_paths"][old_image_key]
-                
-                config["image_paths"][new_image_key] = self.config_data
+                    # 同时在 pipeline.tasks 中删除旧条目
+                    if "pipeline" in config and "tasks" in config["pipeline"]:
+                        config["pipeline"]["tasks"] = [
+                            t for t in config["pipeline"]["tasks"]
+                            if t.get("name") != old_image_key
+                        ]
+
+                config["image_paths"][new_image_key] = self.config_data.copy()
+
+                # 同步写入 pipeline.tasks 格式（如果 config 已有 pipeline）
+                if "pipeline" in config:
+                    if "tasks" not in config["pipeline"]:
+                        config["pipeline"]["tasks"] = []
+                    # 找到或创建匹配的 task
+                    existing = None
+                    for t in config["pipeline"]["tasks"]:
+                        if t.get("name") == new_image_key:
+                            existing = t
+                            break
+                    pipeline_task = _image_paths_to_pipeline_task(new_image_key, self.config_data)
+                    if existing:
+                        idx = config["pipeline"]["tasks"].index(existing)
+                        config["pipeline"]["tasks"][idx] = pipeline_task
+                    else:
+                        config["pipeline"]["tasks"].append(pipeline_task)
                 
                 # 保存配置
                 with open(self.config_path, 'w', encoding='utf-8') as f:
@@ -854,9 +948,14 @@ class ModeEditorDialog(QDialog):
                 try:
                     with open(config_path, 'r', encoding='utf-8') as f:
                         config = json.load(f)
-                    # 获取图像配置
+                    # 获取图像配置，优先 pipeline.tasks 格式
                     image_key = os.path.splitext(image_name)[0]
                     config_data = config.get("image_paths", {}).get(image_key, {})
+                    if not config_data and "pipeline" in config:
+                        for task in config["pipeline"].get("tasks", []):
+                            if task.get("name") == image_key:
+                                config_data = _pipeline_task_to_image_paths(task)
+                                break
                 except Exception as e:
                     logger.error(f"加载配置文件失败: {e}")
             
@@ -985,7 +1084,7 @@ class ModeEditorDialog(QDialog):
                         config_path = os.path.join(dir_path, 'config.json')
                         if not os.path.exists(config_path):
                             with open(config_path, 'w', encoding='utf-8') as f:
-                                json.dump({"image_paths": {}}, f, ensure_ascii=False, indent=2)
+                                json.dump({"image_paths": {}, "pipeline": {"tasks": []}}, f, ensure_ascii=False, indent=2)
                     except Exception as e:
                         QMessageBox.warning(self, "警告", f"创建目录 {mode_data} 失败: {e}")
             elif isinstance(mode_data, dict):
@@ -1000,7 +1099,7 @@ class ModeEditorDialog(QDialog):
                                 config_path = os.path.join(dir_path, 'config.json')
                                 if not os.path.exists(config_path):
                                     with open(config_path, 'w', encoding='utf-8') as f:
-                                        json.dump({"image_paths": {}}, f, ensure_ascii=False, indent=2)
+                                        json.dump({"image_paths": {}, "pipeline": {"tasks": []}}, f, ensure_ascii=False, indent=2)
                             except Exception as e:
                                 QMessageBox.warning(self, "警告", f"创建目录 {submode_dir} 失败: {e}")
         
