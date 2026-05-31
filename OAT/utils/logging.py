@@ -66,12 +66,12 @@ class LogRedirect(QtCore.QObject):
         stack = inspect.stack()
         # 遍历调用栈，找到实际的print触发位置
         # 跳过当前方法(get_caller_info)、log方法、info/warn/error方法和print方法
-        # 寻找第一个不在logging.py和mainGui.py中的调用点
+        # 寻找第一个不在logging.py中的调用点
         for i in range(3, len(stack)):
             frame = stack[i]
             module = inspect.getmodule(frame[0])
             # 检查是否为目标调用点
-            if module and not module.__name__.startswith('OAT.utils.logging') and not module.__name__.startswith('OAT.tools.mainGui'):
+            if module and not module.__name__.startswith('OAT.utils.logging'):
                 return f"{module.__name__}:{frame.lineno}"
 
         # 如果没有找到合适的调用点，回退到原逻辑
@@ -101,17 +101,29 @@ class LogRedirect(QtCore.QObject):
         # 更新最后一条日志信息
         self.last_log_message = message
         self.last_log_time = current_time
-        
+
         timestamp = self.get_timestamp()
         caller_info = self.get_caller_info()
         
-        # 根据级别设置不同的颜色
-        color_map = {
-            'INFO': '#666666',  # 灰色
-            'WARN': '#FFC107',  # 黄色
-            'ERROR': '#F44336',  # 红色
-        }
-        color = color_map.get(level, '#666666')  # 默认灰色
+        # 根据级别和主题设置不同的颜色
+        try:
+            from qfluentwidgets.common.config import isDarkTheme
+            _dark = isDarkTheme()
+        except Exception:
+            _dark = False
+        if _dark:
+            color_map = {
+                'INFO': '#BBBBBB',  # 浅灰（暗色背景下可见）
+                'WARN': '#FFC107',  # 黄色
+                'ERROR': '#F44336',  # 红色
+            }
+        else:
+            color_map = {
+                'INFO': '#666666',  # 灰色
+                'WARN': '#FFC107',  # 黄色
+                'ERROR': '#F44336',  # 红色
+            }
+        color = color_map.get(level, '#999999')  # 默认灰色
         
         # 文本浏览器显示格式（带颜色）
         display_text = f"<font color='{color}'>{timestamp} - [{level}] {message}</font>"
