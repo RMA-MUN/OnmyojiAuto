@@ -16,6 +16,7 @@ dependencies = [
     "pyinstaller>=6.19.0",
     "pynput==1.8.1",
     "pyqt6==6.8.1",
+    "pyqt6-fluent-widgets[full]>=1.11.2",
     "pyscreeze==0.1.28",
     "pywin32==310",
     "pyyaml==6.0.1",
@@ -28,3 +29,6 @@ dependencies = [
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
+
+[tool.uv.sources]
+pyqt6-fluent-widgets = { git = "https://github.com/zhiyiYo/PyQt-Fluent-Widgets.git", rev = "PyQt6" }
