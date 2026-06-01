@@ -795,7 +795,7 @@ class WindowSynchronizer:
             else:
                 # 空间不足，使用最小间距，可能会有轻微遮挡
                 window_spacing = 5
-                logger.warning("警告：屏幕宽度不足，窗口可能会有轻微遮挡")
+                logger.warn("警告：屏幕宽度不足，窗口可能会有轻微遮挡")
         else:
             window_spacing = 20  # 只有一个窗口时的默认间距
         
