@@ -48,11 +48,11 @@ def mode_choice(
         # 调用缓存函数获取路径
         script_dir = get_script_dir(mode, sub_mode)
     except ValueError as e:
-        print(f"模式配置错误: {e}")
-        print('请检查是否正确选择了模式或配置文件！')
+        logger.error(f"模式配置错误: {e}")
+        logger.error('请检查是否正确选择了模式或配置文件！')
         return
     except FileNotFoundError as e:
-        print(f"路径错误: {e}")
+        logger.error(f"路径错误: {e}")
         return
 
     # 执行通用挑战函数

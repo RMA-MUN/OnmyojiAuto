@@ -131,7 +131,7 @@ class WindowChecker:
                 try:
                     warning_box("检测到窗口处于最小化状态，请先恢复窗口再继续操作。")
                 except Exception as e:
-                    print(f"显示弹窗失败: {e}")
+                    logger.error(f"显示弹窗失败: {e}")
                 return
 
         current_size = self.get_window_info()
@@ -148,7 +148,7 @@ class WindowChecker:
                     try:
                         warning_box(f"窗口尺寸调整失败，当前尺寸：{updated_size[2]}。\n请手动调整窗口大小为{target_width}x{target_height}，或检查窗口是否被其他程序占用。")
                     except Exception as e:
-                        print(f"显示弹窗失败: {e}")
+                        logger.error(f"显示弹窗失败: {e}")
                     # 如果已提供了窗口句柄，仍然继续运行
                     if not self.window_handle:
                         return
