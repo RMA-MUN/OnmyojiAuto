@@ -140,11 +140,11 @@ def close_game(window_hwnd: int) -> bool:
                         time.sleep(2)
                 
                 if not success:
-                    logger.warning("警告：所有确认关闭尝试都失败了！")
+                    logger.warn("警告：所有确认关闭尝试都失败了！")
                 else:
                     logger.info("确认关闭操作成功")
 
-            return True
+            return success
         else:
             logger.error("无效的窗口句柄")
             return False
@@ -273,7 +273,8 @@ def do_after_challenge(window_hwnds: list[int] | int, synchronizer=None, is_sync
         
         # 关闭所有窗口
         if unique_windows:
-            close_multiple_games(unique_windows)
+            if not close_multiple_games(unique_windows):
+                logger.error("部分游戏窗口关闭失败，请手动检查")
         
         # 如果同时需要关闭程序，等待游戏窗口关闭
         if close_program_flag:
