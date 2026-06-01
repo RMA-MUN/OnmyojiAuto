@@ -1,3 +1,4 @@
+import os
 import random
 import threading
 import time
@@ -122,6 +123,9 @@ class OnmyojiAutomation:
     def preload_image(self, logo_path: str) -> bool:
         """预加载并缓存图像模板"""
         if logo_path not in self.image_templates:
+            if not os.path.exists(logo_path):
+                logger.warn(f"图像文件不存在，跳过预加载: {logo_path}")
+                return False
             try:
                 # 读取图像并进行预处理
                 image = Image.open(logo_path)
@@ -130,7 +134,7 @@ class OnmyojiAutomation:
                     image = image.convert('RGB')
                 self.image_templates[logo_path] = image
             except Exception as e:
-                logger.warning(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
+                logger.warn(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
                 return False
         return True
 
@@ -479,7 +483,7 @@ class OnmyojiAutomation:
             else:
                 return False
         except Exception as e:
-            print(f"隐藏窗口捕获发生错误: {str(e)}")
+            logger.error(f"隐藏窗口捕获发生错误: {str(e)}")
             # 降级到常规模式
             return self._perform_action_normal(logo, threshold, sync_mode, click_type, click_area)
 
