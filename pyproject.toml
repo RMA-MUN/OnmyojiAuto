@@ -12,7 +12,6 @@ dependencies = [
     "pillow==9.5.0",
     "psutil==7.0.0",
     "pyautogui==0.9.54",
-    "pygetwindow==0.0.9",
     "pyinstaller>=6.19.0",
     "pynput==1.8.1",
     "pyqt6==6.8.1",
@@ -23,7 +22,7 @@ dependencies = [
     "rapidocr==3.7.0",
     "requests==2.32.5",
     "tqdm==4.67.3",
-    "urllib3==1.26.20",
+    "urllib3>=2.0,<3",
 ]
 
 [[tool.uv.index]]

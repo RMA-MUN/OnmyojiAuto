@@ -1,8 +1,7 @@
 import os
 import json
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout
 
 from qfluentwidgets import (
     ComboBox, SpinBox, CheckBox, RadioButton,
@@ -162,15 +161,13 @@ class HomePage(QWidget):
     def get_text(self):
         return '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.增加OCR文字识别功能</span>
+                <span style="margin: 0;">1.重构GUI界面，基于Fluent-Widgets实现</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.优化日志系统，提供更分明的日志级别过滤</span>
+                <span style="margin: 0;">2.识别实现参考MAA的pipeline</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.修复部分情况下warning_box无限弹窗的恶性bug</span>
+                <span style="margin: 0;">3.修复错误引用logger.warning引发的报错</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.修复后台模式的坐标问题</span>
-                <br style="margin: 0;"/>
-                <span style="margin: 0;">5.优化部分体验</span>
+                <span style="margin: 0;">4.修复close_game关闭失败但return True的问题</span>
             </div>
         '''
 

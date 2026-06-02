@@ -225,7 +225,6 @@ class OnmyojiAutomation:
         返回:
             tuple: (是否找到, 文字区域坐标, 文字内容)
         """
-        import threading
         import queue
         
         # 创建队列用于接收OCR结果
