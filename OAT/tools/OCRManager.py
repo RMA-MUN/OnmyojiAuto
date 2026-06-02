@@ -1,4 +1,3 @@
-import os
 import cv2
 from rapidocr import RapidOCR
 
@@ -19,6 +18,7 @@ class OCRManager:
         """延迟初始化OCR reader"""
         if self.reader is None:
             try:
+                logger.info('正在初始化OCR引擎')
                 # 初始化RapidOCR（支持中英文识别）
                 self.reader = RapidOCR(
                     params={
@@ -28,6 +28,7 @@ class OCRManager:
                         "Det.max_side_len": 960  # 设置最大边长，避免图像过大
                     }
                 )
+                logger.info('OCR引擎初始化完成')
             except Exception as e:
                 logger.error(f"OCR初始化失败: {str(e)}")
                 self.reader = None
@@ -80,43 +81,38 @@ class OCRManager:
         found = False
         text_area = None
         real_text = None
-        # 统计达到阈值的文字数量
-        threshold_count = 0
-        # 存储达到阈值的文字信息
-        threshold_texts = []
 
         # 获取识别结果数据（RapidOCR返回的是RapidOCROutput对象）
         if hasattr(results, 'txts'):
             if debug:
+                threshold_count = 0
+                threshold_texts = []
                 logger.info(f"[OCR Debug] 识别到的文字数量: {len(results.txts)}")
-            
+
             # 遍历所有文字
             for i in range(len(results.txts)):
                 text = results.txts[i]
                 conf = results.scores[i]
                 box = results.boxes[i]
-                
+
                 # 调试输出：显示识别到的文字及其置信度
                 if debug:
-                    # 将numpy数组转换为列表以便打印
                     box_list = box.tolist() if hasattr(box, 'tolist') else box
                     logger.info(f"[OCR Debug] 识别到文字: '{text}'，置信度: {conf:.4f}，区域: {box_list}")
-                
-                # 检查是否达到置信度阈值
-                if conf >= confidence_threshold:
-                    threshold_count += 1
-                    threshold_texts.append({
-                        'text': text,
-                        'confidence': conf,
-                        'area': box
-                    })
-                    
+                    # 检查是否达到置信度阈值
+                    if conf >= confidence_threshold:
+                        threshold_count += 1
+                        threshold_texts.append({
+                            'text': text,
+                            'confidence': conf,
+                            'area': box
+                        })
+
                 # 检查是否找到目标文字
                 if target_text in text:
                     found = True
                     real_text = text
-                    # 将numpy数组转换为Python列表
-                    text_area = box.tolist() if hasattr(box, 'tolist') else box  # 文字区域坐标
+                    text_area = box.tolist() if hasattr(box, 'tolist') else box
                     if debug:
                         logger.info(f"[OCR Debug] 找到目标文字: '{target_text}'，匹配文字: '{text}'，置信度: {conf:.4f}")
                     break
@@ -134,9 +130,7 @@ class OCRManager:
             if threshold_count > 0:
                 logger.info(f"[OCR Debug] 达到阈值的文字详情:")
                 for idx, item in enumerate(threshold_texts, 1):
-                    # 计算区域边界
                     area = item['area']
-                    # 将numpy数组转换为列表以便处理
                     if hasattr(area, 'tolist'):
                         area_list = area.tolist()
                         x_coords = [point[0] for point in area_list]
@@ -147,10 +141,6 @@ class OCRManager:
                     min_x, max_x = min(x_coords), max(x_coords)
                     min_y, max_y = min(y_coords), max(y_coords)
                     logger.info(f"  {idx}. 文字: '{item['text']}'，置信度: {item['confidence']:.4f}，区域: [x: {min_x:.1f}-{max_x:.1f}, y: {min_y:.1f}-{max_y:.1f}]")
-
-        # 输出结果（仅在找到文字时打印）
-        # if found:
-        #     print(f"OCR找到文字：{real_text}")
 
         return found, text_area, real_text
 
