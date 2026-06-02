@@ -8,7 +8,6 @@ import time
 from pynput import mouse, keyboard
 from typing import List, Tuple, Optional
 from OAT.tools.WindowChecker import WindowChecker
-from OAT.tools.settings import CUSTOM_RES_WIDTH, CUSTOM_RES_HEIGHT, WINDOW_ARRANGE_MODE, WINDOWS_PER_ROW
 from OAT.utils.logging import logger
 
 
@@ -224,13 +223,8 @@ class WindowSynchronizer:
                                 relative_y_ratio = max(0.0, min(1.0, relative_y_ratio))
                                 
                                 # 使用副窗口实际客户区域尺寸计算目标坐标，提高准确性
-                                # 先按自定义分辨率计算理想坐标
-                                ideal_x = relative_x_ratio * CUSTOM_RES_WIDTH
-                                ideal_y = relative_y_ratio * CUSTOM_RES_HEIGHT
-                                
-                                # 然后根据副窗口实际尺寸进行缩放，确保映射到正确位置
-                                sub_absolute_x = int(round((ideal_x / CUSTOM_RES_WIDTH) * sub_client_width))
-                                sub_absolute_y = int(round((ideal_y / CUSTOM_RES_HEIGHT) * sub_client_height))
+                                sub_absolute_x = int(round(relative_x_ratio * sub_client_width))
+                                sub_absolute_y = int(round(relative_y_ratio * sub_client_height))
                                 
                                 # 确保坐标在有效范围内
                                 sub_absolute_x = max(0, min(sub_absolute_x, sub_client_width))
