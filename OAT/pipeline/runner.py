@@ -39,6 +39,7 @@ class PipelineRunner:
         self.next_start_time: Optional[float] = None
         self.current_task: Optional[Task] = None
         self._last_matched_task: Optional[Task] = None
+        self._last_matched_task_name: Optional[str] = None
 
     def run(self, times: int) -> bool:
         """执行挑战主循环"""
@@ -99,9 +100,12 @@ class PipelineRunner:
             return False
 
         if self._match_and_execute(task):
+            if task.name != self._last_matched_task_name:
+                self.retry_count = 0
             self._update_consecutive(task.name)
             if self._should_abort(task.name):
                 return False
+            self._last_matched_task_name = task.name
             self.next_start_time = None
             return True
         return False
@@ -110,9 +114,12 @@ class PipelineRunner:
         """遍历所有非全局任务，返回是否匹配到任一任务"""
         for task in self._non_global_tasks:
             if self._match_and_execute(task):
+                if task.name != self._last_matched_task_name:
+                    self.retry_count = 0
                 self._update_consecutive(task.name)
                 if self._should_abort(task.name):
-                    return False  # 调用方会终止
+                    return False
+                self._last_matched_task_name = task.name
                 return True
         return False
 
@@ -192,12 +199,12 @@ class PipelineRunner:
         count = self.consecutive_count.get(task_name, 0)
         if count >= 5:
             logger.error(f"图片 {task_name} 已连续出现5次，强制停止")
-            raise SystemExit("连续匹配超限")
+            return True
         if count >= 2:
             self.retry_count += 1
             if self.retry_count >= 5:
                 logger.error(f"重试5次后图片 {task_name} 仍然存在，结束挑战")
-                raise SystemExit("重试超限")
+                return True
         return False
 
 
