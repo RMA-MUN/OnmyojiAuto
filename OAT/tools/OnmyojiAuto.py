@@ -89,6 +89,21 @@ class OnmyojiAutomation:
             except Exception:
                 pass
 
+        # 窗口矩形缓存
+        self._window_rect_cache = None
+        self._window_rect_cache_ts = 0.0
+
+    def _get_cached_window_rect(self):
+        """获取窗口矩形（带1秒TTL缓存）"""
+        now = time.time()
+        if self._window_rect_cache is not None and now - self._window_rect_cache_ts < 1.0:
+            return self._window_rect_cache
+        rect = win32gui.GetWindowRect(self.hwnd)
+        client = win32gui.GetClientRect(self.hwnd)
+        self._window_rect_cache = (rect, client)
+        self._window_rect_cache_ts = now
+        return self._window_rect_cache
+
     def is_window_present(self) -> bool:
         """检查窗口是否存在且有效"""
         if self.hwnd == 0:
@@ -247,10 +262,9 @@ class OnmyojiAutomation:
                     # 如果有窗口句柄，将OCR坐标转换为客户区坐标
                     if self.hwnd and text_area:
                         try:
-                            # 获取窗口信息
-                            window_rect = win32gui.GetWindowRect(self.hwnd)
-                            client_rect = win32gui.GetClientRect(self.hwnd)
-                            
+                            # 获取窗口信息（使用缓存）
+                            window_rect, client_rect = self._get_cached_window_rect()
+
                             # 计算标题栏高度（窗口高度 - 客户区高度）
                             window_height = window_rect[3] - window_rect[1]
                             client_height = client_rect[3] - client_rect[1]
@@ -308,7 +322,7 @@ class OnmyojiAutomation:
         :param absolute_y: 屏幕绝对Y坐标
         :return: 窗口内的相对坐标(x, y)
         """
-        rect = win32gui.GetWindowRect(self.hwnd)
+        rect, _ = self._get_cached_window_rect()
         window_left, window_top, _, _ = rect
         relative_x = absolute_x - window_left
         relative_y = absolute_y - window_top
@@ -449,10 +463,9 @@ class OnmyojiAutomation:
                     
                     # 计算标题栏高度并转换坐标（后台模式下，图像识别返回的坐标包含标题栏）
                     try:
-                        # 获取窗口信息
-                        window_rect = win32gui.GetWindowRect(self.hwnd)
-                        client_rect = win32gui.GetClientRect(self.hwnd)
-                        
+                        # 获取窗口信息（使用缓存）
+                        window_rect, client_rect = self._get_cached_window_rect()
+
                         # 计算标题栏高度（窗口高度 - 客户区高度）
                         window_height = window_rect[3] - window_rect[1]
                         client_height = client_rect[3] - client_rect[1]

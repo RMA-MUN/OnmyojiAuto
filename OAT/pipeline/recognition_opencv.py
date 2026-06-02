@@ -17,6 +17,8 @@ from .recognition import RecognitionEngine, RecognitionResult
 class OpenCVRecognitionEngine(RecognitionEngine):
     """基于 OpenCV 模板匹配 + RapidOCR 的识别引擎"""
 
+    _template_cache: dict = {}
+
     def __init__(
         self,
         hwnd: int,
@@ -52,6 +54,14 @@ class OpenCVRecognitionEngine(RecognitionEngine):
         except Exception:
             return 0
 
+    def _load_template(self, template_path: str) -> Optional[np.ndarray]:
+        if template_path in self._template_cache:
+            return self._template_cache[template_path]
+        target = cv2.imread(template_path)
+        if target is not None:
+            self._template_cache[template_path] = target
+        return target
+
     def capture_screenshot(self) -> Optional[np.ndarray]:
         if self.window_capture:
             return self.window_capture.capture_window()
@@ -71,7 +81,7 @@ class OpenCVRecognitionEngine(RecognitionEngine):
             return RecognitionResult(found=False)
 
         try:
-            target = cv2.imread(template_path)
+            target = self._load_template(template_path)
             if target is None:
                 return RecognitionResult(found=False)
 
