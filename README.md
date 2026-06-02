@@ -1,10 +1,11 @@
 # OnmyojiAuto - 阴阳师自动化
 
 <div align="center">
-    <img src="https://img.shields.io/badge/version-v2.2.1-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-v2.3.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/system-Windows-blue.svg" alt="System">
     <img src="https://img.shields.io/badge/python-v3.12.4-blue.svg" alt="System">
 </div>
+
 
 
 
@@ -13,10 +14,10 @@
 
 ## 📥 程序下载 & 更新日志
 
-| 功能              | 链接                                                                                         |
-| ----------------- |:-------------------------------------------------------------------------------------------|
-| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.2.1/OAT-v2.2.1.zip) |
-| 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest)                             |
+| 功能              | 链接                                                         |
+| ----------------- | :----------------------------------------------------------- |
+| 下载最新exe压缩包 | [立即下载](https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v2.3.0/OAT-v2.3.0.zip) |
+| 查看版本更新内容  | [前往查看](https://github.com/RMA-MUN/OnmyojiAuto/releases/latest) |
 
 ---
 
@@ -27,10 +28,8 @@
 |           ![运行图片](./img_pages/home.png)            |
 |                同步器和窗口预览功能展示                |
 | ![同步器和窗口预览功能展示](./img_pages/sync_page.png) |
-|                        背景图片                        |
+|                        设置页面                        |
 |        ![背景图片](./img_pages/background.png)         |
-
-（可自行替换背景图片：将替换后的png图片命名为`background.png`即可覆盖）
 
 ---
 
@@ -83,10 +82,8 @@ uv sync
 - `PyQt6`：GUI界面开发
 - `pywin32`：Windows窗口控制
 - `rapidocr`：文字识别
-- `pyautogui`：自动化操作
 - `numpy`：数值计算
 - `requests`：网络请求
-- `PyYAML`：配置文件解析
 
 ### 3. 环境配置
 
