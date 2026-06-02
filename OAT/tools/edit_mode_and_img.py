@@ -1,5 +1,6 @@
 import os
 import json
+import ast
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QPushButton, QLineEdit, QLabel, QFileDialog, QListWidget, QListWidgetItem, QMessageBox, QSplitter
 from PyQt6.QtGui import QPixmap
@@ -267,13 +268,13 @@ class ImageConfigDialog(QDialog):
             # 设置自定义区域
             try:
                 # 尝试解析输入的区域
-                area = eval(self.custom_area_line_edit.text())
+                area = ast.literal_eval(self.custom_area_line_edit.text())
                 if isinstance(area, list) and len(area) == 4:
                     self.config_data["click_area"] = area
                 else:
                     # 使用默认值
                     self.config_data["click_area"] = [100, 100, 100, 400]
-            except:
+            except (ValueError, SyntaxError, TypeError):
                 # 使用默认值
                 self.config_data["click_area"] = [100, 200, 200, 400]
         
@@ -287,7 +288,7 @@ class ImageConfigDialog(QDialog):
         try:
             threshold = float(self.ocr_threshold_edit.text())
             self.config_data["ocr_confidence_threshold"] = threshold
-        except:
+        except (ValueError, TypeError):
             self.config_data["ocr_confidence_threshold"] = 0.8
         
         # OCR识别后的操作
