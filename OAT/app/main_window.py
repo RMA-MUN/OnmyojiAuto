@@ -42,10 +42,12 @@ from OAT.utils.error_box import error_box
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
 from OAT.utils.markdown_to_html import markdown_to_html
 from OAT.tools.edit_mode_and_img import ModeEditorDialog
+from OAT.tools.MultiInstanceManager import MultiInstanceManager
 
 from .home_page import HomePage
 from .sync_page import SyncPage
 from .settings_page import SettingsPage
+from .multi_instance_page import MultiInstancePage
 
 setup_global_exception_handler()
 
@@ -57,9 +59,11 @@ class AppUI:
         self.home_page = HomePage(window)
         self.sync_page = SyncPage(window)
         self.settings_page = SettingsPage(window)
+        self.multi_instance_page = MultiInstancePage(window)
 
         window.addSubInterface(self.home_page, FIF.HOME, "首页")
         window.addSubInterface(self.sync_page, FIF.TILES, "同步器")
+        window.addSubInterface(self.multi_instance_page, FIF.GAME, "多开管理")
         window.addSubInterface(self.settings_page, FIF.SETTING, "设置")
 
         self._setup_proxies()
@@ -110,6 +114,15 @@ class AppUI:
         self.custom_res_height_input = self.settings_page.custom_res_height_input
         self.custom_res_warning = self.settings_page.custom_res_warning
 
+        self.exe_path_input = self.multi_instance_page.exe_path_input
+        self.browse_btn = self.multi_instance_page.browse_btn
+        self.launch_count = self.multi_instance_page.launch_count
+        self.launch_btn = self.multi_instance_page.launch_btn
+        self.close_selected_btn = self.multi_instance_page.close_selected_btn
+        self.close_all_btn = self.multi_instance_page.close_all_btn
+        self.refresh_btn = self.multi_instance_page.refresh_btn
+        self.instance_table = self.multi_instance_page.instance_table
+
     def get_text(self):
         return self.home_page.get_text()
 
@@ -146,6 +159,8 @@ class MainWindow(FluentWindow):
 
         self.sync = WindowSynchronizer(sync_mode=self.sync_mode_value)
         self.sync_mode_flag = False
+
+        self.multi_instance_manager = MultiInstanceManager()
 
         icon_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
@@ -204,6 +219,12 @@ class MainWindow(FluentWindow):
 
         self.ui.custom_res_width_input.textChanged.connect(self.ui.on_width_changed)
         self.ui.custom_res_height_input.textChanged.connect(self.ui.on_height_changed)
+
+        self.ui.multi_instance_page.launch_btn.clicked.connect(self.launch_game_instances)
+        self.ui.multi_instance_page.close_selected_btn.clicked.connect(self.close_selected_instances)
+        self.ui.multi_instance_page.close_all_btn.clicked.connect(self.close_all_instances)
+        self.ui.multi_instance_page.refresh_btn.clicked.connect(self.refresh_instance_list)
+        self.ui.multi_instance_page.close_instance.connect(self.close_instance_by_id)
 
     def _setup_shortcuts(self):
         self.ui.window_detect_btn.setShortcut("Ctrl+W")
@@ -1027,3 +1048,66 @@ class MainWindow(FluentWindow):
         dialog.exec()
         self.ui.home_page.reload_modes()
         self.ui.on_mode_selected(self.ui.find_mode_combo.currentIndex())
+
+    def launch_game_instances(self):
+        exe_path = self.ui.multi_instance_page.get_exe_path()
+        if not exe_path:
+            warning_box("请先选择游戏exe文件路径")
+            return
+
+        if not os.path.exists(exe_path):
+            warning_box(f"文件不存在: {exe_path}")
+            return
+
+        count = self.ui.multi_instance_page.get_launch_count()
+        logger.info(f"启动 {count} 个游戏实例: {exe_path}")
+
+        def launch_thread():
+            try:
+                instances = self.multi_instance_manager.launch_instance(exe_path, count)
+                for instance in instances:
+                    self.ui.multi_instance_page.instance_added.emit(
+                        instance.instance_id,
+                        instance.hwnd or 0,
+                        instance.status
+                    )
+                    logger.info(f"实例 {instance.instance_id} 已启动, 状态: {instance.status}")
+            except Exception as e:
+                logger.error(f"启动实例失败: {e}")
+                error_box(f"启动失败: {str(e)}")
+
+        thread = threading.Thread(target=launch_thread, daemon=True)
+        thread.start()
+
+    def close_selected_instances(self):
+        selected_ids = self.ui.multi_instance_page.get_selected_instance_ids()
+        if not selected_ids:
+            warning_box("请先选择要关闭的实例")
+            return
+
+        for instance_id in selected_ids:
+            self.close_instance_by_id(instance_id)
+
+    def close_all_instances(self):
+        closed = self.multi_instance_manager.close_all()
+        self.ui.multi_instance_page.clear_instances()
+        logger.info(f"已关闭 {closed} 个实例")
+
+    def refresh_instance_list(self):
+        self.multi_instance_manager.refresh_all_status()
+        instances = self.multi_instance_manager.get_all_instances()
+
+        for instance_id, instance in instances.items():
+            self.ui.multi_instance_page.update_instance(
+                instance_id,
+                hwnd=instance.hwnd,
+                status=instance.status
+            )
+
+    def close_instance_by_id(self, instance_id: int):
+        success = self.multi_instance_manager.close_instance(instance_id)
+        if success:
+            self.ui.multi_instance_page.update_instance(instance_id, status="已关闭")
+            logger.info(f"实例 {instance_id} 已关闭")
+        else:
+            logger.error(f"关闭实例 {instance_id} 失败")
