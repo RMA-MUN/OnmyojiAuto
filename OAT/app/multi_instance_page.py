@@ -78,9 +78,11 @@ class MultiInstancePage(QWidget):
         config_row.addLayout(interval_col)
         card_layout.addLayout(config_row)
 
-        interval_hint = BodyLabel("推荐5秒，小于3秒可能导致启动不完全")
+        card_layout.addSpacing(4)
+
         hint_hbox = QHBoxLayout()
         hint_hbox.addStretch()
+        interval_hint = BodyLabel("推荐5秒，小于3秒可能导致启动不完全")
         hint_hbox.addWidget(interval_hint)
         hint_hbox.addStretch()
         card_layout.addLayout(hint_hbox)
