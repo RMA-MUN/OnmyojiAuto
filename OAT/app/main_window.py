@@ -1058,7 +1058,9 @@ class MainWindow(FluentWindow):
         interval = self.ui.multi_instance_page.get_launch_interval()
 
         if interval < 3:
-            warning_box("启动间隔建议不少于3秒，否则可能出现启动不完全的情况，推荐5秒")
+            warning_box("启动间隔建议不少于3秒，否则可能出现启动不完全的情况，已重置为5秒")
+            self.ui.multi_instance_page.launch_interval.setValue(5)
+            return
 
         logger.info(f"启动 {count} 个游戏实例: {exe_path}, 间隔 {interval}s")
 
