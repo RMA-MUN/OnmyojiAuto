@@ -11,6 +11,14 @@ from qfluentwidgets import (
 
 
 class MultiInstancePage(QWidget):
+    """多开管理页：游戏路径 + 启动数量 + 启动间隔 + 启动按钮 + 使用说明。
+
+    信号说明：
+    - launch_finished: 后台启动线程结束（成功或失败）后发射，用于恢复启动按钮；
+      由 worker 线程 emit，跨线程信号自动 queued，槽在 GUI 线程执行
+    - path_changed: 游戏路径输入框文本变化时发射（浏览选择/手动输入都会触发），
+      上层据此立即把新路径写入 yyx-launcher.ini
+    """
     launch_finished = QtCore.pyqtSignal()
     path_changed = QtCore.pyqtSignal(str)
 
@@ -18,9 +26,11 @@ class MultiInstancePage(QWidget):
         super().__init__(parent)
         self.setObjectName("multi_instance_page")
         self._setup_ui()
+        # 输入框内容变化即转发 path_changed 信号（空值过滤在 main_window 侧处理）
         self.exe_path_input.textChanged.connect(self.path_changed.emit)
 
     def _setup_ui(self):
+        # 外层留白，卡片垂直堆叠：配置卡 + 使用说明卡
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(16)
@@ -29,6 +39,7 @@ class MultiInstancePage(QWidget):
         card_layout = QVBoxLayout(multi_card)
         card_layout.setSpacing(12)
 
+        # 标题居中
         header = StrongBodyLabel("多开管理")
         header_hbox = QHBoxLayout()
         header_hbox.addStretch()
@@ -36,6 +47,7 @@ class MultiInstancePage(QWidget):
         header_hbox.addStretch()
         card_layout.addLayout(header_hbox)
 
+        # 游戏路径：标签 + 输入框（占满）+ 浏览按钮
         exe_label = BodyLabel("游戏路径")
         card_layout.addWidget(exe_label)
 
@@ -50,6 +62,7 @@ class MultiInstancePage(QWidget):
         path_row.addWidget(self.browse_btn)
         card_layout.addLayout(path_row)
 
+        # 启动数量与启动间隔：两列并排（标签在上、控件在下），等宽对齐
         card_layout.addSpacing(4)
 
         config_row = QHBoxLayout()
@@ -80,6 +93,7 @@ class MultiInstancePage(QWidget):
         config_row.addLayout(interval_col)
         card_layout.addLayout(config_row)
 
+        # 间隔推荐提示（游戏启动期存在互斥，间隔过小会导致启动不完全）
         card_layout.addSpacing(4)
 
         hint_hbox = QHBoxLayout()
@@ -89,6 +103,7 @@ class MultiInstancePage(QWidget):
         hint_hbox.addStretch()
         card_layout.addLayout(hint_hbox)
 
+        # 居中固定宽度的启动按钮
         btn_hbox = QHBoxLayout()
         btn_hbox.addStretch()
         self.launch_btn = PrimaryPushButton(FIF.PLAY, "启动实例", self)
@@ -101,6 +116,7 @@ class MultiInstancePage(QWidget):
 
         main_layout.addWidget(multi_card)
 
+        # 使用说明卡片：步骤 + 痒痒熊来源说明
         help_card = CardWidget(self)
         help_layout = QVBoxLayout(help_card)
         help_layout.setSpacing(8)
@@ -127,6 +143,7 @@ class MultiInstancePage(QWidget):
         main_layout.addStretch()
 
     def _on_browse_clicked(self):
+        """打开文件对话框选择游戏 exe；选中后写入输入框（触发 path_changed 信号）。"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择游戏exe文件", "",
             "可执行文件 (*.exe);;所有文件 (*)"

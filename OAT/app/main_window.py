@@ -158,6 +158,7 @@ class MainWindow(FluentWindow):
 
         self.multi_instance_manager = MultiInstanceManager()
 
+        # 多开：启动时读取 ini 里上次保存的游戏路径，回填到多开页输入框
         saved_path = self.multi_instance_manager.get_saved_path()
         if saved_path:
             self.ui.multi_instance_page.exe_path_input.setText(saved_path)
@@ -221,6 +222,7 @@ class MainWindow(FluentWindow):
         self.ui.custom_res_height_input.textChanged.connect(self.ui.on_height_changed)
 
         self.ui.multi_instance_page.launch_btn.clicked.connect(self.launch_game_instances)
+        # 路径变化（浏览/手动输入）立即同步写入 yyx-launcher.ini
         self.ui.multi_instance_page.path_changed.connect(self.on_multi_path_changed)
         self.ui.multi_instance_page.launch_finished.connect(
             lambda: self.ui.multi_instance_page.launch_btn.setEnabled(True)
@@ -1062,6 +1064,7 @@ class MainWindow(FluentWindow):
         count = self.ui.multi_instance_page.get_launch_count()
         interval = self.ui.multi_instance_page.get_launch_interval()
 
+        # 间隔过小会导致游戏启动不完全：弹窗警告并重置为推荐值，本次不启动
         if interval < 3:
             warning_box("启动间隔建议不少于3秒，否则可能出现启动不完全的情况，已重置为5秒")
             self.ui.multi_instance_page.launch_interval.setValue(5)
@@ -1069,10 +1072,13 @@ class MainWindow(FluentWindow):
 
         logger.info(f"启动 {count} 个游戏实例: {exe_path}, 间隔 {interval}s")
 
+        # 启动期间禁用按钮防重入，由 launch_finished 信号在 GUI 线程恢复
         launch_btn = self.ui.multi_instance_page.launch_btn
         launch_btn.setEnabled(False)
 
         def launch_thread():
+            # 后台线程执行批量启动（内部有间隔 sleep，不能放 GUI 线程）；
+            # 每个实例通过 on_launched 回调即时打日志，不直接碰 Qt 控件
             try:
                 self.multi_instance_manager.launch_instances(
                     exe_path, count, interval,
@@ -1084,12 +1090,14 @@ class MainWindow(FluentWindow):
                 logger.error(f"启动实例失败: {e}")
                 error_box(f"启动失败: {str(e)}")
             finally:
+                # 跨线程 emit 信号，槽在 GUI 线程执行，恢复启动按钮
                 self.ui.multi_instance_page.launch_finished.emit()
 
         thread = threading.Thread(target=launch_thread, daemon=True)
         thread.start()
 
     def on_multi_path_changed(self, exe_path: str):
+        """路径输入框内容变化时把新路径写入 yyx-launcher.ini（空值跳过）。"""
         if not exe_path:
             return
         try:
