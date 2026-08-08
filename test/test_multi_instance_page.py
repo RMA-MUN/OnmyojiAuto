@@ -25,6 +25,13 @@ class TestMultiInstancePage(unittest.TestCase):
         self.assertEqual(page.launch_count.minimum(), 1)
         self.assertEqual(page.launch_count.maximum(), 20)
 
+    def test_path_change_emits_signal(self):
+        page = MultiInstancePage()
+        emitted = []
+        page.path_changed.connect(emitted.append)
+        page.exe_path_input.setText(r"D:\Games\Launch.exe")
+        self.assertEqual(emitted, [r"D:\Games\Launch.exe"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -221,6 +221,7 @@ class MainWindow(FluentWindow):
         self.ui.custom_res_height_input.textChanged.connect(self.ui.on_height_changed)
 
         self.ui.multi_instance_page.launch_btn.clicked.connect(self.launch_game_instances)
+        self.ui.multi_instance_page.path_changed.connect(self.on_multi_path_changed)
         self.ui.multi_instance_page.launch_finished.connect(
             lambda: self.ui.multi_instance_page.launch_btn.setEnabled(True)
         )
@@ -1087,3 +1088,12 @@ class MainWindow(FluentWindow):
 
         thread = threading.Thread(target=launch_thread, daemon=True)
         thread.start()
+
+    def on_multi_path_changed(self, exe_path: str):
+        if not exe_path:
+            return
+        try:
+            self.multi_instance_manager.build_init_file(exe_path)
+            logger.info(f"游戏路径已更新: {exe_path}")
+        except Exception as e:
+            logger.error(f"更新游戏路径失败: {e}")

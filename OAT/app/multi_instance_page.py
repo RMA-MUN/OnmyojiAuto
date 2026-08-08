@@ -12,11 +12,13 @@ from qfluentwidgets import (
 
 class MultiInstancePage(QWidget):
     launch_finished = QtCore.pyqtSignal()
+    path_changed = QtCore.pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("multi_instance_page")
         self._setup_ui()
+        self.exe_path_input.textChanged.connect(self.path_changed.emit)
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
