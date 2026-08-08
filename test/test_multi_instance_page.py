@@ -56,6 +56,24 @@ class TestMultiInstancePage(unittest.TestCase):
         self.assertEqual(page.instance_table.rowCount(), 2)
 
 
+    def test_worker_thread_emit_updated_creates_status(self):
+        page = MultiInstancePage()
+        page.add_instance(1, pid=100, status="运行中", launched_at="00:00:01")
+        page.show()
+
+        def worker():
+            page.instance_updated.emit(1, None, "已关闭")
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=2)
+        deadline = time.time() + 3
+        while page.instance_table.item(0, 3).text() != "已关闭" and time.time() < deadline:
+            self.app.processEvents()
+            time.sleep(0.02)
+        self.app.processEvents()
+        self.assertEqual(page.instance_table.item(0, 3).text(), "已关闭")
+
     def test_update_instance_updates_columns(self):
         page = MultiInstancePage()
         page.add_instance(1, pid=100, status="运行中", launched_at="00:00:01")

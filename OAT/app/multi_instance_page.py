@@ -15,7 +15,7 @@ from qfluentwidgets import (
 class MultiInstancePage(QWidget):
     close_instance = QtCore.pyqtSignal(int)
     instance_added = QtCore.pyqtSignal(int, int, str, str)
-    instance_updated = QtCore.pyqtSignal(int, object, object, object)
+    instance_updated = QtCore.pyqtSignal(int, object, object)
     instances_cleared = QtCore.pyqtSignal()
     launch_finished = QtCore.pyqtSignal()
 
