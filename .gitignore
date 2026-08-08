@@ -62,3 +62,9 @@ platforms/
 
 # 排除package.txt文件
 package.txt
+
+# 代码索引
+.codegraph/
+
+# 多开：launcher 本地配置（游戏路径由 OAT 运行时写入，不入库）
+yyx/yyx-launcher.ini
