@@ -1071,15 +1071,12 @@ class MainWindow(FluentWindow):
 
         def launch_thread():
             try:
-                instances = self.multi_instance_manager.launch_instances(exe_path, count, interval)
-                for instance in instances:
-                    self.ui.multi_instance_page.instance_added.emit(
-                        instance.instance_id,
-                        instance.pid or 0,
-                        instance.status,
-                        instance.launched_at
+                self.multi_instance_manager.launch_instances(
+                    exe_path, count, interval,
+                    on_launched=lambda inst: self.ui.multi_instance_page.instance_added.emit(
+                        inst.instance_id, inst.pid or 0, inst.status, inst.launched_at
                     )
-                    logger.info(f"实例 {instance.instance_id} 已启动, 状态: {instance.status}")
+                )
             except Exception as e:
                 logger.error(f"启动实例失败: {e}")
                 error_box(f"启动失败: {str(e)}")
@@ -1095,13 +1092,28 @@ class MainWindow(FluentWindow):
             warning_box("请先选择要关闭的实例")
             return
 
-        for instance_id in selected_ids:
-            self.close_instance_by_id(instance_id)
+        def close_thread():
+            for instance_id in selected_ids:
+                success = self.multi_instance_manager.close_instance(instance_id)
+                self.ui.multi_instance_page.instance_updated.emit(
+                    instance_id, None, "已关闭" if success else "关闭失败"
+                )
+                if success:
+                    logger.info(f"实例 {instance_id} 已关闭")
+                else:
+                    logger.error(f"关闭实例 {instance_id} 失败")
+
+        thread = threading.Thread(target=close_thread, daemon=True)
+        thread.start()
 
     def close_all_instances(self):
-        closed = self.multi_instance_manager.close_all()
-        self.ui.multi_instance_page.clear_instances()
-        logger.info(f"已关闭 {closed} 个实例")
+        def close_thread():
+            closed = self.multi_instance_manager.close_all()
+            logger.info(f"已关闭 {closed} 个实例")
+            self.ui.multi_instance_page.instances_cleared.emit()
+
+        thread = threading.Thread(target=close_thread, daemon=True)
+        thread.start()
 
     def refresh_instance_list(self):
         self.multi_instance_manager.refresh_all_status()
@@ -1115,9 +1127,15 @@ class MainWindow(FluentWindow):
             )
 
     def close_instance_by_id(self, instance_id: int):
-        success = self.multi_instance_manager.close_instance(instance_id)
-        if success:
-            self.ui.multi_instance_page.update_instance(instance_id, status="已关闭")
-            logger.info(f"实例 {instance_id} 已关闭")
-        else:
-            logger.error(f"关闭实例 {instance_id} 失败")
+        def close_thread():
+            success = self.multi_instance_manager.close_instance(instance_id)
+            self.ui.multi_instance_page.instance_updated.emit(
+                instance_id, None, "已关闭" if success else "关闭失败"
+            )
+            if success:
+                logger.info(f"实例 {instance_id} 已关闭")
+            else:
+                logger.error(f"关闭实例 {instance_id} 失败")
+
+        thread = threading.Thread(target=close_thread, daemon=True)
+        thread.start()

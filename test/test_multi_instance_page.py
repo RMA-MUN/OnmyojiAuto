@@ -56,5 +56,20 @@ class TestMultiInstancePage(unittest.TestCase):
         self.assertEqual(page.instance_table.rowCount(), 2)
 
 
+    def test_update_instance_updates_columns(self):
+        page = MultiInstancePage()
+        page.add_instance(1, pid=100, status="运行中", launched_at="00:00:01")
+        page.update_instance(1, pid=200, status="已关闭")
+        self.assertEqual(page.instance_table.item(0, 2).text(), "200")
+        self.assertEqual(page.instance_table.item(0, 3).text(), "已关闭")
+        self.assertEqual(page.instance_table.item(0, 4).text(), "00:00:01")
+
+    def test_update_instance_unknown_id_noop(self):
+        page = MultiInstancePage()
+        page.add_instance(1, pid=100, status="运行中")
+        page.update_instance(99, status="已关闭")
+        self.assertEqual(page.instance_table.item(0, 3).text(), "运行中")
+
+
 if __name__ == "__main__":
     unittest.main()

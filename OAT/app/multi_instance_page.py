@@ -13,12 +13,10 @@ from qfluentwidgets import (
 
 
 class MultiInstancePage(QWidget):
-    browse_exe = QtCore.pyqtSignal()
-    launch_instance = QtCore.pyqtSignal()
     close_instance = QtCore.pyqtSignal(int)
-    close_all = QtCore.pyqtSignal()
-    refresh_list = QtCore.pyqtSignal()
     instance_added = QtCore.pyqtSignal(int, int, str, str)
+    instance_updated = QtCore.pyqtSignal(int, object, object, object)
+    instances_cleared = QtCore.pyqtSignal()
     launch_finished = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
@@ -27,6 +25,8 @@ class MultiInstancePage(QWidget):
         self._instance_id_to_row: dict[int, int] = {}
         self._setup_ui()
         self.instance_added.connect(self.add_instance)
+        self.instance_updated.connect(self.update_instance)
+        self.instances_cleared.connect(self.clear_instances)
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -143,7 +143,6 @@ class MultiInstancePage(QWidget):
         )
         if file_path:
             self.exe_path_input.setText(file_path)
-            self.browse_exe.emit()
 
     def get_exe_path(self) -> str:
         return self.exe_path_input.text()

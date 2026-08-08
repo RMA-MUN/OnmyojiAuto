@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import psutil
 
@@ -33,7 +33,8 @@ class MultiInstanceManager:
             newline=""
         )
 
-    def launch_instances(self, exe_path: str, count: int = 1, interval: float = 5.0) -> list[GameInstance]:
+    def launch_instances(self, exe_path: str, count: int = 1, interval: float = 5.0,
+                         on_launched: Optional[Callable[[GameInstance], None]] = None) -> list[GameInstance]:
         if not self.launcher_exe.exists():
             raise FileNotFoundError(f"yyx-launcher.exe 不存在: {self.launcher_exe}")
 
@@ -69,6 +70,9 @@ class MultiInstanceManager:
 
             self.instances[instance_id] = instance
             launched.append(instance)
+
+            if on_launched is not None:
+                on_launched(instance)
 
             if i < count - 1:
                 time.sleep(interval)

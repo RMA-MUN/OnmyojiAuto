@@ -52,6 +52,20 @@ class TestLaunchInstances(unittest.TestCase):
             self.assertIn(r"D:\Games\Launch.exe",
                           manager.launcher_ini.read_text(encoding=ENCODING))
 
+    def test_on_launched_callback_called_per_instance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "yyx-launcher.exe").write_bytes(b"MZ")
+            manager = MultiInstanceManager(yyx_dir=Path(tmp))
+            called = []
+            with mock.patch("OAT.tools.MultiInstanceManager.subprocess.Popen",
+                            return_value=FakeProc()), \
+                 mock.patch("OAT.tools.MultiInstanceManager.time.sleep"):
+                manager.launch_instances("x", count=3, interval=0.01,
+                                         on_launched=lambda inst: called.append(inst))
+            self.assertEqual(len(called), 3)
+            self.assertEqual([i.instance_id for i in called], [1, 2, 3])
+            self.assertEqual(called[0].status, "运行中")
+
     def test_failure_marks_instance_and_continues(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "yyx-launcher.exe").write_bytes(b"MZ")
