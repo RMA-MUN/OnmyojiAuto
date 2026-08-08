@@ -112,3 +112,7 @@ class GameInstance:
 - 不做窗口出现检测（表格仅记录启动状态）
 - 不处理 launcher 退出后游戏进程存活的关闭问题（进程树杀仅覆盖 launcher 存活场景；launcher 已退出的实例仅标记"已退出"）
 - 不做权限检测/自提权（约定 OAT 以管理员运行）
+
+## 变更记录（2026-08-08 实施后用户裁定）
+
+**删除多开管理表格**：用户确认多开页只保留启动功能。删除实例表格（6 列）、关闭选中/全部关闭/刷新列表按钮、`close_instance`/`instance_added`/`instance_updated`/`instances_cleared` 信号及 `add_instance`/`update_instance`/`remove_instance`/`clear_instances`/`get_selected_instance_ids` 等方法；main_window 删除 `close_selected_instances`/`close_all_instances`/`refresh_instance_list`/`close_instance_by_id`。保留：路径选择、数量、间隔、启动按钮、`launch_finished` 信号（按钮恢复）、MultiInstanceManager 的实例跟踪与 close API（供后续使用）。启动结果通过 `on_launched` 回调写日志。
