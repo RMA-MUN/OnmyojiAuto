@@ -225,6 +225,9 @@ class MainWindow(FluentWindow):
         self.ui.multi_instance_page.close_all_btn.clicked.connect(self.close_all_instances)
         self.ui.multi_instance_page.refresh_btn.clicked.connect(self.refresh_instance_list)
         self.ui.multi_instance_page.close_instance.connect(self.close_instance_by_id)
+        self.ui.multi_instance_page.launch_finished.connect(
+            lambda: self.ui.multi_instance_page.launch_btn.setEnabled(True)
+        )
 
     def _setup_shortcuts(self):
         self.ui.window_detect_btn.setShortcut("Ctrl+W")
@@ -1081,7 +1084,7 @@ class MainWindow(FluentWindow):
                 logger.error(f"启动实例失败: {e}")
                 error_box(f"启动失败: {str(e)}")
             finally:
-                launch_btn.setEnabled(True)
+                self.ui.multi_instance_page.launch_finished.emit()
 
         thread = threading.Thread(target=launch_thread, daemon=True)
         thread.start()

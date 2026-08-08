@@ -19,6 +19,7 @@ class MultiInstancePage(QWidget):
     close_all = QtCore.pyqtSignal()
     refresh_list = QtCore.pyqtSignal()
     instance_added = QtCore.pyqtSignal(int, int, str, str)
+    launch_finished = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
