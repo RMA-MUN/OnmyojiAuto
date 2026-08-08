@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, CardWidget, StrongBodyLabel,
-    BodyLabel, LineEdit, SpinBox, FluentIcon as FIF
+    BodyLabel, CaptionLabel, LineEdit, SpinBox, FluentIcon as FIF
 )
 
 
@@ -96,6 +96,30 @@ class MultiInstancePage(QWidget):
         card_layout.addLayout(btn_hbox)
 
         main_layout.addWidget(multi_card)
+
+        help_card = CardWidget(self)
+        help_layout = QVBoxLayout(help_card)
+        help_layout.setSpacing(8)
+
+        help_title = StrongBodyLabel("使用说明")
+        help_layout.addWidget(help_title)
+
+        steps = [
+            "1. 点击「浏览」选择阴阳师游戏exe文件路径",
+            "2. 设置启动数量（1-20个）",
+            "3. 设置启动间隔（建议5秒，最少3秒）",
+            "4. 点击「启动实例」开始多开",
+            "5. 等待游戏窗口依次出现",
+        ]
+        for step in steps:
+            help_layout.addWidget(CaptionLabel(step))
+
+        help_layout.addSpacing(4)
+        note = CaptionLabel("本多开器基于痒痒熊(yyx-launcher)开发，通过依次启动游戏实例实现多开。间隔过小可能导致启动不完全。")
+        note.setWordWrap(True)
+        help_layout.addWidget(note)
+
+        main_layout.addWidget(help_card)
         main_layout.addStretch()
 
     def _on_browse_clicked(self):
