@@ -33,6 +33,18 @@ class MultiInstanceManager:
             newline=""
         )
 
+    def get_saved_path(self) -> str:
+        if not self.launcher_ini.exists():
+            return ""
+        try:
+            content = self.launcher_ini.read_text(encoding=locale.getpreferredencoding(False))
+            for line in content.splitlines():
+                if line.startswith("YYSLaunchPath="):
+                    return line[len("YYSLaunchPath="):]
+        except Exception:
+            pass
+        return ""
+
     def launch_instances(self, exe_path: str, count: int = 1, interval: float = 5.0,
                          on_launched: Optional[Callable[[GameInstance], None]] = None) -> list[GameInstance]:
         if not self.launcher_exe.exists():

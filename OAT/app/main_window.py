@@ -158,6 +158,10 @@ class MainWindow(FluentWindow):
 
         self.multi_instance_manager = MultiInstanceManager()
 
+        saved_path = self.multi_instance_manager.get_saved_path()
+        if saved_path:
+            self.ui.multi_instance_page.exe_path_input.setText(saved_path)
+
         icon_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             'tools', 'uiResources', self.main_config.get('icon_image', 'icon.ico')
