@@ -1,7 +1,7 @@
 from PyQt6 import QtCore
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QSizePolicy, QFileDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 )
 
 from qfluentwidgets import (
@@ -30,45 +30,51 @@ class MultiInstancePage(QWidget):
         header = StrongBodyLabel("多开管理")
         card_layout.addWidget(header)
 
-        config_widget = QWidget()
-        config_layout = QHBoxLayout(config_widget)
-        config_layout.setContentsMargins(0, 0, 0, 0)
-        config_layout.setSpacing(12)
+        exe_label = BodyLabel("游戏路径")
+        card_layout.addWidget(exe_label)
 
-        exe_label = BodyLabel("游戏路径:")
         self.exe_path_input = LineEdit(self)
         self.exe_path_input.setPlaceholderText("请选择游戏exe文件路径...")
         self.browse_btn = PushButton(FIF.FOLDER, "浏览", self)
         self.browse_btn.clicked.connect(self._on_browse_clicked)
 
-        count_label = BodyLabel("启动数量:")
+        path_row = QHBoxLayout()
+        path_row.setSpacing(8)
+        path_row.addWidget(self.exe_path_input, 1)
+        path_row.addWidget(self.browse_btn)
+        card_layout.addLayout(path_row)
+
+        config_row = QHBoxLayout()
+        config_row.setSpacing(16)
+
+        count_box = QVBoxLayout()
+        count_box.setSpacing(6)
+        count_label = BodyLabel("启动数量")
         self.launch_count = SpinBox(self)
         self.launch_count.setRange(1, 20)
         self.launch_count.setValue(1)
+        count_box.addWidget(count_label)
+        count_box.addWidget(self.launch_count)
 
-        interval_label = BodyLabel("启动间隔(秒):")
+        interval_box = QVBoxLayout()
+        interval_box.setSpacing(6)
+        interval_label = BodyLabel("启动间隔(秒)")
         self.launch_interval = SpinBox(self)
         self.launch_interval.setRange(0, 120)
         self.launch_interval.setValue(5)
+        interval_box.addWidget(interval_label)
+        interval_box.addWidget(self.launch_interval)
 
-        config_layout.addWidget(exe_label)
-        config_layout.addWidget(self.exe_path_input, 1)
-        config_layout.addWidget(self.browse_btn)
-        config_layout.addSpacing(16)
-        config_layout.addWidget(count_label)
-        config_layout.addWidget(self.launch_count)
-        config_layout.addSpacing(16)
-        config_layout.addWidget(interval_label)
-        config_layout.addWidget(self.launch_interval)
-
-        card_layout.addWidget(config_widget)
+        config_row.addLayout(count_box, 1)
+        config_row.addLayout(interval_box, 1)
+        card_layout.addLayout(config_row)
 
         self.launch_btn = PrimaryPushButton(FIF.PLAY, "启动实例", self)
-        self.launch_btn.setMinimumHeight(32)
-        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.launch_btn.setSizePolicy(size_policy)
+        self.launch_btn.setMinimumHeight(36)
+        self.launch_btn.setFixedWidth(220)
 
-        card_layout.addWidget(self.launch_btn)
+        card_layout.addSpacing(4)
+        card_layout.addWidget(self.launch_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         main_layout.addWidget(multi_card)
         main_layout.addStretch()
 
