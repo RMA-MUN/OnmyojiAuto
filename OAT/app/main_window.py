@@ -42,10 +42,12 @@ from OAT.utils.error_box import error_box
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
 from OAT.utils.markdown_to_html import markdown_to_html
 from OAT.tools.edit_mode_and_img import ModeEditorDialog
+from OAT.tools.MultiInstanceManager import MultiInstanceManager
 
 from .home_page import HomePage
 from .sync_page import SyncPage
 from .settings_page import SettingsPage
+from .multi_instance_page import MultiInstancePage
 
 setup_global_exception_handler()
 
@@ -57,9 +59,11 @@ class AppUI:
         self.home_page = HomePage(window)
         self.sync_page = SyncPage(window)
         self.settings_page = SettingsPage(window)
+        self.multi_instance_page = MultiInstancePage(window)
 
         window.addSubInterface(self.home_page, FIF.HOME, "首页")
         window.addSubInterface(self.sync_page, FIF.TILES, "同步器")
+        window.addSubInterface(self.multi_instance_page, FIF.GAME, "多开管理")
         window.addSubInterface(self.settings_page, FIF.SETTING, "设置")
 
         self._setup_proxies()
@@ -110,6 +114,11 @@ class AppUI:
         self.custom_res_height_input = self.settings_page.custom_res_height_input
         self.custom_res_warning = self.settings_page.custom_res_warning
 
+        self.exe_path_input = self.multi_instance_page.exe_path_input
+        self.browse_btn = self.multi_instance_page.browse_btn
+        self.launch_count = self.multi_instance_page.launch_count
+        self.launch_btn = self.multi_instance_page.launch_btn
+
     def get_text(self):
         return self.home_page.get_text()
 
@@ -146,6 +155,13 @@ class MainWindow(FluentWindow):
 
         self.sync = WindowSynchronizer(sync_mode=self.sync_mode_value)
         self.sync_mode_flag = False
+
+        self.multi_instance_manager = MultiInstanceManager()
+
+        # 多开：启动时读取 ini 里上次保存的游戏路径，回填到多开页输入框
+        saved_path = self.multi_instance_manager.get_saved_path()
+        if saved_path:
+            self.ui.multi_instance_page.exe_path_input.setText(saved_path)
 
         icon_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
@@ -204,6 +220,13 @@ class MainWindow(FluentWindow):
 
         self.ui.custom_res_width_input.textChanged.connect(self.ui.on_width_changed)
         self.ui.custom_res_height_input.textChanged.connect(self.ui.on_height_changed)
+
+        self.ui.multi_instance_page.launch_btn.clicked.connect(self.launch_game_instances)
+        # 路径变化（浏览/手动输入）立即同步写入 yyx-launcher.ini
+        self.ui.multi_instance_page.path_changed.connect(self.on_multi_path_changed)
+        self.ui.multi_instance_page.launch_finished.connect(
+            lambda: self.ui.multi_instance_page.launch_btn.setEnabled(True)
+        )
 
     def _setup_shortcuts(self):
         self.ui.window_detect_btn.setShortcut("Ctrl+W")
@@ -1027,3 +1050,58 @@ class MainWindow(FluentWindow):
         dialog.exec()
         self.ui.home_page.reload_modes()
         self.ui.on_mode_selected(self.ui.find_mode_combo.currentIndex())
+
+    def launch_game_instances(self):
+        exe_path = self.ui.multi_instance_page.get_exe_path()
+        if not exe_path:
+            warning_box("请先选择游戏exe文件路径")
+            return
+
+        if not os.path.exists(exe_path):
+            warning_box(f"文件不存在: {exe_path}")
+            return
+
+        count = self.ui.multi_instance_page.get_launch_count()
+        interval = self.ui.multi_instance_page.get_launch_interval()
+
+        # 间隔过小会导致游戏启动不完全：弹窗警告并重置为推荐值，本次不启动
+        if interval < 3:
+            warning_box("启动间隔建议不少于3秒，否则可能出现启动不完全的情况，已重置为5秒")
+            self.ui.multi_instance_page.launch_interval.setValue(5)
+            return
+
+        logger.info(f"启动 {count} 个游戏实例: {exe_path}, 间隔 {interval}s")
+
+        # 启动期间禁用按钮防重入，由 launch_finished 信号在 GUI 线程恢复
+        launch_btn = self.ui.multi_instance_page.launch_btn
+        launch_btn.setEnabled(False)
+
+        def launch_thread():
+            # 后台线程执行批量启动（内部有间隔 sleep，不能放 GUI 线程）；
+            # 每个实例通过 on_launched 回调即时打日志，不直接碰 Qt 控件
+            try:
+                self.multi_instance_manager.launch_instances(
+                    exe_path, count, interval,
+                    on_launched=lambda inst: logger.info(
+                        f"实例 {inst.instance_id} 已启动, PID: {inst.pid}, 状态: {inst.status}"
+                    )
+                )
+            except Exception as e:
+                logger.error(f"启动实例失败: {e}")
+                error_box(f"启动失败: {str(e)}")
+            finally:
+                # 跨线程 emit 信号，槽在 GUI 线程执行，恢复启动按钮
+                self.ui.multi_instance_page.launch_finished.emit()
+
+        thread = threading.Thread(target=launch_thread, daemon=True)
+        thread.start()
+
+    def on_multi_path_changed(self, exe_path: str):
+        """路径输入框内容变化时把新路径写入 yyx-launcher.ini（空值跳过）。"""
+        if not exe_path:
+            return
+        try:
+            self.multi_instance_manager.build_init_file(exe_path)
+            logger.info(f"游戏路径已更新: {exe_path}")
+        except Exception as e:
+            logger.error(f"更新游戏路径失败: {e}")

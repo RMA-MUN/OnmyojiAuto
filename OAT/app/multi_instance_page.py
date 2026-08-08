@@ -1,0 +1,161 @@
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+)
+
+from qfluentwidgets import (
+    PushButton, PrimaryPushButton, CardWidget, StrongBodyLabel,
+    BodyLabel, CaptionLabel, LineEdit, SpinBox, FluentIcon as FIF
+)
+
+
+class MultiInstancePage(QWidget):
+    """多开管理页：游戏路径 + 启动数量 + 启动间隔 + 启动按钮 + 使用说明。
+
+    信号说明：
+    - launch_finished: 后台启动线程结束（成功或失败）后发射，用于恢复启动按钮；
+      由 worker 线程 emit，跨线程信号自动 queued，槽在 GUI 线程执行
+    - path_changed: 游戏路径输入框文本变化时发射（浏览选择/手动输入都会触发），
+      上层据此立即把新路径写入 yyx-launcher.ini
+    """
+    launch_finished = QtCore.pyqtSignal()
+    path_changed = QtCore.pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("multi_instance_page")
+        self._setup_ui()
+        # 输入框内容变化即转发 path_changed 信号（空值过滤在 main_window 侧处理）
+        self.exe_path_input.textChanged.connect(self.path_changed.emit)
+
+    def _setup_ui(self):
+        # 外层留白，卡片垂直堆叠：配置卡 + 使用说明卡
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(16)
+
+        multi_card = CardWidget(self)
+        card_layout = QVBoxLayout(multi_card)
+        card_layout.setSpacing(12)
+
+        # 标题居中
+        header = StrongBodyLabel("多开管理")
+        header_hbox = QHBoxLayout()
+        header_hbox.addStretch()
+        header_hbox.addWidget(header)
+        header_hbox.addStretch()
+        card_layout.addLayout(header_hbox)
+
+        # 游戏路径：标签 + 输入框（占满）+ 浏览按钮
+        exe_label = BodyLabel("游戏路径")
+        card_layout.addWidget(exe_label)
+
+        self.exe_path_input = LineEdit(self)
+        self.exe_path_input.setPlaceholderText("请选择游戏exe文件路径...")
+        self.browse_btn = PushButton(FIF.FOLDER, "浏览", self)
+        self.browse_btn.clicked.connect(self._on_browse_clicked)
+
+        path_row = QHBoxLayout()
+        path_row.setSpacing(8)
+        path_row.addWidget(self.exe_path_input, 1)
+        path_row.addWidget(self.browse_btn)
+        card_layout.addLayout(path_row)
+
+        # 启动数量与启动间隔：两列并排（标签在上、控件在下），等宽对齐
+        card_layout.addSpacing(4)
+
+        config_row = QHBoxLayout()
+        config_row.setSpacing(24)
+
+        count_col = QVBoxLayout()
+        count_col.setSpacing(6)
+        count_label = BodyLabel("启动数量")
+        self.launch_count = SpinBox(self)
+        self.launch_count.setRange(1, 20)
+        self.launch_count.setValue(1)
+        self.launch_count.setFixedWidth(200)
+        count_col.addWidget(count_label)
+        count_col.addWidget(self.launch_count)
+
+        interval_col = QVBoxLayout()
+        interval_col.setSpacing(6)
+        interval_label = BodyLabel("启动间隔(秒)")
+        self.launch_interval = SpinBox(self)
+        self.launch_interval.setRange(0, 120)
+        self.launch_interval.setValue(5)
+        self.launch_interval.setFixedWidth(200)
+        interval_col.addWidget(interval_label)
+        interval_col.addWidget(self.launch_interval)
+
+        config_row.addLayout(count_col)
+        config_row.addStretch()
+        config_row.addLayout(interval_col)
+        card_layout.addLayout(config_row)
+
+        # 间隔推荐提示（游戏启动期存在互斥，间隔过小会导致启动不完全）
+        card_layout.addSpacing(4)
+
+        hint_hbox = QHBoxLayout()
+        hint_hbox.addStretch()
+        interval_hint = BodyLabel("推荐5秒，小于3秒可能导致启动不完全")
+        hint_hbox.addWidget(interval_hint)
+        hint_hbox.addStretch()
+        card_layout.addLayout(hint_hbox)
+
+        # 居中固定宽度的启动按钮
+        btn_hbox = QHBoxLayout()
+        btn_hbox.addStretch()
+        self.launch_btn = PrimaryPushButton(FIF.PLAY, "启动实例", self)
+        self.launch_btn.setMinimumHeight(36)
+        self.launch_btn.setFixedWidth(220)
+        btn_hbox.addWidget(self.launch_btn)
+        btn_hbox.addStretch()
+        card_layout.addSpacing(8)
+        card_layout.addLayout(btn_hbox)
+
+        main_layout.addWidget(multi_card)
+
+        # 使用说明卡片：步骤 + 痒痒熊来源说明
+        help_card = CardWidget(self)
+        help_layout = QVBoxLayout(help_card)
+        help_layout.setSpacing(8)
+
+        help_title = StrongBodyLabel("使用说明")
+        help_layout.addWidget(help_title)
+
+        steps = [
+            "1. 点击「浏览」选择阴阳师游戏exe文件路径",
+            "2. 设置启动数量（1-20个）",
+            "3. 设置启动间隔（建议5秒，最少3秒）",
+            "4. 点击「启动实例」开始多开",
+            "5. 等待游戏窗口依次出现",
+        ]
+        for step in steps:
+            help_layout.addWidget(CaptionLabel(step))
+
+        help_layout.addSpacing(4)
+        note = CaptionLabel("本多开器基于痒痒熊(yyx-launcher)开发，通过依次启动游戏实例实现多开。间隔过小可能导致启动不完全。")
+        note.setWordWrap(True)
+        help_layout.addWidget(note)
+
+        main_layout.addWidget(help_card)
+        main_layout.addStretch()
+
+    def _on_browse_clicked(self):
+        """打开文件对话框选择游戏 exe；选中后写入输入框（触发 path_changed 信号）。"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择游戏exe文件", "",
+            "可执行文件 (*.exe);;所有文件 (*)"
+        )
+        if file_path:
+            self.exe_path_input.setText(file_path)
+
+    def get_exe_path(self) -> str:
+        return self.exe_path_input.text()
+
+    def get_launch_count(self) -> int:
+        return self.launch_count.value()
+
+    def get_launch_interval(self) -> int:
+        return self.launch_interval.value()
