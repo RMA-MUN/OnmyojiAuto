@@ -1060,11 +1060,15 @@ class MainWindow(FluentWindow):
             return
 
         count = self.ui.multi_instance_page.get_launch_count()
-        logger.info(f"启动 {count} 个游戏实例: {exe_path}")
+        interval = self.ui.multi_instance_page.get_launch_interval()
+        logger.info(f"启动 {count} 个游戏实例: {exe_path}, 间隔 {interval}s")
+
+        launch_btn = self.ui.multi_instance_page.launch_btn
+        launch_btn.setEnabled(False)
 
         def launch_thread():
             try:
-                instances = self.multi_instance_manager.launch_instance(exe_path, count)
+                instances = self.multi_instance_manager.launch_instances(exe_path, count, interval)
                 for instance in instances:
                     self.ui.multi_instance_page.instance_added.emit(
                         instance.instance_id,
@@ -1076,6 +1080,8 @@ class MainWindow(FluentWindow):
             except Exception as e:
                 logger.error(f"启动实例失败: {e}")
                 error_box(f"启动失败: {str(e)}")
+            finally:
+                launch_btn.setEnabled(True)
 
         thread = threading.Thread(target=launch_thread, daemon=True)
         thread.start()
@@ -1101,7 +1107,7 @@ class MainWindow(FluentWindow):
         for instance_id, instance in instances.items():
             self.ui.multi_instance_page.update_instance(
                 instance_id,
-                hwnd=instance.hwnd,
+                pid=instance.pid,
                 status=instance.status
             )
 
