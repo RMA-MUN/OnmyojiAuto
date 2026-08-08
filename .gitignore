@@ -41,7 +41,7 @@ Desktop.ini
 .tox/
 .coverage
 htmlcov/
-test/
+test/ocr.py
 
 # 临时文件
 *.tmp

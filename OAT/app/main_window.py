@@ -1068,8 +1068,9 @@ class MainWindow(FluentWindow):
                 for instance in instances:
                     self.ui.multi_instance_page.instance_added.emit(
                         instance.instance_id,
-                        instance.hwnd or 0,
-                        instance.status
+                        instance.pid or 0,
+                        instance.status,
+                        instance.launched_at
                     )
                     logger.info(f"实例 {instance.instance_id} 已启动, 状态: {instance.status}")
             except Exception as e:
