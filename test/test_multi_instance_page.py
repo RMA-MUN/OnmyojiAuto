@@ -16,7 +16,7 @@ class TestMultiInstancePage(unittest.TestCase):
     def test_launch_interval_default_and_range(self):
         page = MultiInstancePage()
         self.assertEqual(page.get_launch_interval(), 5)
-        self.assertEqual(page.launch_interval.minimum(), 3)
+        self.assertEqual(page.launch_interval.minimum(), 0)
         self.assertEqual(page.launch_interval.maximum(), 120)
 
     def test_launch_count_default_and_range(self):

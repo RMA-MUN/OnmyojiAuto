@@ -67,7 +67,7 @@ class MultiInstancePage(QWidget):
         interval_col.setSpacing(6)
         interval_label = BodyLabel("启动间隔(秒)")
         self.launch_interval = SpinBox(self)
-        self.launch_interval.setRange(3, 120)
+        self.launch_interval.setRange(0, 120)
         self.launch_interval.setValue(5)
         self.launch_interval.setFixedWidth(200)
         interval_col.addWidget(interval_label)
@@ -78,7 +78,7 @@ class MultiInstancePage(QWidget):
         config_row.addLayout(interval_col)
         card_layout.addLayout(config_row)
 
-        interval_hint = BodyLabel("最少3秒，推荐5秒")
+        interval_hint = BodyLabel("推荐5秒，小于3秒可能导致启动不完全")
         hint_hbox = QHBoxLayout()
         hint_hbox.addStretch()
         hint_hbox.addWidget(interval_hint)
