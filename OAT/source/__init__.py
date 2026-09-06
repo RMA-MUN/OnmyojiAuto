@@ -42,7 +42,8 @@ def get_script_dir(mode: str, sub_mode: Optional[str] = None) -> str:
 def mode_choice(
         mode: str, sub_mode: str, times: int, config: dict,
         window_title: str, hidden_window: bool=False, sync_mode: bool=False,
-        synchronizer=None, sync_mode_value: str = "exactly_sync"
+        synchronizer=None, sync_mode_value: str = "exactly_sync",
+        explore_per_round: int = None
 ):
     try:
         # 调用缓存函数获取路径
@@ -53,6 +54,26 @@ def mode_choice(
         return
     except FileNotFoundError as e:
         logger.error(f"路径错误: {e}")
+        return
+
+    # 程序化脚本模式（如绘卷刷分：探索+突破 组合，无法用管道/通用挑战表达）
+    if 'script' in config:
+        script = config['script']
+        if script == 'huijuanshuafen':
+            from OAT.source.huijuanshuafen.huijuan import run_huijuanshuafen
+            explore_count = int(explore_per_round if explore_per_round else config.get('explore_per_round', 5))
+            logger.info(f"使用绘卷刷分脚本: {mode}，刷分次数={times}，每轮探索={explore_count}次")
+            run_huijuanshuafen(
+                window_title=window_title,
+                rounds=times,
+                explore_per_round=explore_count,
+                sync_mode=sync_mode,
+                synchronizer=synchronizer,
+                script_dir=script_dir,
+                config=config,
+            )
+            return
+        logger.error(f"未知脚本模式: {script}")
         return
 
     # 执行通用挑战函数

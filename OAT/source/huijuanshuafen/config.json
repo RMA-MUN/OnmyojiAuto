@@ -1,0 +1,8 @@
+{
+  "script": "huijuanshuafen",
+  "explore_per_round": 5,
+  "hidden_window": true,
+  "ticket_region": [800, 10, 115, 50],
+  "tansuo_quit_region": [0, 0, 120, 80],
+  "close_region": [1150, 110, 80, 80]
+}

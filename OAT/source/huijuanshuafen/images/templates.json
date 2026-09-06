@@ -1,0 +1,44 @@
+{
+  "templates": {
+    "title_28": "title_28.png",
+    "k28": "k28.png",
+    "chuzhanxiaohao": "chuzhanxiaohao.png",
+    "start": "start.png",
+    "boss": "boss.png",
+    "tiaozhan": "tiaozhan.png",
+    "jieshu": "jieshu.png",
+    "jiesuan": "jiesuan.png",
+    "quit": "quit.png",
+    "quit_true": "quit_true.png"
+  },
+  "breakthrough": {
+    "jiejietupo_loho": "jiejietupo_loho.png",
+    "title": "jiejietupo_title.png",
+    "fangshoujilu": "jilu.png",
+    "jingong": "jingong.png",
+    "success": "success.png",
+    "fail": "fail.png",
+    "finish": "finish.png",
+    "shuaxin": "shuaxin.png",
+    "queding": "queding.png",
+    "close_jiejietupo": "close_jiejietupo.png",
+    "xunzhang_5": "wu_xunzang.png",
+    "xunzhang_4": "si_xunzang.png",
+    "xunzhang_3": "san_xunzang.png",
+    "xunzhang_2": "er_xunzang.png",
+    "xunzhang_1": "yi_xunzang.png",
+    "xunzhang_0": "ling_xunzang.png"
+  },
+  "descriptions": {
+    "title_28": "第28章标题界面 - 显示'第二十八章'文字的界面",
+    "k28": "探索列表中的'第二十八章'按钮 - OCR 识别失败时的图像兜底",
+    "chuzhanxiaohao": "出战小耗界面 - 进入探索后看到小怪的界面",
+    "start": "开始按钮 - 第28章标题界面中的开始按钮",
+    "boss": "BOSS图标 - 探索中的BOSS怪物图标",
+    "tiaozhan": "挑战图标 - 探索中的小怪挑战图标",
+    "jieshu": "结束按钮 - 战斗结束后的结束按钮",
+    "jiesuan": "结算按钮 - 战斗结算界面的确认按钮",
+    "quit": "退出按钮 - 探索内部的退出按钮",
+    "quit_true": "确认退出 - 退出确认对话框中的确定按钮"
+  }
+}
