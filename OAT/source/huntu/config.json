@@ -8,9 +8,6 @@
       {
         "name": "tiaozhan",
         "template": "tiaozhan.png",
-        "recognition": "template+ocr",
-        "ocr_text": "挑战",
-        "ocr_confidence": 0.8,
         "is_start": true
       },
       {
@@ -20,11 +17,8 @@
       },
       {
         "name": "zuihou",
-        "template": "zuihou.png"
-      },
-      {
-        "name": "axiuluo",
-        "template": "axiuluo.png"
+        "template": "zuihou.png",
+        "max_consecutive": 20
       },
       {
         "name": "kaishi",
@@ -34,7 +28,38 @@
       {
         "name": "tianzhao",
         "template": "tianzhao.png"
+      },
+      {
+        "name": "zishepi",
+        "template": "zishepi.png",
+        "action": {
+          "type": "click",
+          "target": "fixed_coord",
+          "x_range": [
+            100,
+            200
+          ],
+          "y_range": [
+            201,
+            400
+          ]
+        }
       }
     ]
+  },
+  "image_paths": {
+    "kaishi": {
+      "path": "kaishi.png",
+      "is_challenge_start": true,
+      "message": "",
+      "is_global": false,
+      "next_image": "",
+      "ocr_enabled": false,
+      "ocr_target_text": "",
+      "ocr_confidence_threshold": 0.8,
+      "ocr_action": "点击文字所在区域",
+      "action_type": "click",
+      "click_type": "image"
+    }
   }
 }
