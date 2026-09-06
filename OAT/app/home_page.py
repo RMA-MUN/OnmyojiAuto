@@ -384,6 +384,8 @@ class HomePage(QWidget):
                 <span style="margin: 0;">5.管道任务支持滑动/等待动作与连续匹配预算</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">6.日志改为按天轮转保留30天</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">7.修复图像配置编辑器格式落后于pipeline的问题</span>
             </div>
         '''
 
