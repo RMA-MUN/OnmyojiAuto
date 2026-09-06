@@ -68,3 +68,12 @@ package.txt
 
 # 多开：launcher 本地配置（游戏路径由 OAT 运行时写入，不入库）
 yyx/yyx-launcher.ini
+
+# 调试产物（测试截图、诊断日志、一次性调试脚本，不入库）
+test/*.png
+test/logs/
+test/diag_entry.py
+test/find_tupoquan.py
+
+# AI 助手本地状态目录，不入库
+.superpowers/
