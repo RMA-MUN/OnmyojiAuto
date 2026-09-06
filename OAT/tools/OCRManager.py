@@ -83,6 +83,12 @@ class OCRManager:
         real_text = None
 
         # 获取识别结果数据（RapidOCR返回的是RapidOCROutput对象）
+        # 注意：整图一个字都没检出时 txts 为 None（不是空列表），直接判空返回
+        if not getattr(results, 'txts', None):
+            if debug:
+                logger.info("[OCR Debug] 未识别到文字")
+        return found, text_area, real_text
+
         if hasattr(results, 'txts'):
             if debug:
                 threshold_count = 0
@@ -122,10 +128,7 @@ class OCRManager:
 
         # 调试输出：统计信息
         if debug:
-            if hasattr(results, 'txts'):
-                logger.info(f"[OCR Debug] 总识别到 {len(results.txts)} 个文字")
-            else:
-                logger.info(f"[OCR Debug] 未识别到文字")
+            logger.info(f"[OCR Debug] 总识别到 {len(results.txts)} 个文字")
             logger.info(f"[OCR Debug] 达到置信度阈值({confidence_threshold})的文字数量: {threshold_count}")
             if threshold_count > 0:
                 logger.info(f"[OCR Debug] 达到阈值的文字详情:")

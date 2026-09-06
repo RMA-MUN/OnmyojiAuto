@@ -1,11 +1,125 @@
 import os
 import json
 import ast
+import shutil
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QPushButton, QLineEdit, QLabel, QFileDialog, QListWidget, QListWidgetItem, QMessageBox, QSplitter
 from PyQt6.QtGui import QPixmap
 
 from OAT.utils.logging import logger
+
+
+def _normalize_dest_filename(new_name: str, pending_source=None, old_image_name="") -> str:
+    """规范化目标文件名：有后缀保留，无后缀继承 pending 源后缀/老图后缀，默认 .png"""
+    s = (new_name or "").strip()
+    if not s:
+        return ""
+    _root, ext = os.path.splitext(s)
+    if ext:
+        return s
+    fallback = ""
+    if pending_source:
+        _, fallback = os.path.splitext(pending_source)
+    if not fallback and old_image_name:
+        _, fallback = os.path.splitext(old_image_name)
+    if not fallback:
+        fallback = ".png"
+    return s + fallback
+
+
+def _normalize_confidence(raw, default=0.8) -> float:
+    try:
+        v = float(raw)
+    except (ValueError, TypeError):
+        return default
+    if v > 100.0:
+        return 1.0
+    if v > 1.0:
+        if v < 2.0:
+            return 1.0
+        v = v / 100.0
+    return min(1.0, max(0.0, v))
+
+def _parse_click_area(raw):
+    import ast
+    try:
+        area = ast.literal_eval(raw)
+    except (ValueError, SyntaxError, TypeError):
+        return None
+    if not isinstance(area, list) or len(area) != 4:
+        return None
+    try:
+        area = [int(x) for x in area]
+    except (ValueError, TypeError):
+        return None
+    if area[0] > area[1] or area[2] > area[3]:
+        return None
+    return area
+
+
+def _plan_image_file_replace(mode_dir, old_image_name, dest_filename, pending_source):
+    """纯逻辑：计算替换/改名计划，不碰磁盘（便于单测）"""
+    mode_dir = mode_dir or ""
+    dest_path = os.path.join(mode_dir, dest_filename or "")
+    old_path = os.path.join(mode_dir, old_image_name or "")
+
+    def _norm(p):
+        return os.path.normcase(os.path.abspath(p)) if p else ""
+
+    same_dest_old = bool(dest_filename) and bool(old_image_name) and _norm(dest_path) == _norm(old_path)
+    if pending_source:
+        same_file = _norm(pending_source) == _norm(dest_path)
+        need_copy = not same_file
+        remove_old = (not same_dest_old) and bool(old_image_name) and bool(dest_filename)
+        return {
+            "dest_path": dest_path,
+            "old_path": old_path,
+            "dest_filename": dest_filename or "",
+            "pending_source": pending_source,
+            "need_copy": need_copy,
+            "remove_old": remove_old,
+            "same_file": same_file,
+        }
+    need_copy = False
+    remove_old = (not same_dest_old) and bool(old_image_name) and bool(dest_filename)
+    return {
+        "dest_path": dest_path,
+        "old_path": old_path,
+        "dest_filename": dest_filename or "",
+        "pending_source": None,
+        "need_copy": need_copy,
+        "remove_old": remove_old,
+        "same_file": same_dest_old,
+    }
+
+
+def _apply_image_file_replace(plan: dict) -> None:
+    """执行替换/改名计划：复制新图、删老图/纯改名"""
+    dest = plan.get("dest_path", "")
+    pending = plan.get("pending_source")
+    old = plan.get("old_path", "")
+    if not dest:
+        return
+    dest_dir = os.path.dirname(dest)
+    if dest_dir and not os.path.exists(dest_dir):
+        os.makedirs(dest_dir, exist_ok=True)
+
+    def _same(a, b):
+        return a and b and os.path.abspath(a) == os.path.abspath(b)
+
+    if pending and plan.get("need_copy"):
+        if not _same(pending, dest):
+            shutil.copy(pending, dest)
+        if plan.get("remove_old") and not _same(old, dest):
+            if old and os.path.exists(old):
+                os.remove(old)
+        return
+    if not pending and plan.get("remove_old"):
+        if old and not _same(old, dest) and os.path.exists(old):
+            if os.path.exists(dest):
+                os.replace(old, dest)
+            else:
+                os.rename(old, dest)
 
 
 def _image_paths_to_pipeline_task(name: str, data: dict) -> dict:
@@ -19,26 +133,94 @@ def _image_paths_to_pipeline_task(name: str, data: dict) -> dict:
     if data.get("next_image"):
         task["next"] = data["next_image"]
 
+    if data.get("threshold") is not None:
+        try:
+            task["threshold"] = float(data["threshold"])
+        except (ValueError, TypeError):
+            pass
+
     ocr_enabled = data.get("ocr_enabled", False)
-    ocr_text = data.get("ocr_target_text", "")
-    if ocr_enabled and ocr_text:
+    ocr_text = (data.get("ocr_target_text") or "").strip()
+    # 逆向转换会把原始 recognition 存下来（审批：接受冗余字段），优先还原纯 ocr 模式
+    if data.get("recognition") == "ocr" and ocr_text:
+        task["recognition"] = "ocr"
+        task["ocr_text"] = ocr_text
+        try:
+            task["ocr_confidence"] = float(data.get("ocr_confidence_threshold", 0.8))
+        except (ValueError, TypeError):
+            task["ocr_confidence"] = 0.8
+    elif ocr_enabled and ocr_text:
         task["recognition"] = "template+ocr"
         task["ocr_text"] = ocr_text
-        task["ocr_confidence"] = data.get("ocr_confidence_threshold", 0.8)
+        try:
+            task["ocr_confidence"] = float(data.get("ocr_confidence_threshold", 0.8))
+        except (ValueError, TypeError):
+            task["ocr_confidence"] = 0.8
 
     click_area = data.get("click_area")
-    if click_area and len(click_area) == 4:
-        task["action"] = {
-            "type": "click",
-            "target": "fixed_coord",
-            "x_range": click_area[:2],
-            "y_range": click_area[2:],
-        }
+    action_type = (data.get("action_type") or "click")
+    if action_type == "wait":
+        try:
+            task["action"] = {"type": "wait", "duration": float(data.get("duration", 1.0))}
+        except (ValueError, TypeError):
+            task["action"] = {"type": "wait", "duration": 1.0}
+    elif action_type == "swipe":
+        # 滑动起点复用 click_type/click_area（与 click 同规则）；终点来自 end_area；缺失则运行时 end=start
+        _click_type = data.get("click_type") or ("coordinate" if click_area else "image")
+        action = {"type": "swipe"}
+        if _click_type == "coordinate" and click_area and len(click_area) == 4:
+            try:
+                action["target"] = "fixed_coord"
+                action["x_range"] = [int(click_area[0]), int(click_area[1])]
+                action["y_range"] = [int(click_area[2]), int(click_area[3])]
+            except (ValueError, TypeError):
+                action["target"] = "matched"
+        else:
+            action["target"] = "matched"
+        end_area = data.get("end_area")
+        if end_area and len(end_area) == 4:
+            try:
+                action["ex_range"] = [int(end_area[0]), int(end_area[1])]
+                action["ey_range"] = [int(end_area[2]), int(end_area[3])]
+            except (ValueError, TypeError):
+                pass
+        try:
+            action["duration"] = float(data.get("duration", 0.5))
+        except (ValueError, TypeError):
+            action["duration"] = 0.5
+        task["action"] = action
+    elif click_area and len(click_area) == 4:
+        # ocr_action 语义：文字区域（缺省/空默认为文字区域）+ 有 OCR 时 runner 无 action 即点文字区，故省略 fixed_coord
+        _ocr_action = (data.get("ocr_action") or "").strip()
+        if not _ocr_action:
+            _ocr_action = "点击文字所在区域"
+        _has_ocr = task.get("recognition") in ("ocr", "template+ocr")
+        if not (_has_ocr and _ocr_action == "点击文字所在区域"):
+            try:
+                task["action"] = {
+                    "type": "click",
+                    "target": "fixed_coord",
+                    "x_range": [int(click_area[0]), int(click_area[1])],
+                    "y_range": [int(click_area[2]), int(click_area[3])],
+                }
+            except (ValueError, TypeError):
+                pass
 
-    if data.get("timeout"):
-        task["timeout"] = data["timeout"]
-    if data.get("max_retries"):
-        task["max_retries"] = data["max_retries"]
+    if data.get("timeout") is not None:
+        try:
+            task["timeout"] = int(data["timeout"])
+        except (ValueError, TypeError):
+            pass
+    if data.get("max_retries") is not None:
+        try:
+            task["max_retries"] = int(data["max_retries"])
+        except (ValueError, TypeError):
+            pass
+    if data.get("max_consecutive") is not None:
+        try:
+            task["max_consecutive"] = int(data["max_consecutive"])
+        except (ValueError, TypeError):
+            pass
 
     return task
 
@@ -47,34 +229,75 @@ def _pipeline_task_to_image_paths(task: dict) -> dict:
     """将 pipeline.tasks 格式转换为 image_paths 格式（用于旧版编辑器）"""
     data = {
         "path": task.get("template", task.get("name", "") + ".png"),
-        "is_challenge_start": task.get("is_start", False),
+        "is_challenge_start": bool(task.get("is_start", False)),
         "message": task.get("message", ""),
-        "is_global": task.get("is_global", False),
+        "is_global": bool(task.get("is_global", False)),
         "next_image": task.get("next", ""),
-        "is_global": task.get("is_global", False),
+        # 冗余存原始值，保证往返无损（已审批）
+        "recognition": task.get("recognition", "template"),
+        "threshold": task.get("threshold"),
+        "timeout": task.get("timeout"),
+        "max_retries": task.get("max_retries"),
+        "max_consecutive": task.get("max_consecutive"),
     }
 
     recognition = task.get("recognition", "template")
-    if recognition == "template+ocr":
+    if recognition in ("template+ocr", "ocr"):
         data["ocr_enabled"] = True
         data["ocr_target_text"] = task.get("ocr_text", "")
-        data["ocr_confidence_threshold"] = task.get("ocr_confidence", 0.8)
+        try:
+            data["ocr_confidence_threshold"] = float(task.get("ocr_confidence", 0.8))
+        except (ValueError, TypeError):
+            data["ocr_confidence_threshold"] = 0.8
     else:
         data["ocr_enabled"] = False
         data["ocr_target_text"] = ""
         data["ocr_confidence_threshold"] = 0.8
     data["ocr_action"] = "点击文字所在区域"
 
-    action = task.get("action", {})
-    if action.get("target") == "fixed_coord":
-        xr = action.get("x_range", [])
-        yr = action.get("y_range", [])
-        if len(xr) == 2 and len(yr) == 2:
-            data["click_area"] = xr + yr
-        else:
-            data.pop("click_area", None)
+    action = task.get("action", {}) or {}
+    action_type = (action.get("type") or "click")
+    data["action_type"] = action_type
+    if action_type == "wait":
+        try:
+            data["duration"] = float(action.get("duration", 1.0))
+        except (ValueError, TypeError):
+            data["duration"] = 1.0
+    elif action_type == "swipe":
+        if action.get("target") == "fixed_coord":
+            xr = list(action.get("x_range", []))
+            yr = list(action.get("y_range", []))
+            if len(xr) == 2 and len(yr) == 2:
+                try:
+                    data["click_area"] = [int(xr[0]), int(xr[1]), int(yr[0]), int(yr[1])]
+                    data["click_type"] = "coordinate"
+                except (ValueError, TypeError):
+                    pass
+        if "click_type" not in data:
+            data["click_type"] = "image"
+        exr = list(action.get("ex_range", []) or [])
+        eyr = list(action.get("ey_range", []) or [])
+        if len(exr) == 2 and len(eyr) == 2:
+            try:
+                data["end_area"] = [int(exr[0]), int(exr[1]), int(eyr[0]), int(eyr[1])]
+            except (ValueError, TypeError):
+                pass
+        try:
+            data["duration"] = float(action.get("duration", 0.5))
+        except (ValueError, TypeError):
+            data["duration"] = 0.5
     else:
-        data.pop("click_area", None)
+        if action.get("target") == "fixed_coord":
+            xr = list(action.get("x_range", []))
+            yr = list(action.get("y_range", []))
+            if len(xr) == 2 and len(yr) == 2:
+                try:
+                    data["click_area"] = [int(xr[0]), int(xr[1]), int(yr[0]), int(yr[1])]
+                    data["click_type"] = "coordinate"
+                except (ValueError, TypeError):
+                    pass
+        if "click_type" not in data:
+            data["click_type"] = "image"
 
     return data
 
@@ -83,15 +306,18 @@ class ImageConfigDialog(QDialog):
     def __init__(self, parent=None, image_name="", config_data={}, config_path="", image_list=[]):
         super().__init__(parent)
         self.setWindowTitle("图像配置")
-        self.resize(500, 400)
-        
+        self.resize(500, 460)
+
         self.image_name = image_name
         self.config_data = config_data
         self.config_path = config_path
         self.image_list = image_list
-        
+        # 待替换的新图绝对路径（浏览选择后设置，保存时复制到模式目录）
+        self.pending_image_source = None
+
         # 初始化UI
         self.setup_ui()
+        self._refresh_preview()
     
     def setup_ui(self):
         """
@@ -107,13 +333,26 @@ class ImageConfigDialog(QDialog):
         name_layout.addWidget(self.name_line_edit)
         main_layout.addLayout(name_layout)
         
-        # 路径
+        # 路径（只读显示目标文件名，替换走浏览按钮）
         path_layout = QHBoxLayout()
         path_label = QLabel("路径:")
         self.path_line_edit = QLineEdit(self.config_data.get("path", self.image_name))
+        self.path_line_edit.setReadOnly(True)
+        self.path_line_edit.setToolTip("目标文件名，点击右侧浏览按钮替换图片")
+        self.browse_img_btn = QPushButton("浏览…/替换图片")
+        self.browse_img_btn.setToolTip("从资源管理器选择一张图，保存时复制到当前模式目录")
+        self.browse_img_btn.clicked.connect(self.browse_image)
         path_layout.addWidget(path_label)
         path_layout.addWidget(self.path_line_edit)
+        path_layout.addWidget(self.browse_img_btn)
         main_layout.addLayout(path_layout)
+
+        # 图片预览（当前图 / 待替换新图）
+        self.preview_label = QLabel()
+        self.preview_label.setFixedHeight(110)
+        self.preview_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setStyleSheet("border: 1px solid #d0d0d0; background: #fafafa;")
+        main_layout.addWidget(self.preview_label)
         
         # 是否是挑战开始
         self.is_challenge_start_checkbox = QtWidgets.QCheckBox("是否是挑战开始")
@@ -161,15 +400,36 @@ class ImageConfigDialog(QDialog):
         # 点击区域设置
         click_area_group = QtWidgets.QGroupBox("点击区域设置")
         click_area_layout = QVBoxLayout(click_area_group)
-        
+
+        # 动作类型：点击 / 滑动 / 等待（pipeline 专属；legacy common_challenge 保持 click-only）
+        self.action_type_group = QtWidgets.QButtonGroup()
+        self.action_click_radio = QtWidgets.QRadioButton("点击")
+        self.action_swipe_radio = QtWidgets.QRadioButton("滑动")
+        self.action_wait_radio = QtWidgets.QRadioButton("等待")
+        _saved_action = (self.config_data.get("action_type") or "click")
+        self.action_click_radio.setChecked(_saved_action == "click")
+        self.action_swipe_radio.setChecked(_saved_action == "swipe")
+        self.action_wait_radio.setChecked(_saved_action == "wait")
+        self.action_type_group.addButton(self.action_click_radio)
+        self.action_type_group.addButton(self.action_swipe_radio)
+        self.action_type_group.addButton(self.action_wait_radio)
+
+        action_type_layout = QHBoxLayout()
+        action_type_layout.addWidget(QLabel("动作类型:"))
+        action_type_layout.addWidget(self.action_click_radio)
+        action_type_layout.addWidget(self.action_swipe_radio)
+        action_type_layout.addWidget(self.action_wait_radio)
+        click_area_layout.addLayout(action_type_layout)
+
         # 点击方式
         self.click_method_group = QtWidgets.QButtonGroup()
         self.click_image_radio = QtWidgets.QRadioButton("点击图片区域")
         self.click_custom_radio = QtWidgets.QRadioButton("点击自定义区域")
         
         # 默认选择点击图片区域
-        self.click_image_radio.setChecked(not self.config_data.get("click_area"))
-        self.click_custom_radio.setChecked("click_area" in self.config_data)
+        _is_custom = self.config_data.get("click_type") == "coordinate" or ("click_type" not in self.config_data and "click_area" in self.config_data)
+        self.click_image_radio.setChecked(not _is_custom)
+        self.click_custom_radio.setChecked(_is_custom)
         
         self.click_method_group.addButton(self.click_image_radio)
         self.click_method_group.addButton(self.click_custom_radio)
@@ -184,7 +444,23 @@ class ImageConfigDialog(QDialog):
         custom_area_layout.addWidget(custom_area_label)
         custom_area_layout.addWidget(self.custom_area_line_edit)
         click_area_layout.addLayout(custom_area_layout)
-        
+
+        # 终点区域（滑动终点坐标范围，格式同自定义区域）
+        end_area_layout = QHBoxLayout()
+        end_area_label = QLabel("终点区域:")
+        self.end_area_line_edit = QLineEdit(str(self.config_data.get("end_area", [100, 200, 200, 400])))
+        end_area_layout.addWidget(end_area_label)
+        end_area_layout.addWidget(self.end_area_line_edit)
+        click_area_layout.addLayout(end_area_layout)
+
+        # 时长（滑动时长 / 等待秒数，单位秒）
+        duration_layout = QHBoxLayout()
+        duration_label = QLabel("时长(秒):")
+        self.duration_line_edit = QLineEdit(str(self.config_data.get("duration", 0.5)))
+        duration_layout.addWidget(duration_label)
+        duration_layout.addWidget(self.duration_line_edit)
+        click_area_layout.addLayout(duration_layout)
+
         main_layout.addWidget(click_area_group)
         
         # OCR配置
@@ -242,14 +518,64 @@ class ImageConfigDialog(QDialog):
         # 连接信号
         self.save_btn.clicked.connect(self.save)
         self.cancel_btn.clicked.connect(self.reject)
+
+    def browse_image(self):
+        """弹出资源管理器选择替换图片，仅记录源路径，保存时再复制改名"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择替换图片", "", "图像文件 (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if not file_path:
+            return
+        self.pending_image_source = file_path
+        self._refresh_preview(preview_path=file_path)
+
+    def _preview_candidate_paths(self):
+        """预览优先级：待替换新图 > 模式目录下老图"""
+        if self.pending_image_source and os.path.exists(self.pending_image_source):
+            return self.pending_image_source
+        if self.config_path:
+            mode_dir = os.path.dirname(self.config_path)
+            old_path = os.path.join(mode_dir, self.image_name)
+            if self.image_name and os.path.exists(old_path):
+                return old_path
+        return ""
+
+    def _refresh_preview(self, preview_path=""):
+        if not hasattr(self, "preview_label"):
+            return
+        target = preview_path or self._preview_candidate_paths()
+        if target and os.path.exists(target):
+            pixmap = QPixmap(target)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(
+                    200, 100,
+                    QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                    QtCore.Qt.TransformationMode.SmoothTransformation,
+                )
+                self.preview_label.setPixmap(pixmap)
+                tip = "待替换新图预览" if self.pending_image_source else "当前图片预览"
+                self.preview_label.setToolTip(f"{tip}：{target}")
+                return
+        if self.pending_image_source:
+            self.preview_label.setText(f"已选择：{os.path.basename(self.pending_image_source)}（无预览）")
+        else:
+            self.preview_label.setText("暂无预览")
     
     def save(self):
         """
-        保存配置
+        保存配置（含图片替换：复制到模式目录并按改后名字落地）
         """
-        # 更新配置数据
-        new_name = self.name_line_edit.text()
-        self.config_data["path"] = self.path_line_edit.text()
+        # 更新配置数据（目标文件名按改后名字规范化，后缀缺失时继承）
+        raw_new_name = self.name_line_edit.text()
+        new_name = _normalize_dest_filename(raw_new_name, self.pending_image_source, self.image_name)
+        if not new_name:
+            QMessageBox.warning(self, "警告", "图像名称不能为空")
+            return
+        # 回写规范化后的名字，避免无后缀导致文件与配置不一致
+        if new_name != raw_new_name.strip():
+            self.name_line_edit.setText(new_name)
+        self.path_line_edit.setText(new_name)
+        self.config_data["path"] = new_name
         self.config_data["is_challenge_start"] = self.is_challenge_start_checkbox.isChecked()
         self.config_data["message"] = self.message_line_edit.text()
         self.config_data["is_global"] = self.is_global_checkbox.isChecked()
@@ -259,40 +585,117 @@ class ImageConfigDialog(QDialog):
             next_img_value = os.path.splitext(next_img_value)[0]
         self.config_data["next_image"] = next_img_value
         
-        # 处理点击区域
-        if self.click_image_radio.isChecked():
+        # 处理动作类型（pipeline 专属；legacy common_challenge 保持 click-only，不在此动）
+        if self.action_swipe_radio.isChecked():
+            action_type = "swipe"
+        elif self.action_wait_radio.isChecked():
+            action_type = "wait"
+        else:
+            action_type = "click"
+        self.config_data["action_type"] = action_type
+
+        if action_type == "wait":
+            try:
+                duration = float(self.duration_line_edit.text())
+            except (ValueError, TypeError):
+                QMessageBox.warning(self, "警告", "时长格式非法，应为数字（单位秒）")
+                return
+            if duration < 0:
+                QMessageBox.warning(self, "警告", "时长不能为负数")
+                return
+            self.config_data["duration"] = duration
+            self.config_data.pop("click_area", None)
+            self.config_data.pop("click_type", None)
+            self.config_data.pop("end_area", None)
+        elif action_type == "swipe":
+            # 滑动起点复用目标（点击图片区域 / 点击自定义区域）
+            if self.click_image_radio.isChecked():
+                if "click_area" in self.config_data:
+                    del self.config_data["click_area"]
+                self.config_data["click_type"] = "image"
+            else:
+                area = _parse_click_area(self.custom_area_line_edit.text())
+                if area is None:
+                    QMessageBox.warning(self, "警告", "点击区域格式非法，应为 [x1, x2, y1, y2] 且满足 x1<=x2, y1<=y2")
+                    return
+                self.config_data["click_area"] = area
+                self.config_data["click_type"] = "coordinate"
+            end_area = _parse_click_area(self.end_area_line_edit.text())
+            if end_area is None:
+                QMessageBox.warning(self, "警告", "终点区域格式非法，应为 [x1, x2, y1, y2] 且满足 x1<=x2, y1<=y2")
+                return
+            self.config_data["end_area"] = end_area
+            try:
+                duration = float(self.duration_line_edit.text())
+            except (ValueError, TypeError):
+                QMessageBox.warning(self, "警告", "时长格式非法，应为数字（单位秒）")
+                return
+            if duration < 0:
+                QMessageBox.warning(self, "警告", "时长不能为负数")
+                return
+            self.config_data["duration"] = duration
+        elif self.click_image_radio.isChecked():
             # 移除click_area字段
             if "click_area" in self.config_data:
                 del self.config_data["click_area"]
+            self.config_data["click_type"] = "image"
+            self.config_data.pop("end_area", None)
+            self.config_data.pop("duration", None)
         else:
-            # 设置自定义区域
-            try:
-                # 尝试解析输入的区域
-                area = ast.literal_eval(self.custom_area_line_edit.text())
-                if isinstance(area, list) and len(area) == 4:
-                    self.config_data["click_area"] = area
-                else:
-                    # 使用默认值
-                    self.config_data["click_area"] = [100, 100, 100, 400]
-            except (ValueError, SyntaxError, TypeError):
-                # 使用默认值
-                self.config_data["click_area"] = [100, 200, 200, 400]
+            # 设置自定义区域：非法输入 warn-and-return，绝不静默写默认区域
+            area = _parse_click_area(self.custom_area_line_edit.text())
+            if area is None:
+                QMessageBox.warning(self, "警告", "点击区域格式非法，应为 [x1, x2, y1, y2] 且满足 x1<=x2, y1<=y2")
+                return
+            self.config_data["click_area"] = area
+            self.config_data["click_type"] = "coordinate"
+            self.config_data.pop("end_area", None)
+            self.config_data.pop("duration", None)
         
         # 保存OCR配置
         self.config_data["ocr_enabled"] = self.is_ocr_enabled_checkbox.isChecked()
-        
-        # OCR识别文本
-        self.config_data["ocr_target_text"] = self.ocr_text_edit.text()
+        if not self.config_data["ocr_enabled"]:
+            # 未勾选纯 OCR/OCR：清除残留文字与 recognition，避免前向转换复活 pure-ocr
+            self.config_data["ocr_target_text"] = ""
+            self.config_data.pop("recognition", None)
+        else:
+            # OCR识别文本
+            self.config_data["ocr_target_text"] = self.ocr_text_edit.text()
         
         # OCR识别阈值
-        try:
-            threshold = float(self.ocr_threshold_edit.text())
-            self.config_data["ocr_confidence_threshold"] = threshold
-        except (ValueError, TypeError):
-            self.config_data["ocr_confidence_threshold"] = 0.8
+        self.config_data["ocr_confidence_threshold"] = _normalize_confidence(self.ocr_threshold_edit.text())
         
-        # OCR识别后的操作
+        # OCR识别后的操作（仅 click 类型需要点击区域校验；swipe/wait 自带动作语义）
         self.config_data["ocr_action"] = self.ocr_action_combo.currentText()
+        if action_type == "click" and self.config_data["ocr_action"] == "点击点击区域设置的区域" and "click_area" not in self.config_data:
+            QMessageBox.warning(self, "警告", "OCR操作需要点击区域，但当前未设置点击区域")
+            return
+
+        # 图片文件落地：复制到模式目录并按改后名字命名（含纯改名）
+        if self.config_path:
+            mode_dir = os.path.dirname(self.config_path)
+            plan = _plan_image_file_replace(mode_dir, self.image_name, new_name, self.pending_image_source)
+            needs_file_op = plan["need_copy"] or plan["remove_old"]
+            if needs_file_op:
+                dest_path = plan["dest_path"]
+                old_path = plan["old_path"]
+                # 目标已存在且不是老文件本身 → 弹窗确认覆盖
+                if os.path.exists(dest_path) and os.path.abspath(dest_path) != os.path.abspath(old_path):
+                    # 同文件（待选源就是目标）已在 need_copy=False 排除，此处是真覆盖
+                    if not (plan["pending_source"] and os.path.abspath(plan["pending_source"]) == os.path.abspath(dest_path)):
+                        reply = QMessageBox.question(
+                            self, "确认覆盖",
+                            f"目标文件已存在：\n{dest_path}\n确定要覆盖吗？",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No,
+                        )
+                        if reply != QMessageBox.StandardButton.Yes:
+                            return
+                try:
+                    _apply_image_file_replace(plan)
+                except Exception as e:
+                    QMessageBox.warning(self, "警告", f"替换图片文件失败: {e}")
+                    return
         
         # 保存到文件
         if self.config_path:
@@ -323,12 +726,25 @@ class ImageConfigDialog(QDialog):
                 if new_image_key != old_image_key:
                     if old_image_key in config["image_paths"]:
                         del config["image_paths"][old_image_key]
+                    # 重命名引用改写：其余 image_paths 条目的 next_image 指向旧名则更新
+                    for k, v in config["image_paths"].items():
+                        if isinstance(v, dict) and v.get("next_image") == old_image_key:
+                            v["next_image"] = new_image_key
                     # 同时在 pipeline.tasks 中删除旧条目
                     if "pipeline" in config and "tasks" in config["pipeline"]:
                         config["pipeline"]["tasks"] = [
                             t for t in config["pipeline"]["tasks"]
                             if t.get("name") != old_image_key
                         ]
+                        # 重命名引用改写：其余 task 的 next 指向旧名则更新（排除改名后的任务自身）
+                        for t in config["pipeline"]["tasks"]:
+                            if t.get("name") != new_image_key and t.get("next") == old_image_key:
+                                t["next"] = new_image_key
+
+                # 去掉值为 None 的冗余键，避免 JSON 里出现 null 污染旧格式
+                for _k in ("threshold", "timeout", "max_retries", "max_consecutive"):
+                    if self.config_data.get(_k) is None:
+                        self.config_data.pop(_k, None)
 
                 config["image_paths"][new_image_key] = self.config_data.copy()
 
@@ -352,8 +768,11 @@ class ImageConfigDialog(QDialog):
                 # 保存配置
                 with open(self.config_path, 'w', encoding='utf-8') as f:
                     json.dump(config, f, ensure_ascii=False, indent=2)
-                
-                QMessageBox.information(self, "成功", "配置保存成功")
+
+                if self.pending_image_source:
+                    QMessageBox.information(self, "成功", f"图片已替换为 {new_name}，配置保存成功")
+                else:
+                    QMessageBox.information(self, "成功", "配置保存成功")
                 self.accept()
             except Exception as e:
                 QMessageBox.warning(self, "警告", f"保存配置失败: {e}")
@@ -455,11 +874,14 @@ class ModeEditorDialog(QDialog):
         img_buttons_layout = QHBoxLayout()
         self.add_img_btn = QPushButton("添加图像")
         self.delete_img_btn = QPushButton("删除图像")
+        self.replace_img_btn = QPushButton("替换图片")
+        self.replace_img_btn.setToolTip("选中一张图，从资源管理器选新图直接覆盖，文件名和配置不变")
         self.edit_img_config_btn = QPushButton("编辑图像配置")
         self.usage_instructions_btn = QPushButton("查看使用说明")
-        
+
         img_buttons_layout.addWidget(self.add_img_btn)
         img_buttons_layout.addWidget(self.delete_img_btn)
+        img_buttons_layout.addWidget(self.replace_img_btn)
         img_buttons_layout.addWidget(self.edit_img_config_btn)
         img_buttons_layout.addWidget(self.usage_instructions_btn)
         
@@ -518,6 +940,7 @@ class ModeEditorDialog(QDialog):
         # 图像操作按钮
         self.add_img_btn.clicked.connect(self.add_image)
         self.delete_img_btn.clicked.connect(self.delete_image)
+        self.replace_img_btn.clicked.connect(self.replace_image)
         self.edit_img_config_btn.clicked.connect(self.edit_image_config)
         self.usage_instructions_btn.clicked.connect(self.show_usage_instructions)
         
@@ -801,7 +1224,6 @@ class ModeEditorDialog(QDialog):
                     dest_path = os.path.join(mode_dir, filename)
                     if not os.path.exists(dest_path):
                         try:
-                            import shutil
                             shutil.copy(file, dest_path)
                         except Exception as e:
                             QMessageBox.warning(self, "警告", f"复制文件失败: {e}")
@@ -901,6 +1323,85 @@ class ModeEditorDialog(QDialog):
                     except Exception as e:
                         QMessageBox.warning(self, "警告", f"删除文件失败: {e}")
      
+    def _get_current_mode_path(self):
+        """从模式树获取当前选中的模式路径，如 ['魂王'] 或 ['魂土', '队长']，未选中返回 []"""
+        mode_tree_item = self.mode_tree.currentItem()
+        if not mode_tree_item:
+            return []
+        mode_path = []
+        item = mode_tree_item
+        while item:
+            mode_path.insert(0, item.text(0))
+            item = item.parent()
+        return mode_path
+
+    def _resolve_dir_name(self, mode_path):
+        """由模式路径解析到 source 下的目录名，解析不出返回 ''"""
+        if not mode_path:
+            return ""
+        if len(mode_path) == 1:
+            mode_data = self.temp_mode_config.get(mode_path[0])
+            if isinstance(mode_data, dict):
+                return mode_data.get('default', '') or ""
+            return mode_data or ""
+        mode_data = self.temp_mode_config.get(mode_path[0])
+        if isinstance(mode_data, dict):
+            return mode_data.get(mode_path[1], '') or ""
+        return mode_data or ""
+
+    def replace_image(self):
+        """
+        替换图片（主界面快捷入口）：选中一张图后，从资源管理器选新图直接覆盖。
+        文件名和 config.json 配置不变，与编辑配置对话框内的替换逻辑同源。
+        """
+        current_item = self.img_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "警告", "请选择一个图像")
+            return
+
+        mode_path = self._get_current_mode_path()
+        if not mode_path:
+            QMessageBox.warning(self, "警告", "请先选择一个模式")
+            return
+        dir_name = self._resolve_dir_name(mode_path)
+        if not dir_name:
+            QMessageBox.warning(self, "警告", "模式对应的目录名未设置")
+            return
+
+        img_name = current_item.text()
+        mode_dir = os.path.join(self.source_dir, dir_name)
+        dest_path = os.path.join(mode_dir, img_name)
+        if not os.path.exists(dest_path):
+            QMessageBox.warning(self, "警告", f"原图片文件不存在，无法替换：{img_name}")
+            return
+
+        src_path, _ = QFileDialog.getOpenFileName(
+            self, "选择替换图片", "", "图像文件 (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if not src_path:
+            return
+        if os.path.abspath(src_path) == os.path.abspath(dest_path):
+            QMessageBox.information(self, "提示", "选择的就是当前图片，无需替换")
+            return
+
+        if QMessageBox.question(
+            self, "确认替换",
+            f"确定要用\n{os.path.basename(src_path)}\n替换\n{img_name}\n吗？原图将被覆盖，配置保持不变。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            plan = _plan_image_file_replace(mode_dir, img_name, img_name, src_path)
+            _apply_image_file_replace(plan)
+        except Exception as e:
+            QMessageBox.warning(self, "警告", f"替换图片失败: {e}")
+            return
+
+        QMessageBox.information(self, "成功", f"图片已替换：{img_name}")
+        self.load_images(mode_path)
+
     def edit_image_config(self):
         """
         编辑图像配置
@@ -949,14 +1450,23 @@ class ModeEditorDialog(QDialog):
                 try:
                     with open(config_path, 'r', encoding='utf-8') as f:
                         config = json.load(f)
-                    # 获取图像配置，优先 pipeline.tasks 格式
+                    # 获取图像配置，pipeline 是运行时真相，优先 pipeline.tasks 格式
                     image_key = os.path.splitext(image_name)[0]
-                    config_data = config.get("image_paths", {}).get(image_key, {})
-                    if not config_data and "pipeline" in config:
+                    pipeline_task = None
+                    if "pipeline" in config:
                         for task in config["pipeline"].get("tasks", []):
                             if task.get("name") == image_key:
-                                config_data = _pipeline_task_to_image_paths(task)
+                                pipeline_task = task
                                 break
+                    if pipeline_task is not None:
+                        config_data = _pipeline_task_to_image_paths(pipeline_task)
+                        # pipeline 无等价字段的 legacy 覆盖：仅 message / ocr_action
+                        legacy_entry = config.get("image_paths", {}).get(image_key, {})
+                        for k in ("message", "ocr_action"):
+                            if k in legacy_entry and legacy_entry[k]:
+                                config_data[k] = legacy_entry[k]
+                    else:
+                        config_data = config.get("image_paths", {}).get(image_key, {})
                 except Exception as e:
                     logger.error(f"加载配置文件失败: {e}")
             

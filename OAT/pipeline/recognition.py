@@ -25,9 +25,15 @@ class RecognitionEngine(ABC):
 
     @abstractmethod
     def find_template(
-        self, template_path: str, threshold: float
+        self, template_path: str, threshold: float, region: Optional[Tuple[int, int, int, int]] = None
     ) -> RecognitionResult:
-        """在窗口截图中查找模板图像"""
+        """在窗口截图中查找模板图像
+
+        Args:
+            template_path: 模板图像路径
+            threshold: 匹配阈值
+            region: 限定匹配区域 (x, y, w, h)，客户区坐标，None 表示全窗口
+        """
         ...
 
     @abstractmethod

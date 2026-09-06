@@ -14,7 +14,8 @@ import win32gui
 from PIL import Image
 
 from .WindowSynchronizer import WindowSynchronizer
-from .GetDC import WindowCapture
+from .GetDC import WindowCapture, effective_client_dy
+from . import human_click
 # 导入整个settings模块，而不是单个变量
 from . import settings
 from OAT.utils.warning_box import warning_box
@@ -258,7 +259,8 @@ class OnmyojiAutomation:
                 if found:
                     logger.info(f"OCR识别成功: '{target_text}'，耗时: {elapsed_time:.3f}秒")
                     
-                    # 如果有窗口句柄，将OCR坐标转换为客户区坐标
+                    # 如果有窗口句柄，将截图坐标转换为客户区坐标
+                    # （截图含标题栏时减去标题栏高度；纯客户区截图偏移为0）
                     if self.hwnd and text_area:
                         try:
                             # 获取窗口信息（使用缓存）
@@ -268,13 +270,13 @@ class OnmyojiAutomation:
                             window_height = window_rect[3] - window_rect[1]
                             client_height = client_rect[3] - client_rect[1]
                             title_bar_height = window_height - client_height
+                            dy = effective_client_dy(screenshot.shape[0], client_height, title_bar_height)
                             
-                            # 将OCR坐标（包含标题栏）转换为客户区坐标
+                            # 将截图坐标转换为客户区坐标
                             converted_text_area = []
                             for point in text_area:
                                 x, y = point
-                                # 减去标题栏高度
-                                converted_text_area.append([x, y - title_bar_height])
+                                converted_text_area.append([x, y - dy])
                             
                             text_area = converted_text_area
                         except Exception:
@@ -301,18 +303,12 @@ class OnmyojiAutomation:
             return False, None, None
 
     def _move_mouse(self, x: int, y: int) -> None:
-        """鼠标移动（基础方法）"""
-        # 使用绝对坐标移动，更高效
-        win32api.SetCursorPos((x, y))
+        """鼠标移动（基础方法，委托共享实现）"""
+        human_click.human_like_move(x, y)
 
     def _win32_double_click(self) -> None:
-        """优化的双击操作，减少延迟"""
-        # 组合鼠标事件，减少系统调用
-        flags = win32con.MOUSEEVENTF_LEFTDOWN | win32con.MOUSEEVENTF_LEFTUP
-        win32api.mouse_event(flags, 0, 0, 0, 0)
-        # 更短的双击间隔
-        time.sleep(0.03)
-        win32api.mouse_event(flags, 0, 0, 0, 0)
+        """优化的双击操作，减少延迟（委托共享实现）"""
+        human_click.win32_double_click()
 
     def _calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
         """
@@ -352,6 +348,23 @@ class OnmyojiAutomation:
         win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
 
 
+    @staticmethod
+    def _should_skip_ocr_for_custom_area(ocr_enabled, ocr_text, ocr_action, click_type, click_area) -> bool:
+        """ocr_action 为自定义点击区域时跳过 OCR 直达坐标分支的门控。"""
+        if not (ocr_enabled and (ocr_text or "").strip()):
+            return False
+        if ocr_action != "点击点击区域设置的区域":
+            return False
+        if click_type != "coordinate":
+            return False
+        if not isinstance(click_area, (list, tuple)) or len(click_area) != 4:
+            return False
+        try:
+            x1, x2, y1, y2 = (int(v) for v in click_area)
+        except (ValueError, TypeError):
+            return False
+        return x1 <= x2 and y1 <= y2
+
     def perform_action(self,
                        logo: str,
                        hidden_window: bool = False,
@@ -361,6 +374,7 @@ class OnmyojiAutomation:
                        click_area: list = None,
                        ocr_enabled: bool = False,
                        ocr_target_text: str = "",
+                       ocr_action: str = "",
                        # sync_type: str = "完全同步"
                        ) -> bool:
         """
@@ -381,8 +395,9 @@ class OnmyojiAutomation:
             if threshold is None:
                 threshold = self.default_confidence
                 
-            # 如果启用了OCR，先尝试OCR识别
-            if ocr_enabled and ocr_target_text:
+            # 如果启用了OCR，先尝试OCR识别（自定义点击区域时跳过，直达坐标分支）
+            if ocr_enabled and ocr_target_text and not self._should_skip_ocr_for_custom_area(
+                    ocr_enabled, ocr_target_text, ocr_action, click_type, click_area):
                 found, text_area, real_text = self.find_text_ocr(ocr_target_text)
                 if found and text_area:
                     # 在文字区域内随机点击
@@ -459,8 +474,8 @@ class OnmyojiAutomation:
                     # 计算区域中心
                     center_x = (x1 + x2) // 2
                     center_y = (y1 + y2) // 2
-                    
-                    # 计算标题栏高度并转换坐标（后台模式下，图像识别返回的坐标包含标题栏）
+
+                    # 截图坐标 → 客户区坐标（含标题栏截图才减标题栏，纯客户区截图偏移为0）
                     try:
                         # 获取窗口信息（使用缓存）
                         window_rect, client_rect = self._get_cached_window_rect()
@@ -469,11 +484,12 @@ class OnmyojiAutomation:
                         window_height = window_rect[3] - window_rect[1]
                         client_height = client_rect[3] - client_rect[1]
                         title_bar_height = window_height - client_height
-                        
-                        # 将包含标题栏的坐标转换为客户区坐标
-                        center_y = center_y - title_bar_height
-                        y1 = y1 - title_bar_height
-                        y2 = y2 - title_bar_height
+                        shot_h = wc.last_shot_shape[0] if wc.last_shot_shape else client_height
+                        dy = effective_client_dy(shot_h, client_height, title_bar_height)
+
+                        center_y = center_y - dy
+                        y1 = y1 - dy
+                        y2 = y2 - dy
                         
                         # 确保坐标在客户区内
                         center_y = max(0, center_y)
@@ -615,38 +631,19 @@ class OnmyojiAutomation:
 
     def _human_like_move(self, target_x: int, target_y: int) -> None:
         """
-        核心方法：实现模拟人为的鼠标移动
+        核心方法：实现模拟人为的鼠标移动（委托共享实现）
         :param target_x: 目标X坐标（屏幕绝对坐标）
         :param target_y: 目标Y坐标（屏幕绝对坐标）
         """
-        try:
-            # 获取当前鼠标位置
-            start_x, start_y = pyautogui.position()
-            
-            # 如果已经在目标位置，直接返回
-            if abs(start_x - target_x) < 5 and abs(start_y - target_y) < 5:
-                return
-
-            pyautogui.moveTo(target_x, target_y, duration=0.3)
-            
-            # 最后确保精确到达目标位置
-            win32api.SetCursorPos((target_x, target_y))
-        except Exception:
-            pass
+        human_click.human_like_move(target_x, target_y)
 
     def _complex_move(self, target_x: int, target_y: int) -> None:
         """
+        （委托共享实现，回退路径沿用 self.lock）
         :param target_x: 目标X坐标
         :param target_y: 目标Y坐标
         """
-        try:
-            self._human_like_move(target_x, target_y)
-        except Exception:
-            with self.lock:
-                try:
-                    win32api.SetCursorPos((target_x, target_y))
-                except:
-                    pyautogui.moveTo(target_x, target_y, duration=0.2)
+        human_click.complex_move(target_x, target_y, self.lock)
 
     def clear_cache(self):
         """清除识别缓存"""

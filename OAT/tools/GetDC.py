@@ -20,6 +20,21 @@ if not hasattr(win32con, 'CAPTUREBLT'):
 PW_CLIENTONLY = 1  # 只捕获客户区
 PW_RENDERFULLCONTENT = 2  # 捕获完整内容，包括被遮挡部分
 
+
+def effective_client_dy(shot_h: int, client_h: int, title_bar: int) -> int:
+    """截图顶部应跳过的行数（标题栏自适应）
+
+    PrintWindow 在不同窗口/系统上可能返回含标题栏的截图，也可能返回纯客户区截图
+    （实测：MuMu 窗口用 RENDERFULLCONTENT 会把标题栏截进客户区尺寸的位图里，
+    导致底部 47px 游戏内容被挤掉）。调用方一律用本函数返回值代替固定的
+    title_bar 偏移，按截图实际高度判定。
+    """
+    if title_bar <= 0 or client_h <= 0 or shot_h <= 0:
+        return 0
+    if shot_h >= client_h + title_bar - 2:
+        return title_bar
+    return max(0, shot_h - client_h)
+
 # 使用ctypes直接导入PrintWindow函数，避免win32gui模块版本差异问题
 try:
     user32 = ctypes.windll.user32
@@ -49,6 +64,8 @@ class WindowCapture:
         self.client_height = self.client_rect[3] - self.client_rect[1]
         # 记录上次使用的捕获模式
         self.last_capture_mode = None
+        # 上次成功截图的尺寸 (h, w)，供调用方判定截图是否含标题栏
+        self.last_shot_shape = None
         # 冷却机制：防止窗口最小化或捕获失败后连续弹窗
         self._capture_cooldown = False  # 冷却标志
         self._cooldown_duration = 30.0  # 冷却时间（秒）
@@ -251,6 +268,7 @@ class WindowCapture:
         # 使用指定模式捕获
         img = capture_by_mode(capture_mode)
         if img is not None and np.mean(img) > 5:
+            self.last_shot_shape = img.shape[:2]
             return img
 
         # 如果指定模式失败，尝试另一种模式
@@ -258,6 +276,7 @@ class WindowCapture:
         logger.error(f"{capture_mode}捕获失败，尝试{fallback_mode}方法")
         img = capture_by_mode(fallback_mode)
         if img is not None and np.mean(img) > 5:
+            self.last_shot_shape = img.shape[:2]
             # 永久切换到 fallback_mode 并更新配置
             if settings.BACKEND_GET_IMG_MODE != fallback_mode:
                 logger.info(f"切换到{fallback_mode}模式")
@@ -340,26 +359,28 @@ class WindowCapture:
             saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
             saveDC.SelectObject(saveBitMap)
 
+            # 主用 PW_CLIENTONLY：位图按客户区尺寸创建，必须只渲染客户区，
+            # 否则标题栏会占掉顶部、底部游戏内容被挤出截图（MuMu 实测少 47px）。
             # 使用ctypes的PrintWindow函数或回退到win32gui
             success = False
             if PrintWindow:
-                success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
+                success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
             else:
                 try:
-                    success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
+                    success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
                 except AttributeError:
                     logger.error("win32gui.PrintWindow不可用")
                     return None
 
             if not success:
-                logger.error("PrintWindow调用失败，尝试使用PW_CLIENTONLY模式")
+                logger.error("PrintWindow在PW_CLIENTONLY模式下失败，回退RENDERFULLCONTENT（截图可能含标题栏）")
                 if PrintWindow:
-                    success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
+                    success = PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
                 else:
-                    success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_CLIENTONLY)
+                    success = win32gui.PrintWindow(self.hwnd, saveDC.GetSafeHdc(), PW_RENDERFULLCONTENT)
 
                 if not success:
-                    logger.error("PrintWindow在PW_CLIENTONLY模式下也失败了")
+                    logger.error("PrintWindow在RENDERFULLCONTENT模式下也失败了")
                     return None
 
             # 获取位图数据
