@@ -37,6 +37,7 @@ from OAT.source import MODE_MAPPING
 from OAT.tools import *
 from OAT.utils.error_handler import setup_global_exception_handler, LOG_FILE, log_error
 from OAT.utils.logging import LogRedirect, logger
+from OAT.utils import pause_state
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_box import error_box
 from OAT.tools.settings import APP_VERSION, settings_data, update_settings
@@ -83,6 +84,8 @@ class AppUI:
         self.emergency_stop_btn = self.home_page.emergency_stop_btn
         self.textBrowser = self.home_page.textBrowser
         self.textBrowser_2 = self.home_page.textBrowser_2
+        self.explore_spin = self.home_page.explore_spin
+        self.explore_options = self.home_page.explore_options
 
         self.window_table = self.sync_page.window_table
         self.sync_instruction_btn = self.sync_page.sync_instruction_btn
@@ -306,12 +309,21 @@ class MainWindow(FluentWindow):
             self.active_threads = [t for t in self.active_threads if t.is_alive()]
 
     def start_challenge(self, *args):
+        # 新开局先全停旧线程（用户选择）：停→回收（~3s预算）；新线程 begin_run 复位；永不抛异常
+        try:
+            pause_state.stop_all(list(getattr(self, "active_threads", None) or []), timeout=3.0)
+        except Exception:
+            pass
         self.clean_threads()
         MAX_THREADS = 5
         if len(self.active_threads) >= MAX_THREADS:
             warning_box("已有任务在进行中，请等待完成")
             return
         times = self.ui.spinBox.value()
+        try:
+            self.log_redirect.progress(0, times)
+        except Exception:
+            pass
         mode: str = self.ui.find_mode_combo.currentText()
         sub_mode: str = ""
 
@@ -322,6 +334,14 @@ class MainWindow(FluentWindow):
             elif self.ui.radioButton2.isChecked():
                 sub_mode = self.ui.radioButton2.text()
                 logger.info(f"选择：{mode}, {sub_mode}")
+
+        # 绘卷刷分模式：读取每轮探索次数
+        explore_per_round = None
+        if hasattr(self.ui, 'explore_spin'):
+            val = self.ui.explore_spin.value()
+            explore_per_round = val if val > 0 else None
+            if mode == "绘卷刷分":
+                logger.info(f"绘卷刷分每轮探索次数: {explore_per_round}")
 
         if self.ui.hidden_window_checkbox.isChecked():
             hidden_window = True
@@ -344,7 +364,7 @@ class MainWindow(FluentWindow):
         try:
             thread = threading.Thread(
                 target=self.safe_mode_choice,
-                args=(mode, sub_mode, times, hidden_window, self.sync_mode_flag)
+                args=(mode, sub_mode, times, hidden_window, self.sync_mode_flag, explore_per_round)
             )
             thread.daemon = True
             with self.lock:
@@ -355,8 +375,12 @@ class MainWindow(FluentWindow):
         except ValueError:
             logger.info("请输入有效的整数挑战次数。")
 
-    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False):
+    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False, explore_per_round=None):
         try:
+            try:
+                pause_state.begin_run()
+            except Exception:
+                pass
             with self.lock:
                 if self.shutdown_flag:
                     return
@@ -398,7 +422,7 @@ class MainWindow(FluentWindow):
                 synchronizer = self.sync if hasattr(self, 'sync') else None
                 mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
                             hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
-                            sync_mode_value=self.sync_mode_value)
+                            sync_mode_value=self.sync_mode_value, explore_per_round=explore_per_round)
             else:
                 error_msg = f"读取 {sub_config_path} 配置文件失败。"
                 logger.error(error_msg)
@@ -415,6 +439,11 @@ class MainWindow(FluentWindow):
                     self.active_threads.remove(current_thread)
 
     def emergency_stop(self):
+        # 先唤醒卡在暂停中的挑战循环，使其干净退出，再回收线程
+        try:
+            pause_state.request_stop()
+        except Exception:
+            pass
         for thread in self.active_threads[:]:
             if thread.is_alive():
                 thread.join(timeout=0.5)
@@ -1037,11 +1066,11 @@ class MainWindow(FluentWindow):
                 if os.path.exists(screen_shot_dir):
                     shutil.rmtree(screen_shot_dir)
                     logger.info("窗口预览缓存已清理")
-                log_file_path = os.path.join(logs_dir, "log.log")
+                log_file_path = os.path.join(logs_dir, os.path.basename(LOG_FILE))
                 if os.path.exists(log_file_path):
                     with open(log_file_path, "w", encoding="utf-8") as f:
                         f.write("")
-                    logger.info("log.log文件已清理")
+                    logger.info(f"{os.path.basename(log_file_path)}文件已清理")
         except Exception as e:
             logger.error(f"清理缓存时出错: {e}")
 

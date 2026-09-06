@@ -2,16 +2,21 @@ import os
 import json
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from qfluentwidgets import (
     ComboBox, SpinBox, CheckBox, RadioButton,
     PushButton, PrimaryPushButton,
     CardWidget, BodyLabel, CaptionLabel, StrongBodyLabel,
-    TextBrowser,
+    TextBrowser, TogglePushButton, ProgressBar,
+    RoundMenu, Action,
     FluentIcon as FIF
 )
 
 from OAT.source.mode_config import mode_choice, mode_config
+from OAT.utils import pause_state
+from OAT.utils.logging import logger
 
 source_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'source')
 mode_json_path = os.path.join(source_dir, 'mode.json')
@@ -71,6 +76,21 @@ class HomePage(QWidget):
         spin_label = BodyLabel("请输入要挑战的次数")
         card_layout.addWidget(spin_label)
         card_layout.addWidget(self.spinBox)
+
+        # 绘卷刷分专属：每轮刷分内的探索次数（仅绘卷刷分模式显示）
+        self.explore_options = QWidget(self)
+        explore_layout = QVBoxLayout(self.explore_options)
+        explore_layout.setContentsMargins(0, 0, 0, 0)
+        explore_layout.setSpacing(8)
+        self.explore_spin = SpinBox(self)
+        self.explore_spin.setRange(1, 99)
+        self.explore_spin.setValue(5)
+        self.explore_spin.setToolTip("绘卷刷分模式：每轮刷分先探索N次，再打一轮结界突破")
+        explore_label = BodyLabel("绘卷刷分 - 每轮探索次数")
+        explore_layout.addWidget(explore_label)
+        explore_layout.addWidget(self.explore_spin)
+        self.explore_options.hide()
+        card_layout.addWidget(self.explore_options)
 
         client_label = BodyLabel("选择您的登录客户端")
         card_layout.addWidget(client_label)
@@ -135,11 +155,203 @@ class HomePage(QWidget):
         log_header = StrongBodyLabel("日志")
         log_layout.addWidget(log_header)
 
+        # 工具栏：进度 + 暂停
+        log_toolbar = QHBoxLayout()
+        log_toolbar.setContentsMargins(0, 0, 0, 0)
+        log_toolbar.setSpacing(8)
+
+        self.log_progress_widget = QWidget(self)
+        _progress_layout = QHBoxLayout(self.log_progress_widget)
+        _progress_layout.setContentsMargins(0, 0, 0, 0)
+        _progress_layout.setSpacing(8)
+        self.log_progress_label = BodyLabel("挑战进度 0/0", self.log_progress_widget)
+        self.log_progress_bar = ProgressBar(self.log_progress_widget)
+        self.log_progress_bar.setRange(0, 100)
+        self.log_progress_bar.setValue(0)
+        self.log_progress_bar.setFixedWidth(120)
+        _progress_layout.addWidget(self.log_progress_label)
+        _progress_layout.addWidget(self.log_progress_bar)
+        try:
+            from OAT.utils.logging import logger as _progress_logger
+            _progress_logger.progress_updated.connect(self._on_log_progress)
+        except Exception:
+            pass
+
+        self.log_pause_btn = TogglePushButton('暂停', self)
+        self.log_pause_btn.setCheckable(True)
+        self.log_pause_btn.setChecked(False)
+        self.log_pause_btn.setFixedWidth(72)
+        self.log_pause_btn.toggled.connect(self._on_log_pause_toggled)
+
+        log_toolbar.addWidget(self.log_progress_widget, 0)
+        log_toolbar.addWidget(self.log_pause_btn, 0)
+        log_layout.addLayout(log_toolbar)
+
         self.textBrowser = TextBrowser(self)
         self.textBrowser.setObjectName("log_browser")
+        self.textBrowser.document().setMaximumBlockCount(5000)
+        try:
+            self.textBrowser.setProperty('logAutoScroll', True)
+        except Exception:
+            pass
+        try:
+            self.textBrowser.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.textBrowser.customContextMenuRequested.connect(self._on_log_context_menu)
+        except Exception:
+            pass
         log_layout.addWidget(self.textBrowser)
 
         parent_layout.addWidget(log_card)
+
+    def _on_log_progress(self, done, total):
+        try:
+            try:
+                d = int(done)
+            except Exception:
+                d = 0
+            try:
+                t = int(total)
+            except Exception:
+                t = 0
+            # 新开局（进度清零）：工作线程的 begin_run 已取消暂停，
+            # 把按钮拨回“暂停”；blockSignals 避免触发 toggled 副作用（resume+日志噪音）。
+            if d == 0 and t > 0:
+                try:
+                    try:
+                        self.log_pause_btn.blockSignals(True)
+                    except Exception:
+                        pass
+                    try:
+                        self.log_pause_btn.setChecked(False)
+                    except Exception:
+                        pass
+                    try:
+                        self.log_pause_btn.setText('暂停')
+                    except Exception:
+                        pass
+                finally:
+                    try:
+                        self.log_pause_btn.blockSignals(False)
+                    except Exception:
+                        pass
+            try:
+                self.log_progress_label.setText(f"挑战进度 {d}/{t}")
+            except Exception:
+                pass
+            try:
+                if t <= 0:
+                    v = 0
+                else:
+                    v = int(100 * d / t)
+                    if v < 0:
+                        v = 0
+                    elif v > 100:
+                        v = 100
+                self.log_progress_bar.setValue(v)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _on_log_pause_toggled(self, checked):
+        try:
+            paused = bool(checked)
+        except Exception:
+            paused = False
+        try:
+            if paused:
+                pause_state.pause()
+            else:
+                pause_state.resume()
+        except Exception:
+            pass
+        try:
+            self.log_pause_btn.setText('继续' if paused else '暂停')
+        except Exception:
+            pass
+        try:
+            logger.info("已暂停挑战" if paused else "已继续挑战")
+        except Exception:
+            pass
+
+    def _on_log_context_menu(self, pos):
+        try:
+            menu = RoundMenu(parent=self.textBrowser)
+        except Exception:
+            return
+        try:
+            try:
+                auto = self.textBrowser.property('logAutoScroll')
+                auto_on = True if auto is None else bool(auto)
+            except Exception:
+                auto_on = True
+            act_clear = Action('清空', parent=menu)
+            act_scroll = Action(f"自动滚动：{'开' if auto_on else '关'}", parent=menu)
+            try:
+                act_scroll.setCheckable(True)
+                act_scroll.setChecked(bool(auto_on))
+            except Exception:
+                pass
+            act_open = Action('打开日志目录', parent=menu)
+            act_copy = Action('复制诊断', parent=menu)
+            menu.addAction(act_clear)
+            menu.addAction(act_scroll)
+            menu.addAction(act_open)
+            menu.addAction(act_copy)
+            try:
+                act_clear.triggered.connect(lambda: self.textBrowser.clear())
+            except Exception:
+                pass
+            try:
+                act_scroll.triggered.connect(self._on_log_autoscroll_toggled)
+            except Exception:
+                pass
+            try:
+                act_open.triggered.connect(self._on_log_open_dir)
+            except Exception:
+                pass
+            try:
+                act_copy.triggered.connect(self._on_log_copy_diag)
+            except Exception:
+                pass
+            try:
+                menu.exec(self.textBrowser.mapToGlobal(pos), ani=True)
+            except Exception:
+                try:
+                    menu.exec(self.textBrowser.mapToGlobal(pos))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _on_log_autoscroll_toggled(self):
+        try:
+            auto = self.textBrowser.property('logAutoScroll')
+            cur = True if auto is None else bool(auto)
+            self.textBrowser.setProperty('logAutoScroll', (not cur))
+        except Exception:
+            pass
+
+    def _on_log_open_dir(self):
+        try:
+            log_dir = os.path.abspath('logs')
+            try:
+                os.makedirs(log_dir, exist_ok=True)
+            except Exception:
+                pass
+            QDesktopServices.openUrl(QUrl.fromLocalFile(log_dir))
+        except Exception:
+            pass
+
+    def _on_log_copy_diag(self):
+        try:
+            text = self.textBrowser.toPlainText()
+        except Exception:
+            return
+        try:
+            QtWidgets.QApplication.clipboard().setText(text)
+        except Exception:
+            pass
 
     def _create_changelog_area(self, parent_layout):
         changelog_card = CardWidget(self)
@@ -186,12 +398,17 @@ class HomePage(QWidget):
         self.radioButton1.setChecked(False)
         self.radioButton2.setChecked(False)
         self.soul_land_group.setExclusive(True)
+        self.explore_options.hide()
 
         if not mode_config_data or index < 0 or index >= self.find_mode_combo.count():
             return
 
         mode_name = self.find_mode_combo.currentText()
         mode_data = mode_config_data.get(mode_name)
+
+        # 绘卷刷分模式：显示每轮探索次数选择
+        if mode_name == "绘卷刷分":
+            self.explore_options.show()
 
         if isinstance(mode_data, dict) and len(mode_data) > 1:
             sub_modes = [key for key in mode_data.keys() if key != 'default']

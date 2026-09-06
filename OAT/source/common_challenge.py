@@ -10,6 +10,7 @@ from OAT.tools.OnmyojiAuto import OnmyojiAutomation
 from OAT.tools import settings
 from OAT.utils.do_after_challenge import do_after_challenge
 from OAT.utils.logging import logger
+from OAT.utils.pause_state import is_stale, pause_aware_sleep, wait_if_paused
 from OAT.utils.warning_box import warning_box
 from OAT.utils.error_handler import log_error
 
@@ -80,12 +81,13 @@ class CommonChallenge:
                 self.image_info[k] = {
                     'message': v.get('message', ''),
                     'is_challenge_start': v.get('is_challenge_start', False),
-                    'click_type': v.get('click_type', 'image'),
+                    'click_type': v.get('click_type') or ('coordinate' if v.get('click_area') else 'image'),
                     'click_area': v.get('click_area', None),
                     'next_image': v.get('next_image', None),
                     'is_global': v.get('is_global', False),
                     'ocr_enabled': v.get('ocr_enabled', False),
                     'ocr_target_text': v.get('ocr_target_text', ''),
+                    'ocr_action': v.get('ocr_action') or '点击文字所在区域',
                     'ocr_confidence_threshold': v.get('ocr_confidence_threshold', 0.8)
                 }
             else:
@@ -100,6 +102,7 @@ class CommonChallenge:
                     'is_global': False,
                     'ocr_enabled': False,
                     'ocr_target_text': '',
+                    'ocr_action': '点击文字所在区域',
                     'ocr_confidence_threshold': 0.8
                 }
             
@@ -129,6 +132,30 @@ class CommonChallenge:
             NEXT_IMAGE_TIMEOUT = 15
 
             while i < self.times:
+                # 全局协同暂停：暂停时阻塞等待；收到停止请求则干净退出
+                try:
+                    if wait_if_paused() < 0:
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
+                # 代际过期：双起旧线程即使错过 join 也必须退出（不替代上方停止检查）
+                try:
+                    try:
+                        _stale = is_stale()
+                    except Exception:
+                        _stale = False
+                    if _stale:
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 # 优先检测全局图片
                 global_images = [key for key, info in self.image_info.items() if info['is_global']]
                 for key in global_images:
@@ -142,7 +169,8 @@ class CommonChallenge:
                             click_type=info['click_type'],
                             click_area=info['click_area'],
                             ocr_enabled=info['ocr_enabled'],
-                            ocr_target_text=info['ocr_target_text']
+                            ocr_target_text=info['ocr_target_text'],
+                            ocr_action=info['ocr_action']
                         ):
                             if info['message']:
                                 logger.info(info['message'])
@@ -180,7 +208,8 @@ class CommonChallenge:
                                     click_type=info['click_type'],
                                     click_area=info['click_area'],
                                     ocr_enabled=info['ocr_enabled'],
-                                    ocr_target_text=info['ocr_target_text']
+                                    ocr_target_text=info['ocr_target_text'],
+                                    ocr_action=info['ocr_action']
                                 ):
                                     # 增加连续出现次数
                                     consecutive_count[current_next_image] = consecutive_count.get(current_next_image, 0) + 1
@@ -207,6 +236,10 @@ class CommonChallenge:
                                     if info['is_challenge_start']:
                                         i += 1
                                         logger.info(f"还剩{self.times - i}次挑战")
+                                        try:
+                                            logger.progress(i, self.times)
+                                        except Exception:
+                                            pass
                                         # 挑战开始时重置连续出现次数
                                         consecutive_count = {}
                                         retry_count = 0
@@ -238,7 +271,8 @@ class CommonChallenge:
                                         click_type=info['click_type'],
                                         click_area=info['click_area'],
                                         ocr_enabled=info['ocr_enabled'],
-                                        ocr_target_text=info['ocr_target_text']
+                                        ocr_target_text=info['ocr_target_text'],
+                                        ocr_action=info['ocr_action']
                                     ):
                                         # 增加连续出现次数
                                         consecutive_count[key] = consecutive_count.get(key, 0) + 1
@@ -265,6 +299,10 @@ class CommonChallenge:
                                         if info['is_challenge_start']:
                                             i += 1
                                             logger.info(f"还剩{self.times - i}次挑战")
+                                            try:
+                                                logger.progress(i, self.times)
+                                            except Exception:
+                                                pass
                                             # 挑战开始时重置连续出现次数
                                             consecutive_count = {}
                                             retry_count = 0
@@ -281,8 +319,21 @@ class CommonChallenge:
                                 except Exception as e:
                                     pass
 
-                # 在两次识别之间添加随机休眠时间
-                time.sleep(random.uniform(1.0, 2.0))
+                # 在两次识别之间添加随机休眠时间（暂停不计入休眠，停止则干净退出）
+                try:
+                    _sleep_target = random.uniform(1.0, 2.0)
+                except Exception:
+                    _sleep_target = 1.0
+                try:
+                    _sleep_done = pause_aware_sleep(_sleep_target, 0.1)
+                except Exception:
+                    _sleep_done = True
+                if not _sleep_done:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
 
             logger.info(f"挑战完成！共执行{self.times}次挑战")
             
