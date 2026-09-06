@@ -380,6 +380,18 @@ class HomePage(QWidget):
                 <span style="margin: 0;">3.修复错误引用logger.warning引发的报错</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">4.修复close_game关闭失败但return True的问题</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">5.新增绘卷刷分模式（探索+结界突破组合，每轮探索次数可配）</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">6.日志区新增挑战进度条、暂停/继续按钮与右键菜单</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">7.新开局自动回收旧线程，急停可干净退出</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">8.修复截图标题栏偏移与前后台点击对齐问题</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">9.管道任务支持滑动/等待动作与连续匹配预算</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">10.日志改为按天轮转保留30天</span>
             </div>
         '''
 
