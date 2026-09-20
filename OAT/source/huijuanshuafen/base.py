@@ -22,6 +22,7 @@ from OAT.pipeline.recognition import RecognitionResult
 from OAT.pipeline.recognition_opencv import OpenCVRecognitionEngine
 from OAT.utils.OCRService import ocr_service
 from OAT.utils.logging import logger
+from OAT.utils.pause_state import wait_if_paused
 
 # Example 项目素材基准分辨率（客户区）
 BASE_W = 1920
@@ -241,8 +242,8 @@ class BaseBot:
             name: 模板名
             threshold: 匹配阈值（None 用引擎默认）
             region: 限定区域 (x, y, w, h)，客户区坐标；None 表示全窗口
-            timeout: 轮询超时秒数，0 表示只查一次
-            interval: 轮询间隔
+            timeout: 轮询超时秒数，0 表示只查一次（暂停时长不计入超时）
+            interval: 轮询间隔（暂停感知；停止则提前返回 None）
 
         Returns:
             RecognitionResult | None
@@ -251,8 +252,55 @@ class BaseBot:
         if not path or not os.path.exists(path):
             self.warn_missing(name)
             return None
-        start = time.time()
-        while True:
+        try:
+            timeout_f = float(timeout)
+        except Exception:
+            timeout_f = 0.0
+        try:
+            interval_f = float(interval)
+        except Exception:
+            interval_f = 0.3
+        if not interval_f > 0:
+            interval_f = 0.3
+        # 单次查询：仍需响应暂停（阻塞直到恢复；停止则直接返回 None）
+        try:
+            if wait_if_paused() < 0:
+                return None
+        except Exception:
+            pass
+        try:
+            result = self.engine.find_template(path, threshold, region)
+        except Exception as e:
+            logger.warn(f"模板匹配异常 {name}: {e}")
+            result = None
+        if result is not None and result.found:
+            return result
+        if not timeout_f > 0:
+            return None
+        # 轮询：暂停时长不计入超时（按实际休眠递减剩余预算）
+        remaining = timeout_f
+        while remaining > 0:
+            chunk = remaining if remaining < interval_f else interval_f
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                return None
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return None
+            if remaining <= 0:
+                break
             try:
                 result = self.engine.find_template(path, threshold, region)
             except Exception as e:
@@ -260,9 +308,7 @@ class BaseBot:
                 result = None
             if result is not None and result.found:
                 return result
-            if timeout <= 0 or time.time() - start >= timeout:
-                return None
-            time.sleep(interval)
+        return None
 
     def find_dialog_confirm(self):
         """找'确认退出'类弹窗的确认按钮（OCR精确匹配，返回客户区坐标或None）
@@ -304,9 +350,14 @@ class BaseBot:
         return None
 
     def click_dialog_confirm(self, timeout: float = 5.0) -> bool:
-        """点击确认退出弹窗的确认按钮（模板优先，OCR兜底）"""
-        start = time.time()
-        while time.time() - start < timeout:
+        """点击确认退出弹窗的确认按钮（模板优先，OCR兜底；暂停时长不计入超时）"""
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 5.0
+        if not remaining > 0:
+            remaining = 5.0
+        while remaining > 0:
             if self.tpl_exists("quit_true"):
                 r = self.find_img("quit_true")
                 if r:
@@ -318,7 +369,25 @@ class BaseBot:
                 logger.info(f"点击确认退出（OCR）({pt[0]},{pt[1]})")
                 self.click(*pt)
                 return True
-            time.sleep(0.5)
+            chunk = remaining if remaining < 0.5 else 0.5
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                return False
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return False
         return False
 
     # ---------- 文字识别 ----------
