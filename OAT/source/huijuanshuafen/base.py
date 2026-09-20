@@ -181,7 +181,19 @@ class BaseBot:
         return cx, cy
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, steps: int = 20, step_interval: float = 0.02):
-        """后台拖拽（视角移动 / 列表翻页）"""
+        """后台拖拽（视角移动 / 列表翻页）
+
+        有 backend（模拟器后台）或同步模式时委托 engine.swipe：
+        由 backend 走 NemuIPC/渲染子窗口并做 DPI 换算；其余情况保持原
+        PostMessage 直发链路（PC 桌面版后台）。
+        """
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        if getattr(self.engine, "backend", None) is not None or self.sync_mode:
+            self.engine.swipe(x1, y1, x2, y2,
+                              duration=max(0.05, steps * step_interval),
+                              sync_mode=self.sync_mode)
+            logger.info(f"后台拖拽(swipe) ({x1},{y1}) -> ({x2},{y2})")
+            return
         hwnd = self.hwnd
         if not hwnd or not win32gui.IsWindow(hwnd):
             return
