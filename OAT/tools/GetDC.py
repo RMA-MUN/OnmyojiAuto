@@ -506,6 +506,32 @@ class WindowCapture:
             logger.error(f"图像查找出错: {str(e)}")
             return None
 
+    def find_image_in(self, window_img: np.ndarray, target_image: Union[str, np.ndarray],
+                      threshold: Union[float, int] = None, method: str = "opencv"
+                      ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+        """在给定图像中匹配模板（不截图）
+
+        与 find_image_precise 同一匹配实现，供外部截图通道（如模拟器 backend）复用，
+        保证识别坐标与点击坐标处于同一坐标系。
+        """
+        try:
+            if window_img is None:
+                return None
+            if threshold is None:
+                threshold = settings.FIND_THRESHOLD
+            if isinstance(threshold, (int, float)) and threshold > 1:
+                threshold = threshold / 100.0
+            if method == "opencv":
+                try:
+                    return self._find_image_opencv(window_img, target_image, threshold)
+                except Exception as e:
+                    logger.error(f"OpenCV识别出错: {str(e)}，尝试使用PyScreeze...")
+                    return self._find_image_pyscreeze(window_img, target_image, threshold)
+            return self._find_image_pyscreeze(window_img, target_image, threshold)
+        except Exception as e:
+            logger.error(f"图像查找出错: {str(e)}")
+            return None
+
     def _find_image_opencv(self, window_img: np.ndarray, target_image: Union[str, np.ndarray],
                            threshold: float = 0.8) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
         """使用OpenCV方法查找图像

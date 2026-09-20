@@ -48,6 +48,12 @@ WINDOW_ARRANGE_MODE = settings_data.get('window_arrange_mode', 'diagonal')  # �
 WINDOWS_PER_ROW = settings_data.get('windows_per_row', 3)  # 平铺排列时一行的窗口数量
 # 后台获取图像模式
 BACKEND_GET_IMG_MODE = settings_data.get('capture_window_mode', 'PrintWindow')  # 后台获取图像模式(PrintWindow/BitBlt)
+# 模拟器后台模式（MuMu 免 ADB）
+EMULATOR_TYPE = settings_data.get('emulator_type', 'pc')
+HANDLE_SPEC = settings_data.get('handle_spec', 'auto')
+SCREENSHOT_METHOD = settings_data.get('screenshot_method', 'nemu_ipc')
+CONTROL_METHOD = settings_data.get('control_method', 'window_message')
+MUMU_FOLDER = settings_data.get('mumu_folder', 'E:\\MuMuPlayer')
 
 # 提供更新配置的函数
 def update_settings(key, value):
@@ -100,6 +106,21 @@ def update_settings(key, value):
         elif key == 'capture_window_mode':
             global BACKEND_GET_IMG_MODE
             BACKEND_GET_IMG_MODE = value
+        elif key == 'emulator_type':
+            global EMULATOR_TYPE
+            EMULATOR_TYPE = value
+        elif key == 'handle_spec':
+            global HANDLE_SPEC
+            HANDLE_SPEC = value
+        elif key == 'screenshot_method':
+            global SCREENSHOT_METHOD
+            SCREENSHOT_METHOD = value
+        elif key == 'control_method':
+            global CONTROL_METHOD
+            CONTROL_METHOD = value
+        elif key == 'mumu_folder':
+            global MUMU_FOLDER
+            MUMU_FOLDER = value
         return True
     except Exception as e:
         logger.error(f"保存配置文件失败: {str(e)}")

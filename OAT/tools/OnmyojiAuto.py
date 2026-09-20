@@ -90,6 +90,38 @@ class OnmyojiAutomation:
             except Exception:
                 pass
 
+        # MuMu 后台 backend（单实例；截图沿用 WindowCapture，输入经 backend 路由）
+        self.backend = None
+        try:
+            if settings.EMULATOR_TYPE == "mumu12" and getattr(self, "hwnd", 0):
+                from OAT.tools.emulator.backend import create_backend
+                self.backend = create_backend(
+                    "mumu12",
+                    handle_spec=settings.HANDLE_SPEC,
+                    mumu_folder=settings.MUMU_FOLDER,
+                )
+        except Exception:
+            self.backend = None
+        if self.backend is None and getattr(self, "hwnd", 0):
+            # hwnd 是 MuMu 句柄树根时自动挂模拟器后台（子窗口消息 + IPC），
+            # PC 桌面版窗口不满足句柄树校验，自然回落旧链路
+            try:
+                from OAT.tools.emulator.mumu_handle import build_handle
+                from OAT.tools.emulator.backend import create_backend
+                build_handle(int(self.hwnd), wait_tries=1)
+                self.backend = create_backend(
+                    "mumu12",
+                    handle_spec=int(self.hwnd),
+                    mumu_folder=settings.MUMU_FOLDER,
+                )
+            except Exception:
+                self.backend = None
+        if self.backend is not None and self.synchronizer is not None:
+            try:
+                self.synchronizer.backend = self.backend
+            except Exception:
+                pass
+
         # 窗口矩形缓存
         self._window_rect_cache = None
         self._window_rect_cache_ts = 0.0
@@ -236,12 +268,17 @@ class OnmyojiAutomation:
             start_time = time.time()
             
             try:
-                # 获取窗口截图
+                # 获取窗口截图（backend 优先：与 backend.click 同一坐标系）
                 screenshot = None
-                if self.window_capture:
+                if self.backend is not None:
+                    try:
+                        screenshot = self.backend.screenshot()
+                    except Exception:
+                        screenshot = None
+                if screenshot is None and self.window_capture:
                     # 使用隐藏窗口捕获
                     screenshot = self.window_capture.capture_window()
-                else:
+                elif screenshot is None:
                     # 使用pyautogui截图
                     screenshot = pyautogui.screenshot(region=self.area)
                     # 转换为OpenCV格式
@@ -459,7 +496,15 @@ class OnmyojiAutomation:
                 target_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             
             # 使用设置的识别模式和阈值
-            position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
+            # backend 可用时用同一后端截图（与 backend.click 同一坐标系，IPC 更快）
+            using_backend = self.backend is not None
+            if using_backend:
+                backend_img = self.backend.screenshot()
+                if backend_img is None:
+                    return False
+                position = wc.find_image_in(backend_img, target_image, threshold=threshold, method=self.find_mode)
+            else:
+                position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
             if position:
                 # 确定点击坐标
                 if click_type == "coordinate" and click_area:
@@ -476,28 +521,24 @@ class OnmyojiAutomation:
                     center_y = (y1 + y2) // 2
 
                     # 截图坐标 → 客户区坐标（含标题栏截图才减标题栏，纯客户区截图偏移为0）
-                    try:
-                        # 获取窗口信息（使用缓存）
-                        window_rect, client_rect = self._get_cached_window_rect()
+                    dy = 0
+                    if not using_backend:
+                        try:
+                            # 获取窗口信息（使用缓存）
+                            window_rect, client_rect = self._get_cached_window_rect()
 
-                        # 计算标题栏高度（窗口高度 - 客户区高度）
-                        window_height = window_rect[3] - window_rect[1]
-                        client_height = client_rect[3] - client_rect[1]
-                        title_bar_height = window_height - client_height
-                        shot_h = wc.last_shot_shape[0] if wc.last_shot_shape else client_height
-                        dy = effective_client_dy(shot_h, client_height, title_bar_height)
-
-                        center_y = center_y - dy
-                        y1 = y1 - dy
-                        y2 = y2 - dy
-                        
-                        # 确保坐标在客户区内
-                        center_y = max(0, center_y)
-                        y1 = max(0, y1)
-                        y2 = max(0, y2)
-                    except Exception:
-                        # 如果转换失败，使用原始坐标
-                        pass
+                            # 计算标题栏高度（窗口高度 - 客户区高度）
+                            window_height = window_rect[3] - window_rect[1]
+                            client_height = client_rect[3] - client_rect[1]
+                            title_bar_height = window_height - client_height
+                            shot_h = wc.last_shot_shape[0] if wc.last_shot_shape else client_height
+                            dy = effective_client_dy(shot_h, client_height, title_bar_height)
+                        except Exception:
+                            # 如果转换失败，使用原始坐标
+                            dy = 0
+                    center_y = max(0, center_y - dy)
+                    y1 = max(0, y1 - dy)
+                    y2 = max(0, y2 - dy)
                     
                     # 计算区域的1/3大小作为随机范围，使点击更靠近中心
                     range_x = (x2 - x1) // 3
@@ -585,7 +626,13 @@ class OnmyojiAutomation:
             self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
         else:
             # 非同步模式，使用普通点击方法
-            self.send_click_message(relative_x, relative_y)
+            if getattr(self, "backend", None) is not None:
+                try:
+                    self.backend.click(relative_x, relative_y)
+                except Exception:
+                    self.send_click_message(relative_x, relative_y)
+            else:
+                self.send_click_message(relative_x, relative_y)
 
         # 等待点击操作完成
         time.sleep(random.uniform(1.5, 3.0))

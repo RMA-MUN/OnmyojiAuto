@@ -22,6 +22,7 @@ class WindowSynchronizer:
         self.main_window_hwnd = None
         self.sub_window_hwnd = []
         self.sync_enabled = False
+        self.backend = None  # 可选 EmulatorBackend；命中 instance_hwnds 时路由点击
         # 同步模式：exactly_sync（完全同步）、program_sync（程序同步）、input_sync（键鼠同步）
         self.sync_mode = sync_mode
         # 管道任务同步：记录 PipelineRunner 当前正在执行的任务名
@@ -294,10 +295,18 @@ class WindowSynchronizer:
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
         """
+        backend = getattr(self, "backend", None)
+        if backend is not None:
+            try:
+                if hwnd in backend.instance_hwnds():
+                    backend.click(relative_x, relative_y)
+                    return
+            except Exception:
+                pass
         # 检查窗口是否有效
         if not win32gui.IsWindow(hwnd):
             return
-            
+
         # 组合发送鼠标消息
         self.send_mouse_move(hwnd, relative_x, relative_y)
         

@@ -39,6 +39,7 @@ class OpenCVRecognitionEngine(RecognitionEngine):
         find_mode: str = None,
         synchronizer=None,
         hidden_window: bool = True,
+        backend=None,
     ):
         self.hwnd = hwnd
         self.hidden_window = hidden_window
@@ -47,6 +48,22 @@ class OpenCVRecognitionEngine(RecognitionEngine):
         )
         self.find_mode = find_mode if find_mode else settings.FIND_MODE
         self.synchronizer = synchronizer
+        self.backend = backend
+        if self.backend is None:
+            try:
+                if settings.EMULATOR_TYPE == "mumu12":
+                    from OAT.tools.emulator.backend import create_backend
+                    self.backend = create_backend(
+                        "mumu12",
+                        handle_spec=settings.HANDLE_SPEC,
+                        mumu_folder=settings.MUMU_FOLDER,
+                    )
+            except Exception:
+                self.backend = None
+        if self.backend is None:
+            # hwnd 是 MuMu 句柄树根时自动挂模拟器后台（子窗口消息 + IPC），
+            # PC 桌面版窗口不满足句柄树校验，自然回落旧链路
+            self.backend = self._create_mumu_backend_for_hwnd(hwnd)
 
         # 窗口捕获器（隐藏窗口模式下使用）
         self.window_capture = None
@@ -59,6 +76,23 @@ class OpenCVRecognitionEngine(RecognitionEngine):
     def get_window_rect(self) -> Tuple[int, int, int, int]:
         rect = win32gui.GetClientRect(self.hwnd)
         return (rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1])
+
+    @staticmethod
+    def _create_mumu_backend_for_hwnd(hwnd):
+        """hwnd 通过 MuMu 句柄树校验时创建 MumuBackend；普通窗口返回 None。"""
+        if not hwnd:
+            return None
+        try:
+            from OAT.tools.emulator.mumu_handle import build_handle
+            from OAT.tools.emulator.backend import create_backend
+            build_handle(int(hwnd), wait_tries=1)  # 非 MuMu 树会抛异常
+            return create_backend(
+                "mumu12",
+                handle_spec=int(hwnd),
+                mumu_folder=settings.MUMU_FOLDER,
+            )
+        except Exception:
+            return None
 
     def _get_title_bar_height(self) -> int:
         """计算标题栏高度（窗口高度 - 客户区高度）"""
@@ -81,6 +115,13 @@ class OpenCVRecognitionEngine(RecognitionEngine):
 
     def capture_screenshot(self) -> Optional[np.ndarray]:
         if self.hidden_window:
+            if self.backend is not None:
+                try:
+                    img = self.backend.screenshot()
+                except Exception:
+                    img = None
+                if img is not None:
+                    return img
             if self.window_capture:
                 return self.window_capture.capture_window()
             return None
@@ -174,6 +215,29 @@ class OpenCVRecognitionEngine(RecognitionEngine):
             )
         return RecognitionResult(found=False)
 
+    def _click_postmessage(self, x: int, y: int) -> None:
+        l_param = x | (y << 16)
+        win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param)
+        time.sleep(0.05)
+        win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param)
+        time.sleep(0.2)
+        win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
+
+    def _swipe_postmessage(self, x1: int, y1: int, x2: int, y2: int, duration: float) -> None:
+        try:
+            if not self.hwnd or not win32gui.IsWindow(self.hwnd):
+                return
+            l_param1 = x1 | (y1 << 16)
+            l_param2 = x2 | (y2 << 16)
+            win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param1)
+            win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param1)
+            time.sleep(0.05)
+            win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param2)
+            time.sleep(min(duration, 5.0))
+            win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param2)
+        except Exception:
+            return
+
     def click(self, x: int, y: int, sync_mode: bool = False) -> None:
         """在客户区坐标 (x, y) 处执行点击"""
         # 防御：上游可能传入 float（OCR 坐标），位运算要求 int
@@ -186,13 +250,13 @@ class OpenCVRecognitionEngine(RecognitionEngine):
                 for sub_hwnd, _ in self.synchronizer.get_sub_windows():
                     self.synchronizer.send_click_message(hwnd=sub_hwnd, relative_x=x, relative_y=y)
             else:
-                # 非同步模式：向当前窗口发送 PostMessage
-                l_param = x | (y << 16)
-                win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param)
-                time.sleep(0.05)
-                win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param)
-                time.sleep(0.2)
-                win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param)
+                if self.backend is not None:
+                    try:
+                        self.backend.click(x, y)
+                    except Exception:
+                        self._click_postmessage(x, y)
+                else:
+                    self._click_postmessage(x, y)
         else:
             # 前台模式：客户区坐标 → 屏幕坐标后移动鼠标真实点击
             if sync_mode:
@@ -239,20 +303,13 @@ class OpenCVRecognitionEngine(RecognitionEngine):
                     except Exception:
                         continue
             else:
-                # 非同步模式：向当前窗口发送 PostMessage
-                try:
-                    if not self.hwnd or not win32gui.IsWindow(self.hwnd):
-                        return
-                    l_param1 = x1 | (y1 << 16)
-                    l_param2 = x2 | (y2 << 16)
-                    win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param1)
-                    win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, l_param1)
-                    time.sleep(0.05)
-                    win32gui.PostMessage(self.hwnd, win32con.WM_MOUSEMOVE, 0, l_param2)
-                    time.sleep(min(duration, 5.0))
-                    win32gui.PostMessage(self.hwnd, win32con.WM_LBUTTONUP, 0, l_param2)
-                except Exception:
-                    return
+                if self.backend is not None:
+                    try:
+                        self.backend.swipe(x1, y1, x2, y2, duration)
+                    except Exception:
+                        self._swipe_postmessage(x1, y1, x2, y2, duration)
+                else:
+                    self._swipe_postmessage(x1, y1, x2, y2, duration)
         else:
             # 前台模式：客户区坐标 → 屏幕坐标后真实拖拽
             if sync_mode:
