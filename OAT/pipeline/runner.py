@@ -305,6 +305,7 @@ def create_and_run_pipeline(
     threshold: int = None,
     find_mode: str = None,
     times: int = 1,
+    window_hwnd: int = None,
 ) -> bool:
     """便捷函数：解析配置 → 创建引擎 → 创建运行器 → 执行
 
@@ -318,12 +319,15 @@ def create_and_run_pipeline(
     if find_mode is None:
         find_mode = settings.FIND_MODE
 
-    # 获取窗口句柄
+    # 获取窗口句柄（显式句柄优先：改名/多开场景下比标题可靠）
     hwnd = None
     try:
         import win32gui
 
-        hwnd = win32gui.FindWindow(None, window_title)
+        if window_hwnd and win32gui.IsWindow(int(window_hwnd)):
+            hwnd = int(window_hwnd)
+        if not hwnd:
+            hwnd = win32gui.FindWindow(None, window_title)
     except Exception:
         pass
 

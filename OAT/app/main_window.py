@@ -136,6 +136,9 @@ class AppUI:
 
 
 class MainWindow(FluentWindow):
+    # 后台线程发现客户端后回传 GUI（跨线程信号自动 queued）
+    client_list_ready = QtCore.pyqtSignal(object)
+
     def __init__(self):
         super().__init__()
         self.setMicaEffectEnabled(False)
@@ -174,6 +177,15 @@ class MainWindow(FluentWindow):
 
         self.window_title = "阴阳师-MuMu模拟器专版"
 
+        # 进程发现的客户端选择：selected_hwnd 优先于标题（用户改模拟器名也不受影响）
+        self.selected_client = None
+        self.selected_hwnd = None
+        self._client_item_map = {}
+        self._pending_client_items = None
+        self.client_list_ready.connect(self._apply_client_list)
+        self.ui.client_choose.popup_opened.connect(self.refresh_clients_async)
+        self.ui.client_choose.popup_closed.connect(self._apply_pending_client_list)
+
         self._connect_page_signals()
         self._connect_main_signals()
         self._setup_shortcuts()
@@ -188,6 +200,8 @@ class MainWindow(FluentWindow):
         self.lock = threading.Lock()
 
         self.check_update_silently()
+        # 启动后台刷新一次客户端列表（进程发现，不阻塞 GUI）
+        self.refresh_clients_async()
 
     def _connect_page_signals(self):
         self.ui.settings_page.transparency_changed.connect(self.on_transparency_changed)
@@ -271,9 +285,78 @@ class MainWindow(FluentWindow):
         self._load_theme_qss(theme_str)
 
     def update_window_title(self):
-        selected_client = self.ui.client_choose.currentText()
-        self.window_title = selected_client
-        logger.info(f"选择客户端为:{self.window_title}")
+        selected_label = self.ui.client_choose.currentText()
+        client = getattr(self, '_client_item_map', {}).get(selected_label)
+        if client is not None:
+            # 进程发现项：绑定句柄 + 真实标题（改名/多开场景下可靠）
+            self.selected_client = client
+            self.selected_hwnd = int(client.hwnd) if client.hwnd else None
+            self.window_title = client.title or selected_label
+        else:
+            # 静态标题兜底项：沿用旧标题链路
+            self.selected_client = None
+            self.selected_hwnd = None
+            self.window_title = selected_label
+        logger.info(f"选择客户端为:{selected_label}")
+
+    def refresh_clients_async(self):
+        """后台线程进程发现客户端（模拟器/PC），完成后经信号回 GUI，不阻塞界面。"""
+        def worker():
+            try:
+                from OAT.tools.ClientDiscovery import build_client_items, discover_clients
+                clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+                titles = []
+                try:
+                    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    client_path = os.path.join(script_dir, 'tools', 'client.json')
+                    with open(client_path, 'r', encoding='utf-8') as f:
+                        titles = list(json.load(f).get('title', {}).values())
+                except Exception:
+                    pass
+                self.client_list_ready.emit(build_client_items(clients, titles))
+            except Exception as e:
+                logger.error(f"客户端列表刷新失败: {e}")
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_client_list(self, items):
+        if not items:
+            return
+        try:
+            if self.ui.client_choose.view().isVisible():
+                # 下拉正在展开：暂存，收起后再应用，避免列表被清空打断
+                self._pending_client_items = items
+                return
+        except Exception:
+            pass
+        self._set_client_items(items)
+
+    def _apply_pending_client_list(self):
+        items = self._pending_client_items
+        self._pending_client_items = None
+        if items:
+            self._set_client_items(items)
+
+    def _set_client_items(self, items):
+        """重建下拉条目：按句柄还原之前的选择，无匹配则落到首项。"""
+        combo = self.ui.client_choose
+        prev_hwnd = self.selected_hwnd
+        combo.blockSignals(True)
+        try:
+            combo.clear()
+            for label, _client in items:
+                combo.addItem(label)
+            self._client_item_map = {label: client for label, client in items}
+            target = 0
+            if prev_hwnd is not None:
+                for i, (_label, client) in enumerate(items):
+                    if client is not None and client.hwnd == prev_hwnd:
+                        target = i
+                        break
+            if items:
+                combo.setCurrentIndex(target)
+        finally:
+            combo.blockSignals(False)
+        self.update_window_title()
 
     def refresh_window(self):
         timestamp = self.log_redirect.get_timestamp()
@@ -292,13 +375,15 @@ class MainWindow(FluentWindow):
 
     def window_detection(self, *args):
         logger.info("客户端窗口检测：")
-        automation = OnmyojiAutomation(self.window_title)
+        automation = OnmyojiAutomation(self.window_title, hwnd=getattr(self, 'selected_hwnd', None))
         if automation.is_window_present() is False:
             warning_box("未检测到阴阳师窗口，请先打开游戏")
             return
         automation.print_window_info()
         checker = WindowChecker()
         checker.set_window_title(self.window_title)
+        if getattr(self, 'selected_hwnd', None):
+            checker.set_window_handle(self.selected_hwnd)
         window_size = checker.get_window_info()
         if window_size:
             logger.info(f"当前客户端大小：宽度 {window_size[2][0]}，高度 {window_size[2][1]}")
@@ -385,6 +470,7 @@ class MainWindow(FluentWindow):
                 if self.shutdown_flag:
                     return
             window_title = self.window_title
+            window_hwnd = getattr(self, 'selected_hwnd', None)
             sync_type = getattr(self, 'sync_type', '完全同步')
 
             folder_info = MODE_MAPPING.get(mode)
@@ -421,6 +507,7 @@ class MainWindow(FluentWindow):
             if sub_config:
                 synchronizer = self.sync if hasattr(self, 'sync') else None
                 mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
+                            window_hwnd=window_hwnd,
                             hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
                             sync_mode_value=self.sync_mode_value, explore_per_round=explore_per_round)
             else:

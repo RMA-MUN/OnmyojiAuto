@@ -25,10 +25,18 @@ from ..utils.logging import logger
 
 
 class OnmyojiAutomation:
-    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync", find_mode=None, find_threshold=None):
+    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync", find_mode=None, find_threshold=None, hwnd: int = None):
         self.window_title = window_title
-        # 窗口信息获取与初始化
-        self.hwnd = win32gui.FindWindow(None, window_title)
+        # 窗口信息获取与初始化（显式句柄优先：改名/多开场景下比标题可靠）
+        self.hwnd = 0
+        if hwnd:
+            try:
+                if win32gui.IsWindow(int(hwnd)):
+                    self.hwnd = int(hwnd)
+            except Exception:
+                self.hwnd = 0
+        if not self.hwnd:
+            self.hwnd = win32gui.FindWindow(None, window_title)
         if not self.hwnd:
             logger.error(f"无法找到窗口 {window_title}")
             # 设置默认窗口信息

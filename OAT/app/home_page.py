@@ -23,6 +23,21 @@ mode_json_path = os.path.join(source_dir, 'mode.json')
 mode_config_data = mode_config(mode_json_path) or {}
 
 
+class ClientComboBox(ComboBox):
+    """登录客户端下拉框：打开时通知上层异步刷新（进程发现），关闭时应用暂存结果。"""
+
+    popup_opened = QtCore.pyqtSignal()
+    popup_closed = QtCore.pyqtSignal()
+
+    def showPopup(self):
+        self.popup_opened.emit()
+        super().showPopup()
+
+    def hidePopup(self):
+        super().hidePopup()
+        self.popup_closed.emit()
+
+
 class HomePage(QWidget):
     mode_changed = QtCore.pyqtSignal(str)
     detect_window = QtCore.pyqtSignal()
@@ -95,7 +110,7 @@ class HomePage(QWidget):
         client_label = BodyLabel("选择您的登录客户端")
         card_layout.addWidget(client_label)
 
-        self.client_choose = ComboBox(self)
+        self.client_choose = ClientComboBox(self)
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         client_path = os.path.join(script_dir, 'tools', 'client.json')
         try:

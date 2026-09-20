@@ -43,7 +43,7 @@ def mode_choice(
         mode: str, sub_mode: str, times: int, config: dict,
         window_title: str, hidden_window: bool=False, sync_mode: bool=False,
         synchronizer=None, sync_mode_value: str = "exactly_sync",
-        explore_per_round: int = None
+        explore_per_round: int = None, window_hwnd: int = None
 ):
     try:
         # 调用缓存函数获取路径
@@ -71,6 +71,7 @@ def mode_choice(
                 synchronizer=synchronizer,
                 script_dir=script_dir,
                 config=config,
+                window_hwnd=window_hwnd,
             )
             return
         logger.error(f"未知脚本模式: {script}")
@@ -88,6 +89,8 @@ def mode_choice(
             synchronizer=synchronizer,
             sync_mode_value=sync_mode_value,
             times=times,
+            window_hwnd=window_hwnd,
         )
     else:
-        common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer, sync_mode_value)
+        common_challenge(times, config, script_dir, window_title, hidden_window, sync_mode, synchronizer, sync_mode_value,
+                         window_hwnd=window_hwnd)
