@@ -12,7 +12,7 @@ from .backend import EmulatorBackend
 from .mumu_capture import MumuCapture
 from .mumu_handle import build_handle, is_window
 from .mumu_input import MumuInput
-from .nemu_ipc import NemuIpc, NemuIpcError, NemuIpcIncompatible, find_ipc_dll
+from .nemu_ipc import NemuIpc, find_ipc_dll
 
 
 def is_admin() -> bool:
@@ -26,8 +26,7 @@ class MumuBackend(EmulatorBackend):
     _admin_warned = False
 
     def __init__(self, handle_spec: str = "auto", instance_index: int = 0,
-                 mumu_folder: str = "", ipc_dll_override: str = "",
-                 app_package: str = ""):
+                 mumu_folder: str = "", ipc_dll_override: str = ""):
         from . import mumu_handle as _mh
         if str(handle_spec) == "auto":
             # resolve_auto 返回 HWND；build_handle 校验句柄树
@@ -53,11 +52,10 @@ class MumuBackend(EmulatorBackend):
         self._override = ipc_dll_override
         self._ipc: Optional[NemuIpc] = None
         self._connect_ipc()
-        self._app_package = app_package
         if self._ipc is not None:
             # v6 真前台在 "default" display（如 5）上，不主动解析则停留在桌面 display 0
             try:
-                self._ipc.refresh_display_id((app_package or "").strip() or "default")
+                self._ipc.refresh_display_id("default")
             except Exception:
                 pass
         self.is_elevated = is_admin()
@@ -76,7 +74,7 @@ class MumuBackend(EmulatorBackend):
             ipc = NemuIpc(dll, self._instance_id, self._folder or "E:\\MuMuPlayer")
             ipc.connect()
             self._ipc = ipc
-        except (NemuIpcIncompatible, NemuIpcError, Exception):
+        except Exception:
             self._ipc = None
 
     def reconnect(self) -> None:
@@ -107,6 +105,18 @@ class MumuBackend(EmulatorBackend):
 
     def click(self, x: int, y: int) -> None:
         self._input.click(int(x), int(y))
+
+    def down(self, x: int, y: int) -> None:
+        """拖拽按下（同步器链路用）."""
+        self._input.down(int(x), int(y))
+
+    def move(self, x: int, y: int, pressed: bool = False) -> None:
+        """拖拽移动（同步器链路用）."""
+        self._input.move(int(x), int(y), bool(pressed))
+
+    def up(self, x: int, y: int) -> None:
+        """拖拽抬起（同步器链路用）."""
+        self._input.up(int(x), int(y))
 
     def long_click(self, x: int, y: int, duration: float) -> None:
         self._input.long_click(int(x), int(y), float(duration))

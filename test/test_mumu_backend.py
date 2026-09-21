@@ -36,6 +36,15 @@ class _Inp:
     def swipe(self, x1, y1, x2, y2, duration=0.5):
         self.clicked.append(("swipe", x1, y1, x2, y2))
 
+    def down(self, x, y):
+        self.clicked.append(("down", x, y))
+
+    def move(self, x, y, pressed=False):
+        self.clicked.append(("move", x, y, pressed))
+
+    def up(self, x, y):
+        self.clicked.append(("up", x, y))
+
 
 def _make(monkeypatch):
     monkeypatch.setattr("OAT.tools.emulator.mumu_handle.enum_mumu_windows",
@@ -61,6 +70,15 @@ def test_click_delegates(monkeypatch):
     b = _make(monkeypatch)
     b.click(100, 200)
     assert (100, 200) in b._input.clicked
+
+
+def test_down_move_up_delegate(monkeypatch):
+    """同步器拖拽需要的三个原语转发到 MumuInput。"""
+    b = _make(monkeypatch)
+    b.down(10, 20)
+    b.move(30, 40, pressed=True)
+    b.up(50, 60)
+    assert b._input.clicked == [("down", 10, 20), ("move", 30, 40, True), ("up", 50, 60)]
 
 
 def test_factory_returns_mumu(monkeypatch):

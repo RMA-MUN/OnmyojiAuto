@@ -5,7 +5,6 @@ import threading
 import traceback
 import glob
 from datetime import datetime
-from functools import lru_cache
 
 import cv2
 import win32gui
@@ -18,8 +17,6 @@ from PyQt6.QtWidgets import (
 )
 
 from qfluentwidgets import (
-    ComboBox, PushButton, PrimaryPushButton,
-    InfoBar, InfoBarPosition,
     FluentIcon as FIF, setTheme, Theme, qconfig, FluentWindow,
 )
 
@@ -178,7 +175,6 @@ class MainWindow(FluentWindow):
         self.window_title = "阴阳师-MuMu模拟器专版"
 
         # 进程发现的客户端选择：selected_hwnd 优先于标题（用户改模拟器名也不受影响）
-        self.selected_client = None
         self.selected_hwnd = None
         self._client_item_map = {}
         self._pending_client_items = None
@@ -289,12 +285,10 @@ class MainWindow(FluentWindow):
         client = getattr(self, '_client_item_map', {}).get(selected_label)
         if client is not None:
             # 进程发现项：绑定句柄 + 真实标题（改名/多开场景下可靠）
-            self.selected_client = client
             self.selected_hwnd = int(client.hwnd) if client.hwnd else None
             self.window_title = client.title or selected_label
         else:
             # 静态标题兜底项：沿用旧标题链路
-            self.selected_client = None
             self.selected_hwnd = None
             self.window_title = selected_label
         logger.info(f"选择客户端为:{selected_label}")
@@ -548,16 +542,32 @@ class MainWindow(FluentWindow):
         QtWidgets.QApplication.quit()
 
     def update_window_table(self):
+        """进程发现优先刷新窗口表；一个客户端都没发现才退回按标题枚举。"""
+        rows = []
+        try:
+            from OAT.tools.ClientDiscovery import build_window_rows, discover_clients
+            clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+            rows = build_window_rows(clients)
+        except Exception as e:
+            logger.error(f"进程发现窗口失败：{e}")
+        if not rows:
+            rows = self._enumerate_windows_by_title()
+        self.update_table_with_window_info(rows)
+
+    def _enumerate_windows_by_title(self):
+        """兜底链路：按 client.json 标题枚举（窗口改名后可能失效）。"""
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         client_path = os.path.join(script_dir, 'tools', 'client.json')
         title_list = []
-        with open(client_path, 'r', encoding='utf-8') as file:
-            titles_get = json.load(file)
-            for _, value in titles_get['title'].items():
-                title_list.append(value)
+        try:
+            with open(client_path, 'r', encoding='utf-8') as file:
+                titles_get = json.load(file)
+                for _, value in titles_get['title'].items():
+                    title_list.append(value)
+        except Exception as e:
+            logger.error(f"读取客户端标题失败：{e}")
         window_synchronizer = WindowSynchronizer()
-        window_info = window_synchronizer.get_all_windows(window_titles=title_list)
-        self.update_table_with_window_info(window_info)
+        return window_synchronizer.get_all_windows(window_titles=title_list)
 
     def update_table_with_window_info(self, window_info):
         self.ui.window_table.setRowCount(0)

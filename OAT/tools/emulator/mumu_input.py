@@ -78,7 +78,7 @@ class MumuInput:
             pass
         return int(x), int(y)
 
-    def click(self, x: int, y: int, fast: bool = False) -> None:
+    def click(self, x: int, y: int) -> None:
         if self.ipc is not None:
             ix, iy = self._to_ipc(x, y)
             self.ipc.down(ix, iy)
@@ -92,8 +92,42 @@ class MumuInput:
         t = self._target()
         _send(t, win32con.WM_ACTIVATE, 1, 0)
         _send(t, win32con.WM_LBUTTONDOWN, 0, lp)
-        _sleep(random.uniform(0.01, 0.04) if fast else random.uniform(0.1, 0.2))
+        _sleep(random.uniform(0.1, 0.2))
         _send(t, win32con.WM_LBUTTONUP, 0, lp)
+
+    def down(self, x: int, y: int) -> None:
+        """按下：IPC 走 down；无 IPC 打 control 子句柄（深层）的 WM_LBUTTONDOWN。"""
+        if self.ipc is not None:
+            ix, iy = self._to_ipc(x, y)
+            self.ipc.down(ix, iy)
+            return
+        px, py = phys(self.handle, x, y)
+        t = self._target()
+        _send(t, win32con.WM_ACTIVATE, 1, 0)
+        _send(t, win32con.WM_LBUTTONDOWN, 0, pack_lparam(px, py))
+
+    def move(self, x: int, y: int, pressed: bool = False) -> None:
+        """移动：IPC 只有 down/up，按住时用 down 续点模拟拖拽（悬停 IPC 无能力）。
+
+        无 IPC 时打 WM_MOUSEMOVE，按住带 MK_LBUTTON。
+        """
+        if self.ipc is not None:
+            if not pressed:
+                return
+            ix, iy = self._to_ipc(x, y)
+            self.ipc.down(ix, iy)
+            return
+        px, py = phys(self.handle, x, y)
+        _post(self._target(), win32con.WM_MOUSEMOVE,
+              win32con.MK_LBUTTON if pressed else 0, pack_lparam(px, py))
+
+    def up(self, x: int, y: int) -> None:
+        """抬起：IPC 走 up；无 IPC 打 WM_LBUTTONUP（坐标按 scale 换算）。"""
+        if self.ipc is not None:
+            self.ipc.up()
+            return
+        px, py = phys(self.handle, x, y)
+        _send(self._target(), win32con.WM_LBUTTONUP, 0, pack_lparam(px, py))
 
     def long_click(self, x: int, y: int, duration: float) -> None:
         duration = max(0.0, float(duration))
