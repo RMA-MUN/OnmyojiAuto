@@ -7,7 +7,7 @@ from OAT.utils.do_after_challenge import do_after_challenge
 from OAT.utils.logging import logger
 from OAT.utils.pause_state import is_stale, pause_aware_sleep, wait_if_paused
 from .recognition import RecognitionEngine
-from .task_definition import Task, TaskAction, parse_pipeline
+from .task_definition import Task, parse_pipeline
 
 
 class PipelineRunner:

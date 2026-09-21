@@ -370,15 +370,6 @@ class UpdateGUI(QWidget):
         """
         self.append_operate_log(message)
     
-    def append_update_log(self, message: str) -> None:
-        """
-        追加更新日志并自动滚动到底部
-        :param message: 日志文本
-        :return: None
-        """
-        self.log_text_edit.append(message)
-        self.log_text_edit.verticalScrollBar().setValue(self.log_text_edit.verticalScrollBar().maximum())
-    
     def append_operate_log(self, message: str) -> None:
         """
         追加操作日志并自动滚动到底部

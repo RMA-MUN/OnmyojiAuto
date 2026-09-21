@@ -709,47 +709,6 @@ class HuiJuan(BaseBot):
         logger.warn("等待结界突破界面超时，请确认已进入个人突破界面")
         return False
 
-    def _close_jiejietupo(self) -> None:
-        """关闭结界突破界面（含3胜奖励弹窗处理）
-
-        流程：
-        1. 若有3胜奖励弹窗（宝箱 jiesuan.png）→ 点击领取
-        2. 点击右上角叉号(X)关闭界面（close_region，基准 1920x1080 等比换算）
-        """
-        # 1. 3胜奖励弹窗（宝箱）
-        r = self.find_img("jiesuan", timeout=2)
-        if r:
-            logger.info("检测到3胜奖励，点击宝箱领取")
-            self.click_center(r.region)
-            try:
-                if not pause_aware_sleep(2.0):
-                    try:
-                        logger.info("挑战已停止")
-                    except Exception:
-                        pass
-                    return
-            except Exception:
-                pass
-
-        # 2. 点击右上角叉号关闭
-        r = self.find_img("close_jiejietupo", timeout=3)
-        if r:
-            logger.info("识别到关闭按钮，点击退出")
-            self.click_center(r.region)
-        else:
-            logger.warn("未找到关闭按钮，尝试点击右上角区域")
-            region = tuple(self.config.get("close_region", [1150, 110, 80, 80]))
-            self.click_center(region, jitter_x=10, jitter_y=10)
-        try:
-            if not pause_aware_sleep(2.0):
-                try:
-                    logger.info("挑战已停止")
-                except Exception:
-                    pass
-                return
-        except Exception:
-            pass
-
     def _click_blank(self) -> None:
         """点击空白处消结算界面（随机选左/右侧，避开中部按钮区）"""
         cw, ch = self.client_size()

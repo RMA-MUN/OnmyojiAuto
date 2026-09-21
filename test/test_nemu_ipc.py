@@ -34,12 +34,6 @@ def test_override(tmp_path):
     assert ni.find_ipc_dll("whatever", override=str(dll)) == str(dll)
 
 
-def test_convert_xy():
-    ipc = ni.NemuIpc.__new__(ni.NemuIpc)
-    ipc.height = 720
-    assert ipc.convert_xy(100, 200) == (520, 100)
-
-
 def test_bad_dll_raises():
     try:
         ni.NemuIpc("definitely-not-exist.dll", 0)

@@ -623,10 +623,6 @@ class LogRedirect(QtCore.QObject):
         super().__init__()
         self.text_browser = text_browser
         self.append_log.connect(self._safe_append)
-        # 兼容保留：去重时间阈值（实际去重走全局 display-side 逻辑）
-        self.last_log_message = None
-        self.last_log_time = 0
-        self.log_threshold = 10  # 日志去重时间阈值（秒）
         self._log_level = 'INFO'
         try:
             with _instances_lock:
@@ -760,11 +756,6 @@ class LogRedirect(QtCore.QObject):
                 eff['run_id'] = _RUN_ID
             try:
                 eff['_caller'] = caller
-            except Exception:
-                pass
-            try:
-                self.last_log_message = msg_str
-                self.last_log_time = time.time()
             except Exception:
                 pass
             try:

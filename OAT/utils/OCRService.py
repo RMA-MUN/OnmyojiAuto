@@ -2,8 +2,6 @@
 import threading
 import time
 from typing import Optional, Tuple, List
-import numpy as np
-import cv2
 
 # 导入OCR管理器
 from OAT.tools.OCRManager import OCRManager
@@ -75,46 +73,6 @@ class OCRService:
             return result
         except Exception:
             return False, None, None
-    
-    def find_text_async(self, image_input, target_text: str, callback=None, debug: bool = False):
-        """
-        异步查找文字
-        
-        参数:
-            image_input: 图片文件路径（字符串）或图像对象（numpy数组）
-            target_text: 要查找的目标文字
-            callback: 回调函数，接收识别结果 (found, text_area, real_text)
-            debug: 是否启用调试输出，默认为False
-            
-        返回:
-            threading.Thread: 执行OCR识别的线程对象
-        """
-        def _ocr_task():
-            result = self.find_text(image_input, target_text, debug=debug)
-            if callback:
-                callback(*result)
-        
-        thread = threading.Thread(target=_ocr_task, daemon=True)
-        thread.start()
-        return thread
-    
-    def find_multiple_texts(self, image_input, target_texts: List[str], debug: bool = False) -> List[Tuple[bool, Optional[List[List[float]]], Optional[str]]]:
-        """
-        查找多个目标文字
-        
-        参数:
-            image_input: 图片文件路径（字符串）或图像对象（numpy数组）
-            target_texts: 目标文字列表
-            debug: 是否启用调试输出，默认为False
-            
-        返回:
-            list: 每个目标文字的识别结果列表，格式为 [(found1, area1, text1), (found2, area2, text2), ...]
-        """
-        results = []
-        for text in target_texts:
-            found, area, real_text = self.find_text(image_input, text, debug=debug)
-            results.append((found, area, real_text))
-        return results
     
     def get_text_area_center(self, text_area: List[List[float]]) -> Tuple[float, float]:
         """

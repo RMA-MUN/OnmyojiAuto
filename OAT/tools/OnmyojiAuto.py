@@ -3,12 +3,10 @@ import random
 import threading
 import time
 import traceback
-from functools import lru_cache
 
 import cv2
 import numpy as np
 import pyautogui
-import win32api
 import win32con
 import win32gui
 from PIL import Image
@@ -85,11 +83,6 @@ class OnmyojiAutomation:
         self.default_confidence = threshold_value / 100.0  # 转换为0-1之间的值
         self.image_templates = {}
 
-        # 模拟鼠标移动的参数
-        self.move_duration_range = (0.3, 0.8)  # 移动时长范围（秒）
-        self.jitter_amplitude = 0.5  # 鼠标抖动幅度
-        self.curve_intensity = 5  # 曲线弯曲程度
-        
         # 创建WindowCapture实例，用于隐藏窗口模式
         self.window_capture = None
         if hasattr(self, 'hwnd') and self.hwnd:
@@ -193,13 +186,6 @@ class OnmyojiAutomation:
                 logger.warn(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
                 return False
         return True
-
-    @lru_cache(maxsize=32)
-    def _get_scaled_logo(self, logo: str, scale: float=1.0):
-        """缓存并返回缩放后的图像模板"""
-        # 确保先预加载图像
-        self.preload_image(logo)
-        return logo
 
     def find_img(self, logo: str, use_cache=True) -> bool:
         """图像识别 + 缓存机制"""
@@ -347,26 +333,9 @@ class OnmyojiAutomation:
             logger.error("OCR识别超时")
             return False, None, None
 
-    def _move_mouse(self, x: int, y: int) -> None:
-        """鼠标移动（基础方法，委托共享实现）"""
-        human_click.human_like_move(x, y)
-
     def _win32_double_click(self) -> None:
         """优化的双击操作，减少延迟（委托共享实现）"""
         human_click.win32_double_click()
-
-    def _calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
-        """
-        计算绝对坐标在窗口内的相对位置
-        :param absolute_x: 屏幕绝对X坐标
-        :param absolute_y: 屏幕绝对Y坐标
-        :return: 窗口内的相对坐标(x, y)
-        """
-        rect, _ = self._get_cached_window_rect()
-        window_left, window_top, _, _ = rect
-        relative_x = absolute_x - window_left
-        relative_y = absolute_y - window_top
-        return relative_x, relative_y
 
     def send_click_message(self, relative_x: int, relative_y: int) -> None:
         """
@@ -645,53 +614,6 @@ class OnmyojiAutomation:
         # 等待点击操作完成
         time.sleep(random.uniform(1.5, 3.0))
 
-    def _ease_in_out_cubic(self, t: float) -> float:
-        """
-        缓动函数：模拟移动鼠标的加速/减速过程
-        :param t: 0~1之间的数值，表示移动进度
-        :return: 0~1之间的数值，表示当前进度对应的速度权重
-        """
-        return t * t * (3 - 2 * t) if t <= 1 else 1
-
-    def _generate_bezier_path(self, start: tuple, end: tuple, num_points: int = 50) -> list:
-        """
-        生成简单的曲线路径点（模拟移动鼠标的弯曲轨迹）
-        :param start: 起点坐标 (x, y)
-        :param end: 终点坐标 (x, y)
-        :param num_points: 路径点数量
-        :return: 按顺序排列的路径点列表 [(x,y), (x,y), ...]
-        """
-        path_points = []
-        sx, sy = start
-        ex, ey = end
-        dx, dy = ex - sx, ey - sy
-        
-        # 使用简单的抛物线轨迹
-        for i in range(num_points):
-            t = i / (num_points - 1)
-            # 应用缓动函数
-            eased_t = self._ease_in_out_cubic(t)
-            
-            # 计算当前点坐标
-            x = sx + dx * eased_t
-            y = sy + dy * eased_t
-            
-            # 添加随机偏移，模拟人手抖动
-            x += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
-            y += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
-            
-            path_points.append((round(x), round(y)))
-        
-        return path_points
-
-    def _human_like_move(self, target_x: int, target_y: int) -> None:
-        """
-        核心方法：实现模拟人为的鼠标移动（委托共享实现）
-        :param target_x: 目标X坐标（屏幕绝对坐标）
-        :param target_y: 目标Y坐标（屏幕绝对坐标）
-        """
-        human_click.human_like_move(target_x, target_y)
-
     def _complex_move(self, target_x: int, target_y: int) -> None:
         """
         （委托共享实现，回退路径沿用 self.lock）
@@ -699,8 +621,3 @@ class OnmyojiAutomation:
         :param target_y: 目标Y坐标
         """
         human_click.complex_move(target_x, target_y, self.lock)
-
-    def clear_cache(self):
-        """清除识别缓存"""
-        self.recognition_cache.clear()
-        self._get_scaled_logo.cache_clear()

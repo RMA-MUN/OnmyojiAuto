@@ -42,17 +42,6 @@ def find_ipc_dll(mumu_folder: str, override: str = "") -> Optional[str]:
     return None
 
 
-def serial_to_instance_id(serial: str) -> Optional[int]:
-    try:
-        port = int(str(serial).split(":")[1])
-    except (IndexError, ValueError):
-        return None
-    index, offset = divmod(port - 16384, 32)
-    if 0 <= index < 32 and offset in (0, 1, 2):
-        return index
-    return None
-
-
 class NemuIpc:
     def __init__(self, dll_path: str, instance_id: int, mumu_root: str = ""):
         try:
@@ -86,8 +75,6 @@ class NemuIpc:
         self.width = 0
         self.height = 0
         self.display_id = 0
-        self.app_package = ""
-        self._dll_path = dll_path
         # nemu_connect 要的是安装根目录（如 E:\MuMuPlayer），不是 DLL 所在目录
         self._mumu_root = mumu_root or os.path.dirname(dll_path)
 
@@ -129,7 +116,6 @@ class NemuIpc:
             return self.display_id
         if isinstance(did, int) and did >= 0:
             self.display_id = did
-            self.app_package = pkg
         return self.display_id
 
     def capture(self) -> np.ndarray:
@@ -146,11 +132,6 @@ class NemuIpc:
         if ret > 0:
             raise NemuIpcError("nemu_capture_display failed in capture")
         return np.ctypeslib.as_array(buf).reshape((self.height, self.width, 4))
-
-    def convert_xy(self, x: int, y: int) -> tuple[int, int]:
-        if self.height <= 0:
-            self.get_resolution()
-        return (self.height - int(y), int(x))
 
     def down(self, x: int, y: int, contact: int = 0) -> None:
         """finger 版触摸按下（MAA 同款：contact 从 1 起，原生坐标，无需翻转）"""

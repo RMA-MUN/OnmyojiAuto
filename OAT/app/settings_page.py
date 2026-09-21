@@ -1,20 +1,15 @@
-import os
-import json
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtCore import QUrl
 
 from qfluentwidgets import (
-    ComboBox, Slider, SwitchButton, PushButton,
+    ComboBox, Slider,
     SettingCardGroup, SwitchSettingCard, PushSettingCard,
-    HyperlinkCard, ExpandGroupSettingCard, SettingCard,
+    HyperlinkCard, SettingCard,
     OptionsSettingCard,
     FluentIcon as FIF,
-    InfoBar, InfoBarPosition, SpinBox, LineEdit,
-    CheckBox, RadioButton, PrimaryPushButton,
-    StrongBodyLabel, CaptionLabel, BodyLabel,
+    LineEdit,
+    CaptionLabel, BodyLabel,
     qconfig
 )
 
@@ -31,7 +26,6 @@ class SettingsPage(QWidget):
     sync_mode_changed = QtCore.pyqtSignal(str)
     window_arrange_changed = QtCore.pyqtSignal(str)
     windows_per_row_changed = QtCore.pyqtSignal(int)
-    custom_res_changed = QtCore.pyqtSignal(int, int)
     check_update = QtCore.pyqtSignal()
     clear_cache = QtCore.pyqtSignal()
     open_mode_editor = QtCore.pyqtSignal()

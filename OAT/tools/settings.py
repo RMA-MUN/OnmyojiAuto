@@ -36,13 +36,6 @@ FIND_THRESHOLD = settings_data.get('find_value', 85)
 FIND_THRESHOLD_VALUE = FIND_THRESHOLD / 100.0  # 转换为0-1之间的值
 
 # 其他配置变量
-THEME = settings_data.get('theme', 'light')
-TRANSPARENCY = settings_data.get('transparency', 50)
-CLOSE_PROGRAM_AFTER_CHALLENGE = settings_data.get('close_program_after_challenge', False)
-CLOSE_GAME_AFTER_CHALLENGE = settings_data.get('close_game_after_challenge', False)
-SYNC_MODE = settings_data.get('sync_mode', 'exactly_sync')
-CUSTOM_RES_WIDTH = settings_data.get('custom_res_width', 1404)
-CUSTOM_RES_HEIGHT = settings_data.get('custom_res_height', 834)
 # 窗口排列相关设置
 WINDOW_ARRANGE_MODE = settings_data.get('window_arrange_mode', 'diagonal')  # 窗口排列方式
 WINDOWS_PER_ROW = settings_data.get('windows_per_row', 3)  # 平铺排列时一行的窗口数量
@@ -76,27 +69,6 @@ def update_settings(key, value):
             global FIND_THRESHOLD, FIND_THRESHOLD_VALUE
             FIND_THRESHOLD = value
             FIND_THRESHOLD_VALUE = value / 100.0
-        elif key == 'theme':
-            global THEME
-            THEME = value
-        elif key == 'transparency':
-            global TRANSPARENCY
-            TRANSPARENCY = value
-        elif key == 'close_program_after_challenge':
-            global CLOSE_PROGRAM_AFTER_CHALLENGE
-            CLOSE_PROGRAM_AFTER_CHALLENGE = value
-        elif key == 'close_game_after_challenge':
-            global CLOSE_GAME_AFTER_CHALLENGE
-            CLOSE_GAME_AFTER_CHALLENGE = value
-        elif key == 'sync_mode':
-            global SYNC_MODE
-            SYNC_MODE = value
-        elif key == 'custom_res_width':
-            global CUSTOM_RES_WIDTH
-            CUSTOM_RES_WIDTH = value
-        elif key == 'custom_res_height':
-            global CUSTOM_RES_HEIGHT
-            CUSTOM_RES_HEIGHT = value
         elif key == 'window_arrange_mode':
             global WINDOW_ARRANGE_MODE
             WINDOW_ARRANGE_MODE = value

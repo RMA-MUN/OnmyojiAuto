@@ -8,7 +8,7 @@ from PyQt6.QtGui import QDesktopServices
 from qfluentwidgets import (
     ComboBox, SpinBox, CheckBox, RadioButton,
     PushButton, PrimaryPushButton,
-    CardWidget, BodyLabel, CaptionLabel, StrongBodyLabel,
+    CardWidget, BodyLabel, StrongBodyLabel,
     TextBrowser, TogglePushButton, ProgressBar,
     RoundMenu, Action,
     FluentIcon as FIF
@@ -39,12 +39,6 @@ class ClientComboBox(ComboBox):
 
 
 class HomePage(QWidget):
-    mode_changed = QtCore.pyqtSignal(str)
-    detect_window = QtCore.pyqtSignal()
-    start_challenge = QtCore.pyqtSignal()
-    emergency_stop = QtCore.pyqtSignal()
-    refresh_window = QtCore.pyqtSignal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("home_page")

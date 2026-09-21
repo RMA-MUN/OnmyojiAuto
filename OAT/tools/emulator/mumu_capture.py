@@ -53,10 +53,6 @@ def normalize_to(img: np.ndarray, width: int, height: int) -> np.ndarray:
     return cv2.resize(img, (width, height), interpolation=cv2.INTER_LINEAR)
 
 
-def normalize_to_ref(img: np.ndarray) -> np.ndarray:
-    return normalize_to(img, REF_W, REF_H)
-
-
 class MumuCapture:
     def __init__(self, handle: MumuHandle, ipc: Optional[NemuIpc] = None):
         self.handle = handle
@@ -104,7 +100,7 @@ class MumuCapture:
             return None
         return None if _is_black(img) else img
 
-    def _grab(self, use_printwindow: bool, flag: int = PW_CLIENTONLY) -> Optional[np.ndarray]:
+    def _grab(self, use_printwindow: bool) -> Optional[np.ndarray]:
         hwnd = self.handle.shot_hwnd
         hdc = None
         try:
@@ -122,7 +118,7 @@ class MumuCapture:
                 if use_printwindow:
                     if _PrintWindow is None:
                         return None
-                    img = self._printwindow_grab(hwnd, mem, bmp, w, h, flag)
+                    img = self._printwindow_grab(hwnd, mem, bmp, w, h)
                     if img is None:
                         return None
                     return img
@@ -157,9 +153,9 @@ class MumuCapture:
             return None
 
     @staticmethod
-    def _printwindow_grab(hwnd: int, mem, bmp, w: int, h: int, flag: int) -> Optional[np.ndarray]:
+    def _printwindow_grab(hwnd: int, mem, bmp, w: int, h: int) -> Optional[np.ndarray]:
         """PrintWindow 抓取：CLIENTONLY 可能返回成功但全黑（实测 MuMu），需按黑图回退。"""
-        for f in (flag, PW_RENDERFULLCONTENT if flag == PW_CLIENTONLY else PW_CLIENTONLY):
+        for f in (PW_CLIENTONLY, PW_RENDERFULLCONTENT):
             ok = _PrintWindow(hwnd, mem.GetSafeHdc(), f)
             if not ok:
                 continue

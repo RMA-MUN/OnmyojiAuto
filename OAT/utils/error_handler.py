@@ -1,7 +1,6 @@
 import os
 import sys
 import traceback
-from .warning_box import warning_box
 from .error_box import error_box
 from .logging import logger
 

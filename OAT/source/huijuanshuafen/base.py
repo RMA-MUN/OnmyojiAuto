@@ -154,20 +154,6 @@ class BaseBot:
         except Exception:
             return (0.0, None)
 
-    # ---------- 坐标换算（1920x1080 基准 → 当前客户区） ----------
-
-    def scale_rect(self, rect: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        """等比换算矩形 (x, y, w, h)"""
-        cw, ch = self.client_size()
-        x, y, w, h = rect
-        return (int(x * cw / BASE_W), int(y * ch / BASE_H),
-                int(w * cw / BASE_W), int(h * ch / BASE_H))
-
-    def scale_point(self, x: int, y: int) -> Tuple[int, int]:
-        """等比换算坐标"""
-        cw, ch = self.client_size()
-        return int(x * cw / BASE_W), int(y * ch / BASE_H)
-
     # ---------- 动作（PostMessage 后台模式） ----------
 
     def click(self, x: int, y: int):

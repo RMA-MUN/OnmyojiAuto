@@ -153,36 +153,4 @@ class WindowChecker:
                     if not self.window_handle:
                         return
 
-    # 获取所有窗口
-    @staticmethod
-    def creat_hwnd_list(self) -> list:
-        """
-        获取所有窗口
-        """
-        # 先获取到所有的窗口并存储到一个列表里
-        window_hwnd_of_all = []
-        win32gui.EnumWindows(lambda hwnd, param: param.append(hwnd), window_hwnd_of_all)
-        return window_hwnd_of_all
 
-    # 模糊化查找窗口
-    @staticmethod
-    def find_window_by_title(self, title: str) -> Optional[dict]:
-        """
-        先遍历所有窗口，然后将窗口存储到一个列表中
-        然后根据已知的要查找的窗口标题内的存在的字符串，遍历列表，找到包含该字符串的窗口并返回其句柄等信息
-        """
-        # 先获取到所有的窗口并存储到一个列表里
-        window_list_hwnd = self.creat_hwnd_list()
-        # 将窗口标题转换为字符串
-        window_list_title = [win32gui.GetWindowText(hwnd) for hwnd in window_list_hwnd]
-
-        # 遍历窗口标题列表，查找包含title字符串的窗口标题
-        for window_title in window_list_title:
-            if title in window_title:
-                target_dict = {
-                    'hwnd': window_list_hwnd[window_list_title.index(window_title)],
-                    'title': window_title
-                }
-                return target_dict
-            else:
-                continue

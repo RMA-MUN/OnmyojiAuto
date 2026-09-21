@@ -71,17 +71,6 @@ class WindowCapture:
         self._cooldown_duration = 30.0  # 冷却时间（秒）
         self._last_capture_failure = 0.0  # 上次捕获失败的时间戳
 
-    def reset_cooldown(self):
-        """
-        重置捕获冷却状态，允许重新捕获
-
-        说明：
-            在窗口恢复后调用此方法可以重置冷却状态，
-            使程序能够继续正常的捕获操作
-        """
-        self._capture_cooldown = False
-        self._last_capture_failure = 0.0
-
     def get_window_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
         """获取窗口的位置和尺寸信息"""
         try:
@@ -403,22 +392,6 @@ class WindowCapture:
             # 清理资源
             self._cleanup_resources(hWndDC, mfcDC, saveDC, saveBitMap)
 
-
-    def get_raw_dc(self) -> Optional[int]:
-        """获取原始DC句柄"""
-        try:
-            return win32gui.GetDC(self.hwnd)
-        except Exception as e:
-            logger.error(f"获取DC句柄出错: {str(e)}")
-            return None
-
-    def release_dc(self, hDC: int) -> bool:
-        """释放DC句柄"""
-        try:
-            return win32gui.ReleaseDC(self.hwnd, hDC) == 1
-        except Exception as e:
-            logger.error(f"释放DC句柄出错: {str(e)}")
-            return False
 
     def is_window_minimized(self) -> bool:
         """检查窗口是否最小化"""
