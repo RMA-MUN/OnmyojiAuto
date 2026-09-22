@@ -208,9 +208,13 @@ class WindowCapture:
         Returns:
             成功时返回捕获的图像数组，失败时返回None
         """
-        # 检查冷却状态，如果在冷却期内则直接返回None
+        # 检查冷却状态：超时自动恢复，避免一次失败后永久返回 None
         if self._capture_cooldown:
-            return None
+            import time
+            if time.time() - self._last_capture_failure >= self._cooldown_duration:
+                self._capture_cooldown = False
+            else:
+                return None
 
         # 检查窗口是否最小化
         if self.is_window_minimized():
@@ -258,6 +262,7 @@ class WindowCapture:
         img = capture_by_mode(capture_mode)
         if img is not None and np.mean(img) > 5:
             self.last_shot_shape = img.shape[:2]
+            self._capture_cooldown = False
             return img
 
         # 如果指定模式失败，尝试另一种模式
@@ -266,6 +271,7 @@ class WindowCapture:
         img = capture_by_mode(fallback_mode)
         if img is not None and np.mean(img) > 5:
             self.last_shot_shape = img.shape[:2]
+            self._capture_cooldown = False
             # 永久切换到 fallback_mode 并更新配置
             if settings.BACKEND_GET_IMG_MODE != fallback_mode:
                 logger.info(f"切换到{fallback_mode}模式")
