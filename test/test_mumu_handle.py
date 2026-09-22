@@ -170,3 +170,25 @@ def test_resolve_auto_legacy_title(monkeypatch):
     monkeypatch.setattr(mh, "query_cli_instances", lambda f: {})
     # 优先级顺序 [(100, 模拟器12), (200, 安卓设备)]，取 index 1，无后缀沿用顺序号
     assert mh.resolve_auto(1, "X") == (200, 1)
+
+
+def test_cli_query_suppresses_console(monkeypatch):
+    """mumu-cli 查询必须带 CREATE_NO_WINDOW，否则打包后每次查询闪黑框。"""
+    import json
+    import os
+    import subprocess
+
+    captured = {}
+
+    class _Proc:
+        stdout = json.dumps({"1": {"name": "MuMu模拟器12", "main_wnd": "64"}}).encode()
+
+    def fake_run(args, **kwargs):
+        captured.update(kwargs)
+        return _Proc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(os.path, "isfile", lambda p: "mumu-cli" in str(p))
+    mh.query_cli_instances("E:\MuMuPlayer")
+    mh.query_cli_windows("E:\MuMuPlayer")
+    assert captured.get("creationflags") == subprocess.CREATE_NO_WINDOW
