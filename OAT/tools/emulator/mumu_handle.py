@@ -110,8 +110,10 @@ def query_cli_instances(mumu_folder: str) -> dict[str, int]:
         cli = os.path.join((mumu_folder or "").strip(), "nx_main", "mumu-cli.exe")
         if not os.path.isfile(cli):
             return {}
+        # CREATE_NO_WINDOW：mumu-cli 是控制台程序，GUI 进程下不抑制会闪黑框
         proc = subprocess.run([cli, "info", "--vmindex", "all"],
-                              capture_output=True, timeout=10)
+                              capture_output=True, timeout=10,
+                              creationflags=subprocess.CREATE_NO_WINDOW)
         data = json.loads((proc.stdout or b"").decode("utf-8", "replace"))
     except Exception:
         return {}
@@ -180,8 +182,10 @@ def query_cli_windows(mumu_folder: str) -> list[tuple[int, int, str]]:
         cli = os.path.join((mumu_folder or "").strip(), "nx_main", "mumu-cli.exe")
         if not os.path.isfile(cli):
             return []
+        # CREATE_NO_WINDOW：mumu-cli 是控制台程序，GUI 进程下不抑制会闪黑框
         proc = subprocess.run([cli, "info", "--vmindex", "all"],
-                              capture_output=True, timeout=10)
+                              capture_output=True, timeout=10,
+                              creationflags=subprocess.CREATE_NO_WINDOW)
         data = json.loads((proc.stdout or b"").decode("utf-8", "replace"))
     except Exception:
         return []
