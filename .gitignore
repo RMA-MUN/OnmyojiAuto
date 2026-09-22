@@ -12,6 +12,9 @@ __pycache__/
 *$py.class
 main.build
 main.dist
+*.build/
+*.dist/
+OAT_Updater_Build/
 
 # PyInstaller生成文件
 build/
