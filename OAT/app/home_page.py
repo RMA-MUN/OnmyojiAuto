@@ -24,18 +24,24 @@ mode_config_data = mode_config(mode_json_path) or {}
 
 
 class ClientComboBox(ComboBox):
-    """登录客户端下拉框：打开时通知上层异步刷新（进程发现），关闭时应用暂存结果。"""
+    """登录客户端下拉框：拉开时通知上层异步刷新（进程发现），收起后应用暂存结果。
+
+    注意 qfluentwidgets.ComboBox 是 QPushButton 套壳，不走原生
+    showPopup/hidePopup，而是经 _showComboMenu() 弹自定义菜单
+    （menu.exec 模态，返回即代表菜单已关闭），所以钩这里。
+    """
 
     popup_opened = QtCore.pyqtSignal()
     popup_closed = QtCore.pyqtSignal()
 
-    def showPopup(self):
+    def _showComboMenu(self):
+        if not self.items:
+            return
         self.popup_opened.emit()
-        super().showPopup()
-
-    def hidePopup(self):
-        super().hidePopup()
-        self.popup_closed.emit()
+        try:
+            super()._showComboMenu()
+        finally:
+            self.popup_closed.emit()
 
 
 class HomePage(QWidget):

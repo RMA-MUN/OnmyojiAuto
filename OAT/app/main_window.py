@@ -178,8 +178,9 @@ class MainWindow(FluentWindow):
         self.selected_hwnd = None
         self._client_item_map = {}
         self._pending_client_items = None
+        self._client_popup_open = False
         self.client_list_ready.connect(self._apply_client_list)
-        self.ui.client_choose.popup_opened.connect(self.refresh_clients_async)
+        self.ui.client_choose.popup_opened.connect(self._on_client_popup_opened)
         self.ui.client_choose.popup_closed.connect(self._apply_pending_client_list)
 
         self._connect_page_signals()
@@ -196,7 +197,7 @@ class MainWindow(FluentWindow):
         self.lock = threading.Lock()
 
         self.check_update_silently()
-        # 启动后台刷新一次客户端列表（进程发现，不阻塞 GUI）
+        # 启动后台刷新一次客户端列表（进程发现，不阻塞 GUI）；之后每次拉开下拉再刷
         self.refresh_clients_async()
 
     def _connect_page_signals(self):
@@ -312,19 +313,22 @@ class MainWindow(FluentWindow):
                 logger.error(f"客户端列表刷新失败: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
+    def _on_client_popup_opened(self):
+        """下拉拉开：标记菜单状态并触发一次进程发现。"""
+        self._client_popup_open = True
+        self.refresh_clients_async()
+
     def _apply_client_list(self, items):
         if not items:
             return
-        try:
-            if self.ui.client_choose.view().isVisible():
-                # 下拉正在展开：暂存，收起后再应用，避免列表被清空打断
-                self._pending_client_items = items
-                return
-        except Exception:
-            pass
+        if getattr(self, "_client_popup_open", False):
+            # 下拉菜单正开着：暂存，收起后再应用，避免重建打断菜单
+            self._pending_client_items = items
+            return
         self._set_client_items(items)
 
     def _apply_pending_client_list(self):
+        self._client_popup_open = False
         items = self._pending_client_items
         self._pending_client_items = None
         if items:
