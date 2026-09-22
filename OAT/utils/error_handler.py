@@ -9,7 +9,10 @@ LOGS_DIR = 'logs'
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
-# 日志文件路径见 OAT.utils.logging（file sink 按天轮转），此处统一用 logger
+# 日志文件路径见 OAT.utils.logging（file sink 按天轮转）；main_window 从本模块导入 LOG_FILE，保持再导出
+from .logging import LOG_FILE  # noqa: F401  (re-export for OAT.app.main_window)
+
+__all__ = ["LOG_FILE", "handle_global_exception", "log_exception", "log_error", "setup_global_exception_handler"]
 
 
 def handle_global_exception(e: Exception, window=None):
