@@ -8,7 +8,7 @@ import pyautogui
 import win32gui
 import win32con
 
-from OAT.tools.GetDC import WindowCapture, effective_client_dy
+from OAT.tools.GetDC import WindowCapture, effective_client_dy, warn_minimized_capture
 from OAT.tools import settings
 from OAT.tools.human_click import foreground_click, human_drag
 from OAT.utils.OCRService import ocr_service
@@ -128,6 +128,10 @@ class OpenCVRecognitionEngine(RecognitionEngine):
         # 前台模式：截取窗口矩形区域
         try:
             if not self.hwnd or not win32gui.IsWindow(self.hwnd):
+                return None
+            # 桌面版客户端最小化后系统不再出图，截到的是无效区域；统一弹窗提示
+            if win32gui.IsIconic(self.hwnd):
+                warn_minimized_capture()
                 return None
             left, top, right, bottom = win32gui.GetWindowRect(self.hwnd)
             w, h = right - left, bottom - top

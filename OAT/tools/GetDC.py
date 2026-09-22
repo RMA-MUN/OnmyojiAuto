@@ -20,6 +20,27 @@ if not hasattr(win32con, 'CAPTUREBLT'):
 PW_CLIENTONLY = 1  # 只捕获客户区
 PW_RENDERFULLCONTENT = 2  # 捕获完整内容，包括被遮挡部分
 
+# 客户端最小化时的统一提示文案：PC 桌面版窗口最小化后系统不再出图，GDI 截图拿不到内容
+MINIMIZED_CAPTURE_TIP = "无法在客户端最小化的情况下捕获窗口内容，请恢复窗口后再操作。"
+
+# 统一弹窗节流间隔（秒）：识别循环每帧都会尝试截图，避免弹窗堆叠
+_MINIMIZE_WARN_INTERVAL = 30.0
+_minimize_warn_ts = 0.0
+
+
+def warn_minimized_capture() -> None:
+    """客户端最小化提示弹窗（全局节流），供各截图链路复用。"""
+    global _minimize_warn_ts
+    import time
+    now = time.time()
+    if now - _minimize_warn_ts < _MINIMIZE_WARN_INTERVAL:
+        return
+    _minimize_warn_ts = now
+    try:
+        warning_box(MINIMIZED_CAPTURE_TIP)
+    except Exception as e:
+        logger.error(f"显示错误弹窗失败: {e}")
+
 
 def effective_client_dy(shot_h: int, client_h: int, title_bar: int) -> int:
     """截图顶部应跳过的行数（标题栏自适应）
@@ -135,7 +156,7 @@ class WindowCapture:
         try:
             # 确保窗口可见
             if win32gui.IsIconic(self.hwnd):
-                warning_box("窗口最小化，无法使用BitBlt捕获")
+                warn_minimized_capture()
                 return None
 
             # 重新获取客户区尺寸
@@ -231,12 +252,9 @@ class WindowCapture:
             self._last_capture_failure = current_time
             self._capture_cooldown = True
 
-            # 弹窗提醒用户
-            try:
-                warning_box("窗口处于最小化状态，无法捕获图像，请恢复窗口后再操作。")
-            except Exception as e:
-                logger.error(f"显示错误弹窗失败: {e}")
-            
+            # 弹窗提醒用户（统一文案 + 全局节流）
+            warn_minimized_capture()
+
             return None
 
         # 如果未指定捕获模式，使用配置文件中的设置

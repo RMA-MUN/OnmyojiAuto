@@ -12,7 +12,7 @@ import win32gui
 from PIL import Image
 
 from .WindowSynchronizer import WindowSynchronizer
-from .GetDC import WindowCapture, effective_client_dy
+from .GetDC import WindowCapture, effective_client_dy, warn_minimized_capture
 from . import human_click
 # 导入整个settings模块，而不是单个变量
 from . import settings
@@ -273,6 +273,11 @@ class OnmyojiAutomation:
                     # 使用隐藏窗口捕获
                     screenshot = self.window_capture.capture_window()
                 elif screenshot is None:
+                    # 客户端最小化时屏幕截图同样截不到内容，统一提示后按未识别处理
+                    if self.hwnd and win32gui.IsIconic(self.hwnd):
+                        warn_minimized_capture()
+                        result_queue.put((False, None, None))
+                        return
                     # 使用pyautogui截图
                     screenshot = pyautogui.screenshot(region=self.area)
                     # 转换为OpenCV格式
@@ -535,6 +540,10 @@ class OnmyojiAutomation:
 
     def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool, click_type: str = "image", click_area: list = None) -> bool:
         """使用常规模式执行操作"""
+        # 桌面版客户端最小化后系统不再出图，前台识别必然落空；统一弹窗提示（30s 节流）
+        if self.hwnd and win32gui.IsIconic(self.hwnd):
+            warn_minimized_capture()
+            return False
         found = self.find_img(logo)
         if not found:
             return False

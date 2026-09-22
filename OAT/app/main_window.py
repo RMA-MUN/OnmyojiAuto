@@ -431,8 +431,8 @@ class MainWindow(FluentWindow):
             hidden_window = True
             logger.info("=" * 50)
             logger.info("       已启用后台运行模式      ")
-            logger.info("  后台模式只要不将窗口最小化就不会影响程序的运行")
-            logger.info("     后台模式不支持模拟器，请前往桌面版使用    ")
+            logger.info("  桌面版客户端：窗口可遮挡但不可最小化，最小化将无法截取画面  ")
+            logger.info("  MuMu 模拟器：支持完全最小化运行（IPC 后台通道）  ")
             logger.info("=" * 50)
         else:
             hidden_window = False
@@ -596,20 +596,41 @@ class MainWindow(FluentWindow):
         self.ui.window_table.show()
         logger.info("表格已刷新")
 
+    def _capture_preview_frame(self, hwnd: int):
+        """预览取图：MuMu 句柄树校验通过走后台通道（PrintWindow→IPC→BitBlt，最小化可预览），
+        其余窗口回落 GetDC 窗口截图（最小化时由链路内统一弹窗提示）。"""
+        try:
+            from OAT.tools.emulator.backend import create_backend
+            from OAT.tools.emulator.mumu_handle import build_handle
+            build_handle(int(hwnd), wait_tries=1)  # 非 MuMu 句柄树会抛异常
+            backend = create_backend(
+                "mumu12",
+                handle_spec=int(hwnd),
+                mumu_folder=getattr(settings, 'MUMU_FOLDER', '') or '',
+            )
+            try:
+                img = backend.screenshot()
+                if img is not None:
+                    return img
+            finally:
+                backend.close()
+        except Exception as e:
+            logger.info(f"窗口 {hwnd} 不走 MuMu 后台通道：{e}")
+        return WindowCapture(hwnd=int(hwnd)).capture_window()
+
     def preview_window(self, hwnd, title):
         try:
             screenshot_dir = os.path.join('logs', 'screen_shot')
             if not os.path.exists(screenshot_dir):
                 os.makedirs(screenshot_dir)
-            window_capture = WindowCapture(hwnd=hwnd)
-            img = window_capture.capture_window()
+            img = self._capture_preview_frame(hwnd)
             if img is not None:
                 temp_file_path = os.path.join(screenshot_dir, f"window_preview_{hwnd}.png")
                 cv2.imwrite(temp_file_path, img)
                 self.show_preview_dialog(title, temp_file_path)
             else:
+                # 截图链路内部已对最小化/失败弹窗提示，这里只记日志避免双弹窗
                 logger.error(f"无法捕获窗口 {title} ({hwnd}) 的图像")
-                self.show_error_message("截图失败", "无法捕获窗口图像")
         except Exception as e:
             logger.error(f"预览窗口时出错: {str(e)}")
             self.show_error_message("预览错误", f"发生错误: {str(e)}")
