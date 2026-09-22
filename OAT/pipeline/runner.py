@@ -312,7 +312,6 @@ def create_and_run_pipeline(
     供 source/__init__.py 中的 mode_choice() 调用。
     """
     from OAT.tools import settings
-    from OAT.tools.GetDC import WindowCapture
 
     if threshold is None:
         threshold = settings.FIND_THRESHOLD

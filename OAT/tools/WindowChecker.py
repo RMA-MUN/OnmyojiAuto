@@ -138,8 +138,8 @@ class WindowChecker:
         if current_size:
             current_width, current_height = current_size[2]
             if current_width != target_width or current_height != target_height:
-                # 尝试调整窗口大小，但不强制要求成功
-                resize_success = self.resize_window(target_width, target_height)
+                # 尝试调整窗口大小，但不强制要求成功（结果以后续实际尺寸为准）
+                self.resize_window(target_width, target_height)
                 
                 # 检查调整后的尺寸
                 updated_size = self.get_window_info()
