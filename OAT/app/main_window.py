@@ -138,6 +138,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
+        self.resize(840, 720)
         self.setMicaEffectEnabled(False)
         self.ui = AppUI(self)
 
