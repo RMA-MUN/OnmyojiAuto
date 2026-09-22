@@ -133,6 +133,23 @@ class ExploreManager(BaseBot):
                     pass
                 return False
 
+            # 全局识别：战斗轮询中冒出的关闭钮也先点掉，本 tick 跳过
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    remaining -= 0.5
+                    continue
+            except Exception:
+                pass
+
             # 结束按钮
             r = self.find_img("jieshu", timeout=1)
             if r:
@@ -538,6 +555,21 @@ class ExploreManager(BaseBot):
                     except Exception:
                         pass
                     return False
+            except Exception:
+                pass
+            # 全局识别：任何场景冒出的关闭钮都先点掉，本 tick 跳过状态分支
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    continue
             except Exception:
                 pass
             scene = self._detect_scene()

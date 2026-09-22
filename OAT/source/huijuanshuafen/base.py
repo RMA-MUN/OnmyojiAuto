@@ -35,6 +35,9 @@ CHAPTER28_PANEL_FRAC = (0.55, 0.10, 0.45, 0.80)
 # k28 模板匹配阈值（2026-09-06 ch28-miss 取证：面板内最高分 0.897，默认 0.90 漏检）
 CHAPTER28_K28_THRESHOLD = 0.85
 
+# 全局识别：任何场景下出现都要无条件点掉的弹窗（对标 common_challenge is_global）
+GLOBAL_POPUPS = ("global_xiezhu",)
+
 
 def load_templates(images_dir: str) -> dict:
     """从 images/templates.json 加载全部模板映射（templates + breakthrough 两段合并）"""
@@ -295,6 +298,28 @@ class BaseBot:
             if result is not None and result.found:
                 return result
         return None
+
+    def check_global_popup(self) -> bool:
+        """全局识别：命中任一全局模板就点中心并返回 True；永不抛异常"""
+        try:
+            for name in GLOBAL_POPUPS:
+                try:
+                    r = self.find_img(name, timeout=0)
+                except Exception:
+                    continue
+                if r:
+                    try:
+                        self.click_center(r.region)
+                    except Exception:
+                        return False
+                    try:
+                        logger.info(f"全局识别: 已点击 {name}")
+                    except Exception:
+                        pass
+                    return True
+            return False
+        except Exception:
+            return False
 
     def find_dialog_confirm(self):
         """找'确认退出'类弹窗的确认按钮（OCR精确匹配，返回客户区坐标或None）

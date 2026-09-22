@@ -887,6 +887,21 @@ class HuiJuan(BaseBot):
                     return False
             except Exception:
                 pass
+            # 全局识别：任何场景冒出的关闭钮都先点掉，本 tick 跳过正常流程
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    continue
+            except Exception:
+                pass
             logger.info(f"{'=' * 40}")
             logger.info(f"绘卷刷分 第 {r + 1}/{self.rounds} 轮（每轮探索{self.explore_count}次）")
             logger.info(f"{'=' * 40}")
