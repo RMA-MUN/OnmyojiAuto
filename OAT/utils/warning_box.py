@@ -1,6 +1,5 @@
-import sys
-from PyQt6.QtWidgets import QMessageBox, QApplication
-from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from OAT.utils.logging import logger
 

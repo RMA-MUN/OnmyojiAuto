@@ -9,5 +9,10 @@
   "custom_res_width": 1404,
   "custom_res_height": 834,
   "window_arrange_mode": "diagonal",
-  "capture_window_mode": "PrintWindow"
+  "capture_window_mode": "PrintWindow",
+  "emulator_type": "pc",
+  "handle_spec": "auto",
+  "screenshot_method": "nemu_ipc",
+  "control_method": "window_message",
+  "mumu_folder": "E:\\MuMuPlayer"
 }

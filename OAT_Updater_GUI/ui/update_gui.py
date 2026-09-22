@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, 
     QTextEdit, QPushButton, QMessageBox
 )
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QProcess
 from PyQt6.QtGui import QFont, QPixmap, QIcon
 
 from OAT.utils.markdown_to_html import markdown_to_html
@@ -19,6 +19,22 @@ try:
     from OAT.tools.settings import APP_VERSION
 except:
     APP_VERSION = "v1.9.0"
+
+
+def resolve_oat_exe(cwd: str, exe_dir: str):
+    """解析 OAT.exe 路径：安装目录（cwd）优先，更新程序自身所在目录兜底。
+
+    更新程序运行时 cwd 即安装目录（见 UpdateWorker.install_files）；
+    打包后 sys.executable 所在目录也是安装目录，双保险。
+    找不到返回 None。
+    """
+    for d in (cwd, exe_dir):
+        if not d:
+            continue
+        cand = os.path.join(d, "OAT.exe")
+        if os.path.isfile(cand):
+            return cand
+    return None
 
 
 class UpdateGUI(QWidget):
@@ -284,6 +300,30 @@ class UpdateGUI(QWidget):
         self.start_button.clicked.connect(self.start_update)
         button_layout.addWidget(self.start_button)
 
+        # 启动 OAT 按钮（更新完成后可用）
+        self.launch_button = QPushButton("启动 OAT")
+        self.launch_button.setMinimumWidth(120)
+        self.launch_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #388E3C;
+            }
+            QPushButton:disabled {
+                background-color: #BDBDBD;
+            }
+        """)
+        self.launch_button.setEnabled(False)
+        self.launch_button.clicked.connect(self.launch_oat)
+        button_layout.addWidget(self.launch_button)
+
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
@@ -370,15 +410,6 @@ class UpdateGUI(QWidget):
         """
         self.append_operate_log(message)
     
-    def append_update_log(self, message: str) -> None:
-        """
-        追加更新日志并自动滚动到底部
-        :param message: 日志文本
-        :return: None
-        """
-        self.log_text_edit.append(message)
-        self.log_text_edit.verticalScrollBar().setValue(self.log_text_edit.verticalScrollBar().maximum())
-    
     def append_operate_log(self, message: str) -> None:
         """
         追加操作日志并自动滚动到底部
@@ -395,8 +426,26 @@ class UpdateGUI(QWidget):
         """
         self.status_value_label.setText("更新完成")
         self.status_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-        self.op_log_text_edit.append("更新完成！请重新启动应用程序。")
-        QMessageBox.information(self, "完成", "更新完成！请重新启动应用程序。")
+        self.op_log_text_edit.append("更新完成！点击「启动 OAT」可直接启动应用程序。")
+        self.launch_button.setEnabled(True)
+        QMessageBox.information(self, "完成", "更新完成！点击「启动 OAT」可直接启动应用程序。")
+
+    def launch_oat(self):
+        """
+        更新完成后启动 OAT 主程序，启动后关闭更新程序
+        :return: None
+        """
+        exe_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.getcwd()
+        oat_path = resolve_oat_exe(os.getcwd(), exe_dir)
+        if not oat_path:
+            QMessageBox.warning(self, "提示", "未找到 OAT.exe，请手动启动。")
+            return
+        ok, _pid = QProcess.startDetached(oat_path, [], os.path.dirname(oat_path))
+        if not ok:
+            QMessageBox.warning(self, "提示", "启动 OAT 失败，请手动启动。")
+            return
+        self.op_log_text_edit.append("已启动 OAT，更新程序即将退出。")
+        self.close()
 
     def update_error(self, error_msg):
         """

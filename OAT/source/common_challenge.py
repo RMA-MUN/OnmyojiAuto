@@ -41,7 +41,8 @@ class CommonChallenge:
                  synchronizer=None,  # 同步器实例
                  sync_mode_value: str = "exactly_sync",  # 同步模式值
                  threshold: int = None,
-                 find_mode: str = None):
+                 find_mode: str = None,
+                 window_hwnd: int = None):
         self.times = times
         self.config = config
         self.script_dir = script_dir
@@ -52,6 +53,7 @@ class CommonChallenge:
         self.sync_mode_value = sync_mode_value
         self.threshold = threshold
         self.find_mode = find_mode
+        self.window_hwnd = window_hwnd
         self.automation_obj = None
         self.image_paths = {}
         self.image_info = {}
@@ -63,7 +65,7 @@ class CommonChallenge:
             self.find_mode = settings.FIND_MODE
         
         # 初始化自动化对象
-        self.automation_obj = OnmyojiAutomation(self.window_title, self.synchronizer, self.sync_mode_value, self.find_mode, self.threshold)
+        self.automation_obj = OnmyojiAutomation(self.window_title, self.synchronizer, self.sync_mode_value, self.find_mode, self.threshold, hwnd=self.window_hwnd)
         
         # 预加载图像
         self._preload_images()
@@ -357,7 +359,8 @@ def common_challenge(
         synchronizer=None, # 同步器实例
         sync_mode_value: str = "exactly_sync", # 同步模式值
         threshold: int = None,
-        find_mode: str = None
+        find_mode: str = None,
+        window_hwnd: int = None
 ) -> bool:
     """
     兼容原有函数接口的封装函数
@@ -387,6 +390,7 @@ def common_challenge(
         synchronizer=synchronizer,
         sync_mode_value=sync_mode_value,
         threshold=threshold,
-        find_mode=find_mode
+        find_mode=find_mode,
+        window_hwnd=window_hwnd
     )
     return challenge.run()

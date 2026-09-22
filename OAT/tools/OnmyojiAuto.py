@@ -3,18 +3,16 @@ import random
 import threading
 import time
 import traceback
-from functools import lru_cache
 
 import cv2
 import numpy as np
 import pyautogui
-import win32api
 import win32con
 import win32gui
 from PIL import Image
 
 from .WindowSynchronizer import WindowSynchronizer
-from .GetDC import WindowCapture, effective_client_dy
+from .GetDC import WindowCapture, effective_client_dy, warn_minimized_capture
 from . import human_click
 # 导入整个settings模块，而不是单个变量
 from . import settings
@@ -25,10 +23,18 @@ from ..utils.logging import logger
 
 
 class OnmyojiAutomation:
-    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync", find_mode=None, find_threshold=None):
+    def __init__(self, window_title: str, synchronizer=None, sync_mode: str = "exactly_sync", find_mode=None, find_threshold=None, hwnd: int = None):
         self.window_title = window_title
-        # 窗口信息获取与初始化
-        self.hwnd = win32gui.FindWindow(None, window_title)
+        # 窗口信息获取与初始化（显式句柄优先：改名/多开场景下比标题可靠）
+        self.hwnd = 0
+        if hwnd:
+            try:
+                if win32gui.IsWindow(int(hwnd)):
+                    self.hwnd = int(hwnd)
+            except Exception:
+                self.hwnd = 0
+        if not self.hwnd:
+            self.hwnd = win32gui.FindWindow(None, window_title)
         if not self.hwnd:
             logger.error(f"无法找到窗口 {window_title}")
             # 设置默认窗口信息
@@ -77,16 +83,43 @@ class OnmyojiAutomation:
         self.default_confidence = threshold_value / 100.0  # 转换为0-1之间的值
         self.image_templates = {}
 
-        # 模拟鼠标移动的参数
-        self.move_duration_range = (0.3, 0.8)  # 移动时长范围（秒）
-        self.jitter_amplitude = 0.5  # 鼠标抖动幅度
-        self.curve_intensity = 5  # 曲线弯曲程度
-        
         # 创建WindowCapture实例，用于隐藏窗口模式
         self.window_capture = None
         if hasattr(self, 'hwnd') and self.hwnd:
             try:
                 self.window_capture = WindowCapture(hwnd=self.hwnd)
+            except Exception:
+                pass
+
+        # MuMu 后台 backend（单实例；截图沿用 WindowCapture，输入经 backend 路由）
+        self.backend = None
+        try:
+            if settings.EMULATOR_TYPE == "mumu12" and getattr(self, "hwnd", 0):
+                from OAT.tools.emulator.backend import create_backend
+                self.backend = create_backend(
+                    "mumu12",
+                    handle_spec=settings.HANDLE_SPEC,
+                    mumu_folder=settings.MUMU_FOLDER,
+                )
+        except Exception:
+            self.backend = None
+        if self.backend is None and getattr(self, "hwnd", 0):
+            # hwnd 是 MuMu 句柄树根时自动挂模拟器后台（子窗口消息 + IPC），
+            # PC 桌面版窗口不满足句柄树校验，自然回落旧链路
+            try:
+                from OAT.tools.emulator.mumu_handle import build_handle
+                from OAT.tools.emulator.backend import create_backend
+                build_handle(int(self.hwnd), wait_tries=1)
+                self.backend = create_backend(
+                    "mumu12",
+                    handle_spec=int(self.hwnd),
+                    mumu_folder=settings.MUMU_FOLDER,
+                )
+            except Exception:
+                self.backend = None
+        if self.backend is not None and self.synchronizer is not None:
+            try:
+                self.synchronizer.backend = self.backend
             except Exception:
                 pass
 
@@ -153,13 +186,6 @@ class OnmyojiAutomation:
                 logger.warn(f"警告：预加载图像 {logo_path} 失败：{str(e)}")
                 return False
         return True
-
-    @lru_cache(maxsize=32)
-    def _get_scaled_logo(self, logo: str, scale: float=1.0):
-        """缓存并返回缩放后的图像模板"""
-        # 确保先预加载图像
-        self.preload_image(logo)
-        return logo
 
     def find_img(self, logo: str, use_cache=True) -> bool:
         """图像识别 + 缓存机制"""
@@ -236,12 +262,22 @@ class OnmyojiAutomation:
             start_time = time.time()
             
             try:
-                # 获取窗口截图
+                # 获取窗口截图（backend 优先：与 backend.click 同一坐标系）
                 screenshot = None
-                if self.window_capture:
+                if self.backend is not None:
+                    try:
+                        screenshot = self.backend.screenshot()
+                    except Exception:
+                        screenshot = None
+                if screenshot is None and self.window_capture:
                     # 使用隐藏窗口捕获
                     screenshot = self.window_capture.capture_window()
-                else:
+                elif screenshot is None:
+                    # 客户端最小化时屏幕截图同样截不到内容，统一提示后按未识别处理
+                    if self.hwnd and win32gui.IsIconic(self.hwnd):
+                        warn_minimized_capture()
+                        result_queue.put((False, None, None))
+                        return
                     # 使用pyautogui截图
                     screenshot = pyautogui.screenshot(region=self.area)
                     # 转换为OpenCV格式
@@ -302,26 +338,9 @@ class OnmyojiAutomation:
             logger.error("OCR识别超时")
             return False, None, None
 
-    def _move_mouse(self, x: int, y: int) -> None:
-        """鼠标移动（基础方法，委托共享实现）"""
-        human_click.human_like_move(x, y)
-
     def _win32_double_click(self) -> None:
         """优化的双击操作，减少延迟（委托共享实现）"""
         human_click.win32_double_click()
-
-    def _calc_relative_position(self, absolute_x: int, absolute_y: int) -> tuple:
-        """
-        计算绝对坐标在窗口内的相对位置
-        :param absolute_x: 屏幕绝对X坐标
-        :param absolute_y: 屏幕绝对Y坐标
-        :return: 窗口内的相对坐标(x, y)
-        """
-        rect, _ = self._get_cached_window_rect()
-        window_left, window_top, _, _ = rect
-        relative_x = absolute_x - window_left
-        relative_y = absolute_y - window_top
-        return relative_x, relative_y
 
     def send_click_message(self, relative_x: int, relative_y: int) -> None:
         """
@@ -459,7 +478,15 @@ class OnmyojiAutomation:
                 target_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             
             # 使用设置的识别模式和阈值
-            position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
+            # backend 可用时用同一后端截图（与 backend.click 同一坐标系，IPC 更快）
+            using_backend = self.backend is not None
+            if using_backend:
+                backend_img = self.backend.screenshot()
+                if backend_img is None:
+                    return False
+                position = wc.find_image_in(backend_img, target_image, threshold=threshold, method=self.find_mode)
+            else:
+                position = wc.find_image_precise(target_image, threshold=threshold, method=self.find_mode)
             if position:
                 # 确定点击坐标
                 if click_type == "coordinate" and click_area:
@@ -476,28 +503,24 @@ class OnmyojiAutomation:
                     center_y = (y1 + y2) // 2
 
                     # 截图坐标 → 客户区坐标（含标题栏截图才减标题栏，纯客户区截图偏移为0）
-                    try:
-                        # 获取窗口信息（使用缓存）
-                        window_rect, client_rect = self._get_cached_window_rect()
+                    dy = 0
+                    if not using_backend:
+                        try:
+                            # 获取窗口信息（使用缓存）
+                            window_rect, client_rect = self._get_cached_window_rect()
 
-                        # 计算标题栏高度（窗口高度 - 客户区高度）
-                        window_height = window_rect[3] - window_rect[1]
-                        client_height = client_rect[3] - client_rect[1]
-                        title_bar_height = window_height - client_height
-                        shot_h = wc.last_shot_shape[0] if wc.last_shot_shape else client_height
-                        dy = effective_client_dy(shot_h, client_height, title_bar_height)
-
-                        center_y = center_y - dy
-                        y1 = y1 - dy
-                        y2 = y2 - dy
-                        
-                        # 确保坐标在客户区内
-                        center_y = max(0, center_y)
-                        y1 = max(0, y1)
-                        y2 = max(0, y2)
-                    except Exception:
-                        # 如果转换失败，使用原始坐标
-                        pass
+                            # 计算标题栏高度（窗口高度 - 客户区高度）
+                            window_height = window_rect[3] - window_rect[1]
+                            client_height = client_rect[3] - client_rect[1]
+                            title_bar_height = window_height - client_height
+                            shot_h = wc.last_shot_shape[0] if wc.last_shot_shape else client_height
+                            dy = effective_client_dy(shot_h, client_height, title_bar_height)
+                        except Exception:
+                            # 如果转换失败，使用原始坐标
+                            dy = 0
+                    center_y = max(0, center_y - dy)
+                    y1 = max(0, y1 - dy)
+                    y2 = max(0, y2 - dy)
                     
                     # 计算区域的1/3大小作为随机范围，使点击更靠近中心
                     range_x = (x2 - x1) // 3
@@ -517,6 +540,10 @@ class OnmyojiAutomation:
 
     def _perform_action_normal(self, logo: str, threshold: float, sync_mode: bool, click_type: str = "image", click_area: list = None) -> bool:
         """使用常规模式执行操作"""
+        # 桌面版客户端最小化后系统不再出图，前台识别必然落空；统一弹窗提示（30s 节流）
+        if self.hwnd and win32gui.IsIconic(self.hwnd):
+            warn_minimized_capture()
+            return False
         found = self.find_img(logo)
         if not found:
             return False
@@ -585,57 +612,16 @@ class OnmyojiAutomation:
             self.synchronizer.send_click_message(hwnd=self.hwnd, relative_x=relative_x, relative_y=relative_y)
         else:
             # 非同步模式，使用普通点击方法
-            self.send_click_message(relative_x, relative_y)
+            if getattr(self, "backend", None) is not None:
+                try:
+                    self.backend.click(relative_x, relative_y)
+                except Exception:
+                    self.send_click_message(relative_x, relative_y)
+            else:
+                self.send_click_message(relative_x, relative_y)
 
         # 等待点击操作完成
         time.sleep(random.uniform(1.5, 3.0))
-
-    def _ease_in_out_cubic(self, t: float) -> float:
-        """
-        缓动函数：模拟移动鼠标的加速/减速过程
-        :param t: 0~1之间的数值，表示移动进度
-        :return: 0~1之间的数值，表示当前进度对应的速度权重
-        """
-        return t * t * (3 - 2 * t) if t <= 1 else 1
-
-    def _generate_bezier_path(self, start: tuple, end: tuple, num_points: int = 50) -> list:
-        """
-        生成简单的曲线路径点（模拟移动鼠标的弯曲轨迹）
-        :param start: 起点坐标 (x, y)
-        :param end: 终点坐标 (x, y)
-        :param num_points: 路径点数量
-        :return: 按顺序排列的路径点列表 [(x,y), (x,y), ...]
-        """
-        path_points = []
-        sx, sy = start
-        ex, ey = end
-        dx, dy = ex - sx, ey - sy
-        
-        # 使用简单的抛物线轨迹
-        for i in range(num_points):
-            t = i / (num_points - 1)
-            # 应用缓动函数
-            eased_t = self._ease_in_out_cubic(t)
-            
-            # 计算当前点坐标
-            x = sx + dx * eased_t
-            y = sy + dy * eased_t
-            
-            # 添加随机偏移，模拟人手抖动
-            x += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
-            y += random.uniform(-self.jitter_amplitude, self.jitter_amplitude)
-            
-            path_points.append((round(x), round(y)))
-        
-        return path_points
-
-    def _human_like_move(self, target_x: int, target_y: int) -> None:
-        """
-        核心方法：实现模拟人为的鼠标移动（委托共享实现）
-        :param target_x: 目标X坐标（屏幕绝对坐标）
-        :param target_y: 目标Y坐标（屏幕绝对坐标）
-        """
-        human_click.human_like_move(target_x, target_y)
 
     def _complex_move(self, target_x: int, target_y: int) -> None:
         """
@@ -644,8 +630,3 @@ class OnmyojiAutomation:
         :param target_y: 目标Y坐标
         """
         human_click.complex_move(target_x, target_y, self.lock)
-
-    def clear_cache(self):
-        """清除识别缓存"""
-        self.recognition_cache.clear()
-        self._get_scaled_logo.cache_clear()

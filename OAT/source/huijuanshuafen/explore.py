@@ -14,7 +14,7 @@ import random
 import time
 
 from OAT.utils.logging import logger
-from OAT.utils.pause_state import is_stale, wait_if_paused
+from OAT.utils.pause_state import is_stale, pause_aware_sleep, wait_if_paused
 
 from .base import CHAPTER28_K28_THRESHOLD, BaseBot
 
@@ -95,23 +95,76 @@ class ExploreManager(BaseBot):
     # ---------- 战斗 ----------
 
     def _fight(self, timeout: float = 60.0) -> bool:
-        """战斗循环：检测结束/结算按钮并点击
+        """战斗循环：检测结束/结算按钮并点击（暂停感知：暂停时阻塞且不计入超时）
 
         Returns:
             True = 战斗正常完成（出现结算或战斗已结束）
-            False = 未进入战斗（点击怪物未生效，仍在地图上）或异常超时
+            False = 未进入战斗（点击怪物未生效，仍在地图上）/异常超时/收到停止请求
         """
-        start = time.time()
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 60.0
+        if not remaining > 0:
+            remaining = 60.0
         saw_settlement = False  # 是否出现过结束/结算按钮（战斗确实开始了）
+        no_progress = 0.0  # 无战斗进展的累计时长（不含暂停时长；>15s 且未见结算则判未进入）
         logger.info("进入战斗循环")
 
-        while time.time() - start < timeout:
+        while remaining > 0:
+            # 全局协同暂停：暂停时阻塞等待；收到停止请求则干净退出
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
+            try:
+                _stale = is_stale()
+            except Exception:
+                _stale = False
+            if _stale:
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+
+            # 全局识别：战斗轮询中冒出的关闭钮也先点掉，本 tick 跳过
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    remaining -= 0.5
+                    continue
+            except Exception:
+                pass
+
             # 结束按钮
             r = self.find_img("jieshu", timeout=1)
             if r:
                 saw_settlement = True
                 self.click_center(r.region)
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
+                remaining -= 1.0
                 continue
 
             # 结算按钮
@@ -127,10 +180,20 @@ class ExploreManager(BaseBot):
             if on_map:
                 if not saw_settlement:
                     # 点击怪物后仍在地图 → 判定未进入战斗，让调用方重试
-                    if time.time() - start > 5:
+                    if (timeout - remaining) > 5:
                         logger.warn("点击后5秒仍在地图，判定未进入战斗")
                         return False
-                    time.sleep(1)
+                    try:
+                        if not pause_aware_sleep(1.0):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    remaining -= 1.0
+                    no_progress += 1.0
                 else:
                     # 结算完回到地图（小怪战后的正常状态）
                     logger.info("战斗已结束，回到地图")
@@ -138,8 +201,18 @@ class ExploreManager(BaseBot):
                 continue
 
             # 无任何按钮可见：战斗加载中/结算转场
-            time.sleep(1)
-            if time.time() - start > 15 and not saw_settlement:
+            try:
+                if not pause_aware_sleep(1.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
+            remaining -= 1.0
+            no_progress += 1.0
+            if no_progress > 15 and not saw_settlement:
                 logger.warn("15秒无战斗进展，判定未进入战斗")
                 return False
 
@@ -167,16 +240,35 @@ class ExploreManager(BaseBot):
             True 表示击败BOSS（完成一轮），False 表示继续探索
         """
         for attempt in range(3):
+            # 全局协同暂停：暂停时阻塞等待；收到停止请求则干净退出
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             # BOSS（优先）
             r = self.find_img("boss", timeout=1)
             if r:
                 logger.info(f"找到BOSS，开始战斗 (第{attempt + 1}次尝试)")
                 self.click_center(r.region)
                 if self._fight():
-                    self._handle_finish()
+                    if not self._handle_finish():
+                        return False
                     return True
                 logger.warn("BOSS战斗未开始，重试点击")
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 continue
 
             # 小怪
@@ -187,7 +279,15 @@ class ExploreManager(BaseBot):
                 if self._fight():
                     return False
                 logger.warn("小怪战斗未开始，重试点击")
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 continue
 
             # 地图上没有怪物可打
@@ -197,53 +297,113 @@ class ExploreManager(BaseBot):
         self._slide_view()
         return False
 
-    def _handle_finish(self) -> None:
-        """处理BOSS战后的结束阶段
+    def _handle_finish(self) -> bool:
+        """处理BOSS战后的结束阶段（暂停感知：暂停时阻塞且不计入等待）
 
         流程：战斗结束 → 点结束按钮(jieshu) → 点结算按钮(jiesuan)
               → 点退出(quit) → 点确认退出(quit_true) → 验证已离开探索
         点击后必须验证场景，确认弹窗可能延迟弹出或一次没点上
+
+        Returns:
+            True=处理完成（无论是否确认离开，由调用方继续），False=收到停止请求
         """
-        time.sleep(2)
+        try:
+            if not pause_aware_sleep(2.0):
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+        except Exception:
+            pass
 
         # 1. 结束按钮（若战斗循环中未处理完，这里兜底）
         r = self.find_img("jieshu", timeout=3)
         if r:
             logger.info("点击结束按钮")
             self.click_center(r.region)
-            time.sleep(1)
+            try:
+                if not pause_aware_sleep(1.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
 
         # 2. 结算按钮
         r = self.find_img("jiesuan", timeout=3)
         if r:
             logger.info("点击结算按钮")
             self.click_center(r.region)
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
 
         # 3. 退出探索：点quit → 点确认 → 验证离开，最多3轮
         for attempt in range(3):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             # 已离开探索内部？必须正向确认去向（k28标题或探索列表），
             # 否则可能是加载过渡帧，不能当成功（曾因此误报后卡死在unknown）
             if not self.find_img("chuzhanxiaohao", timeout=1):
                 if self.find_img("title_28", timeout=1):
                     logger.info("已退出到k28标题界面")
-                    return
+                    return True
                 if self._is_explore_list():
                     logger.info("已退出到探索列表界面（主循环会点28章返回）")
-                    return
+                    return True
                 logger.info("不在探索内部，但标题/列表均未确认（可能在加载），继续确认")
-                time.sleep(2)
+                try:
+                    if not pause_aware_sleep(2.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 continue
 
             logger.info(f"仍在探索内部，退出探索 (第{attempt + 1}次)")
             r = self.find_img("quit", timeout=3)
             if r:
                 self.click_center(r.region)
-                time.sleep(1.5)
+                try:
+                    if not pause_aware_sleep(1.5):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
             # 确认退出弹窗（模板优先，OCR兜底找独立的"确认"二字）
             if self.click_dialog_confirm(timeout=6):
-                time.sleep(2)
+                try:
+                    if not pause_aware_sleep(2.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
         # 3轮后仍在探索内部：最后确认一次
         if self.find_img("chuzhanxiaohao", timeout=1):
@@ -254,6 +414,7 @@ class ExploreManager(BaseBot):
             logger.info("已退出到探索列表界面（主循环会点28章返回）")
         else:
             logger.info("已离开探索内部（去向未确认，主循环按场景自适应）")
+        return True
 
     def _find_chapter28_ocr(self):
         """OCR 优先找'第二十八章'（与入口写法变体一致），返回客户区中心点或 None"""
@@ -396,6 +557,21 @@ class ExploreManager(BaseBot):
                     return False
             except Exception:
                 pass
+            # 全局识别：任何场景冒出的关闭钮都先点掉，本 tick 跳过状态分支
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    continue
+            except Exception:
+                pass
             scene = self._detect_scene()
             logger.info(f"第{self.explore_round + 1}/{self.explore_count}轮 场景: {scene}")
 
@@ -413,7 +589,15 @@ class ExploreManager(BaseBot):
                         break
                 else:
                     logger.warn("未找到开始按钮")
-                time.sleep(2)
+                try:
+                    if not pause_aware_sleep(2.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
             elif scene in (ExploreState.EXPLORE_INSIDE, ExploreState.FIGHTING):
                 # 探索地图（怪物按钮可见），处理怪物战斗；BOSS战结束记一轮
@@ -422,21 +606,45 @@ class ExploreManager(BaseBot):
                 if self._handle_explore_inside():
                     self.explore_round += 1
                     logger.info(f"完成第 {self.explore_round} 轮探索")
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
             elif scene == ExploreState.EXPLORE_LIST:
                 # 误退出到地图：点28章返回k28标题，标题分支会接管进探索
                 unknown_streak = 0
                 if self._enter_chapter28_from_list():
                     list_fail_streak = 0
-                    time.sleep(2)
+                    try:
+                        if not pause_aware_sleep(2.0):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
                 else:
                     list_fail_streak += 1
                     logger.warn(f"从列表返回第28章失败 ({list_fail_streak}/3)")
                     if list_fail_streak >= 3:
                         logger.error("连续3次无法从列表返回，退出探索循环")
                         break
-                    time.sleep(2)
+                    try:
+                        if not pause_aware_sleep(2.0):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
 
             elif scene == ExploreState.SETTLEMENT:
                 unknown_streak = 0
@@ -445,7 +653,15 @@ class ExploreManager(BaseBot):
                     r = self.find_img("jiesuan")
                     if r:
                         self.click_center(r.region)
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
             else:
                 # 未知场景：限次等待后熔断退出（曾无限等待导致卡死），交上层自适应
@@ -454,7 +670,15 @@ class ExploreManager(BaseBot):
                     logger.error("连续15次未知场景（约30秒），退出探索循环，请检查游戏界面")
                     break
                 logger.info(f"未知场景，等待 2 秒... ({unknown_streak}/15)")
-                time.sleep(2)
+                try:
+                    if not pause_aware_sleep(2.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
 
         logger.info(f"探索循环结束，共完成 {self.explore_round} 轮")
         return True

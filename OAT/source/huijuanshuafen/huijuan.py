@@ -15,16 +15,22 @@ import json
 import os
 import random
 import time
+from typing import Tuple
 
 from OAT.pipeline.recognition_opencv import OpenCVRecognitionEngine
 from OAT.utils.logging import logger
-from OAT.utils.pause_state import is_stale, wait_if_paused
+from OAT.utils.pause_state import is_stale, pause_aware_sleep, wait_if_paused
 
 from .base import CHAPTER28_K28_THRESHOLD, BaseBot, load_templates
 from .explore import ExploreManager
 
 # 找28章时尝试的文字（按顺序）
 CHAPTER_28_TEXTS = ["第二十八章", "28章", "二十八"]
+
+# 模拟器（backend 后台截图）下突破券 OCR 区域：相对截图宽高的比例 (x, y, w, h)
+# 真机实测：区域裁剪过紧时 RapidOCR 检测框会丢前导数字（'1/30' 只读到 '/30'），
+# 需保留足够上下文；按比例取同时兼容窗口尺寸/多开差异。
+TICKET_REGION_FRAC = (0.55, 0.0, 0.15, 0.11)
 
 
 class HuiJuan(BaseBot):
@@ -75,9 +81,22 @@ class HuiJuan(BaseBot):
     def _find_chapter28_scroll(self, max_scroll: int = 7):
         """直接查找失败时，通过多次翻页查找'第二十八章'"""
         for k in range(max_scroll):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return None
+            except Exception:
+                pass
             img = self._raw_capture()
             if img is None:
-                time.sleep(0.5)
+                try:
+                    if not pause_aware_sleep(0.5):
+                        return None
+                except Exception:
+                    pass
                 continue
 
             center, _ = self._find_chapter28_on(img)
@@ -93,22 +112,51 @@ class HuiJuan(BaseBot):
                 sx, sy = int(cw * 0.26), int(ch * 0.74)
             logger.info(f"翻页第{k + 1}/{max_scroll}次，从({sx},{sy})向上滑动")
             self.drag(sx, sy, sx, sy - int(ch * 0.37))
-            time.sleep(0.8)
+            try:
+                if not pause_aware_sleep(0.8):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return None
+            except Exception:
+                pass
 
         self.save_debug_shot("ch28scroll")
         logger.warn(f"翻页{max_scroll}次仍未找到'第二十八章'")
         return None
 
     def _click_text_retry(self, text: str, max_retries: int = 3, wait: float = 1.5) -> bool:
-        """查找并点击指定文字（重试）"""
+        """查找并点击指定文字（重试；暂停感知）"""
+        try:
+            wait_f = float(wait)
+        except Exception:
+            wait_f = 1.5
         for k in range(max_retries):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             center, _ = self.ocr_find(text, confidence=0.3)
             if center:
                 self.click(*center)
                 logger.info(f"已点击'{text}' ({center[0]},{center[1]})")
                 return True
             if k < max_retries - 1:
-                time.sleep(wait)
+                try:
+                    if not pause_aware_sleep(wait_f):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
         return False
 
     def _detect_scene(self) -> str:
@@ -139,11 +187,27 @@ class HuiJuan(BaseBot):
         r = self.find_img("start", timeout=2)
         if r:
             self.click_center(r.region)
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             return True
         # OCR 兜底（仅在图像识别失败时使用，可能误匹配左侧标签）
         if self._click_text_retry("探索"):
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             return True
         logger.warn("未找到探索按钮")
         return False
@@ -156,10 +220,19 @@ class HuiJuan(BaseBot):
         if not self.tpl_exists("quit_true"):
             return
         for _ in range(max_tries):
+            try:
+                if wait_if_paused() < 0:
+                    return
+            except Exception:
+                pass
             if not self.click_dialog_confirm(timeout=3):
                 return
             logger.info("检测到退出确认弹窗，已自动点击确认")
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    return
+            except Exception:
+                pass
 
     def _enter_explore_28(self) -> bool:
         """进入第28章探索（场景自适应）
@@ -171,11 +244,27 @@ class HuiJuan(BaseBot):
         if scene == "unknown":
             # 可能卡在退出确认弹窗（上一轮残留），自动清理后重测
             self._clear_exit_dialog()
-            time.sleep(1)
+            try:
+                if not pause_aware_sleep(1.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             scene = self._detect_scene()
         if scene == "unknown":
             # 可能截图时机问题，再等1秒确认一次
-            time.sleep(1)
+            try:
+                if not pause_aware_sleep(1.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             scene = self._detect_scene()
 
         if scene == "k28_title":
@@ -197,36 +286,89 @@ class HuiJuan(BaseBot):
 
         # 点击第二十八章，并确认进入k28标题界面（防止点偏还在列表）
         for attempt in range(2):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             logger.info(f"点击第二十八章 ({center[0]},{center[1]}) (第{attempt + 1}次)")
             self.click(*center)
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             if self.find_img("title_28"):
                 return self._click_explore_button()
             logger.warn("点击后未检测到k28标题界面，重试")
             center, _ = self._find_chapter28_on(self._raw_capture())
             if center is None:
                 break
-            time.sleep(1)
+            try:
+                if not pause_aware_sleep(1.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
 
         logger.warn("点击第二十八章后未进入标题界面")
         return False
 
     # ---------- 突破券 ----------
 
+    def _ticket_region(self, shot=None) -> Tuple[int, int, int, int]:
+        """突破券识别区域 (x, y, w, h)
+
+        模拟器（backend 后台截图）按截图尺寸比例取（TICKET_REGION_FRAC），
+        兼容窗口尺寸/多开差异；PC 桌面版沿用 config 实测绝对坐标。
+        """
+        if getattr(self.engine, "backend", None) is not None and shot is not None:
+            sh, sw = shot.shape[:2]
+            fx, fy, fw, fh = TICKET_REGION_FRAC
+            return (int(fx * sw), int(fy * sh), int(fw * sw), int(fh * sh))
+        return tuple(self.config.get("ticket_region", [800, 10, 115, 50]))
+
     def _get_ticket_count(self) -> int:
         """读取右上角突破券数量（OCR 'N/30'），失败返回 -1
 
-        识别区域 ticket_region 为当前游戏窗口客户区直接坐标（用
-        test/find_tupoquan.py 实测得出），窗口尺寸变化后需重新测量
+        区域见 _ticket_region：模拟器按截图比例，PC 桌面版为 config
+        ticket_region 实测坐标（test/find_tupoquan.py 得出，窗口尺寸变化后需重测）
         """
-        region = tuple(self.config.get("ticket_region", [800, 10, 115, 50]))
         for attempt in range(3):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return -1
+            except Exception:
+                pass
             img = self._raw_capture()
             if img is None:
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return -1
+                except Exception:
+                    pass
                 continue
 
-            real_text = self._ocr_ticket_text(img, region)
+            real_text = self._ocr_ticket_text(img, self._ticket_region(img))
             if not real_text:
                 # 兜底：顶部全宽条带（窗口尺寸变化导致区域偏移时仍能找到）
                 real_text = self._ocr_ticket_text_full_strip(img)
@@ -236,7 +378,15 @@ class HuiJuan(BaseBot):
                 logger.info(f"突破券: {number}")
                 return number
             logger.warn(f"突破券识别失败(第{attempt + 1}次，重试)")
-            time.sleep(1.5)
+            try:
+                if not pause_aware_sleep(1.5):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return -1
+            except Exception:
+                pass
 
         logger.warn("突破券识别失败")
         return -1
@@ -244,13 +394,16 @@ class HuiJuan(BaseBot):
     def _ocr_ticket_text(self, shot, region) -> str:
         """取区域内最可能是'突破券 N/30'的一行文字
 
-        纵向向下扩展一个标题栏高度，兼容截图含/不含标题栏两种情况
-        （实测 PrintWindow/BitBlt 回退会导致截图顶部是否含标题栏不稳定）
+        只有能解析出数量的文字才返回（部分裁剪可能只读到 '/30'），
+        否则返回空串让调用方走顶部全宽兜底。
+        纵向偏移用 effective_client_dy 自适应截图含/不含标题栏两种情况。
         """
+        from OAT.tools.GetDC import effective_client_dy
         from OAT.utils.OCRService import ocr_service
-        tb = max(0, self._title_bar())
-        rx, ry, rw, rh = region
         sh, sw = shot.shape[:2]
+        _, ch = self.client_size()
+        tb = effective_client_dy(sh, ch, self._title_bar())
+        rx, ry, rw, rh = region
         x1 = int(rx)
         y1 = int(ry)
         x2 = min(int(rx + rw), sw)
@@ -266,9 +419,8 @@ class HuiJuan(BaseBot):
             results = mgr.reader(crop)
             if hasattr(results, 'txts') and results.txts:
                 for text in results.txts:
-                    if "/30" in text:
+                    if self._parse_ticket_number(text) >= 0:
                         return text
-                return results.txts[0]
         except Exception:
             pass
         return ""
@@ -286,7 +438,7 @@ class HuiJuan(BaseBot):
             results = mgr.reader(crop)
             if hasattr(results, 'txts') and results.txts:
                 for i, text in enumerate(results.txts):
-                    if "/30" in text:
+                    if self._parse_ticket_number(text) >= 0:
                         box = results.boxes[i]
                         area = box.tolist() if hasattr(box, 'tolist') else box
                         xs = [p[0] for p in area]
@@ -332,6 +484,15 @@ class HuiJuan(BaseBot):
             True=已回到探索列表界面, False=无法退出（调用方应终止）
         """
         for attempt in range(3):
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             scene = self._detect_scene()
             if scene == "explore_list":
                 logger.info("已在探索列表界面，无需关闭")
@@ -339,10 +500,26 @@ class HuiJuan(BaseBot):
             if scene == "unknown":
                 # 可能卡在"确认退出探索"弹窗：点确认（模板+OCR）
                 if self.click_dialog_confirm(timeout=2):
-                    time.sleep(1)
+                    try:
+                        if not pause_aware_sleep(1.0):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
                     continue
                 # 界面可能在加载过渡中，多等一会重测
-                time.sleep(1)
+                try:
+                    if not pause_aware_sleep(1.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 continue
 
             logger.info(f"当前在k28标题界面，点击退出回到探索列表 (第{attempt + 1}次)")
@@ -357,7 +534,15 @@ class HuiJuan(BaseBot):
                 logger.warn("未找到退出按钮，点击左上角兜底")
                 region = tuple(self.config.get("tansuo_quit_region", [0, 0, 120, 80]))
                 self.click_center(region, jitter_x=5, jitter_y=5)
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
 
         logger.warn("3次尝试仍未确认探索列表界面，继续尝试找突破入口（由入口查找决定）")
         return True
@@ -367,9 +552,24 @@ class HuiJuan(BaseBot):
 
         地图加载有过渡动画，轮询等待；OCR兜底用客户区底部动态条带
         （固定区域在不同窗口尺寸下会错过底部按钮，见 config 注释）
+        暂停时长不计入超时；停止则提前返回 None。
         """
-        start = time.time()
-        while time.time() - start < timeout:
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 15.0
+        if not remaining > 0:
+            remaining = 15.0
+        while remaining > 0:
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return None
+            except Exception:
+                pass
             # 图像识别优先（用户截取的入口图标）
             r = self.find_img("jiejietupo_loho", timeout=0)
             if r:
@@ -383,7 +583,29 @@ class HuiJuan(BaseBot):
             center, _ = self.ocr_find("结界突破", region=region, confidence=0.3)
             if center:
                 return center
-            time.sleep(1.5)
+            chunk = remaining if remaining < 1.5 else 1.5
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return None
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return None
         return None
 
     def _wait_jiejietupo_scene(self, timeout: float = 8.0) -> bool:
@@ -400,14 +622,58 @@ class HuiJuan(BaseBot):
         has_fangshou = self.tpl_exists("fangshoujilu")
         if not (has_title or has_fangshou):
             logger.warn("缺少结界突破锚点素材(title/fangshoujilu)，跳过场景确认")
-            time.sleep(3)
+            try:
+                if not pause_aware_sleep(3.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             return True
 
-        start = time.time()
-        while time.time() - start < timeout:
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 8.0
+        if not remaining > 0:
+            remaining = 8.0
+        while remaining > 0:
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             # 主锚点：突破界面标题
             if has_title and not self.find_img("title"):
-                time.sleep(0.5)
+                chunk = remaining if remaining < 0.5 else 0.5
+                try:
+                    slept = float(wait_if_paused(chunk))
+                except Exception:
+                    try:
+                        time.sleep(chunk)
+                    except Exception:
+                        pass
+                    slept = chunk
+                if slept < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+                remaining -= slept
+                if slept <= 0 and remaining > 0:
+                    try:
+                        _fb = min(chunk, remaining)
+                        time.sleep(_fb)
+                        remaining -= _fb
+                    except Exception:
+                        return False
                 continue
 
             # 确认在个人突破页签（记录页签）
@@ -416,35 +682,32 @@ class HuiJuan(BaseBot):
                 return True
 
             # 主锚点已出现但页签未确认：再等等（默认即个人突破）
-            time.sleep(0.5)
+            chunk = remaining if remaining < 0.5 else 0.5
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return False
 
         logger.warn("等待结界突破界面超时，请确认已进入个人突破界面")
         return False
-
-    def _close_jiejietupo(self) -> None:
-        """关闭结界突破界面（含3胜奖励弹窗处理）
-
-        流程：
-        1. 若有3胜奖励弹窗（宝箱 jiesuan.png）→ 点击领取
-        2. 点击右上角叉号(X)关闭界面（close_region，基准 1920x1080 等比换算）
-        """
-        # 1. 3胜奖励弹窗（宝箱）
-        r = self.find_img("jiesuan", timeout=2)
-        if r:
-            logger.info("检测到3胜奖励，点击宝箱领取")
-            self.click_center(r.region)
-            time.sleep(2)
-
-        # 2. 点击右上角叉号关闭
-        r = self.find_img("close_jiejietupo", timeout=3)
-        if r:
-            logger.info("识别到关闭按钮，点击退出")
-            self.click_center(r.region)
-        else:
-            logger.warn("未找到关闭按钮，尝试点击右上角区域")
-            region = tuple(self.config.get("close_region", [1150, 110, 80, 80]))
-            self.click_center(region, jitter_x=10, jitter_y=10)
-        time.sleep(2)
 
     def _click_blank(self) -> None:
         """点击空白处消结算界面（随机选左/右侧，避开中部按钮区）"""
@@ -471,8 +734,32 @@ class HuiJuan(BaseBot):
         """
         if not (self.tpl_exists("close_jiejietupo") or self.tpl_exists("title")):
             return True  # 无锚点素材可验，沿用老行为
+        try:
+            interval_f = float(interval)
+        except Exception:
+            interval_f = 2.0
+        if not interval_f > 0:
+            interval_f = 2.0
         for attempt in range(retries):
-            time.sleep(interval)
+            try:
+                slept = float(wait_if_paused(interval_f))
+            except Exception:
+                try:
+                    time.sleep(interval_f)
+                except Exception:
+                    pass
+                slept = interval_f
+            if slept < 0:
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+            if not slept > 0:
+                try:
+                    time.sleep(interval_f)
+                except Exception:
+                    pass
             if not self._is_still_in_jiejietupo():
                 logger.info("已确认退出结界突破界面")
                 return True
@@ -498,20 +785,73 @@ class HuiJuan(BaseBot):
         4. 超过 timeout 秒仍没关掉 → 报错返回 False（调用方终止，不硬进下一轮）
 
         Returns:
-            True=已关闭突破界面, False=超时需人工介入
+            True=已关闭突破界面, False=超时需人工介入/收到停止请求
         """
         logger.info(f"最后一次进攻已点出，等待战斗结束 {settle_wait:.0f} 秒")
-        time.sleep(settle_wait)
+        try:
+            if not pause_aware_sleep(settle_wait):
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+        except Exception:
+            pass
 
-        deadline = time.time() + timeout
-        while time.time() < deadline:
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 5 * 60
+        if not remaining > 0:
+            remaining = 5 * 60
+        while remaining > 0:
+            try:
+                if wait_if_paused() < 0:
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             self._click_blank()
-            time.sleep(2)
+            try:
+                slept = float(wait_if_paused(2.0))
+            except Exception:
+                try:
+                    time.sleep(2.0)
+                except Exception:
+                    pass
+                slept = 2.0
+            if slept < 0:
+                try:
+                    logger.info("挑战已停止")
+                except Exception:
+                    pass
+                return False
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(2.0, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return False
+                if remaining <= 0:
+                    break
             r = self.find_img("close_jiejietupo", timeout=3)
             if r:
                 logger.info("识别到关闭按钮，点击退出突破界面")
                 self.click_center(r.region)
-                time.sleep(2)
+                try:
+                    if not pause_aware_sleep(2.0):
+                        try:
+                            logger.info("挑战已停止")
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    pass
                 if self._verify_jiejietupo_closed():
                     return True
                 continue
@@ -547,6 +887,21 @@ class HuiJuan(BaseBot):
                     return False
             except Exception:
                 pass
+            # 全局识别：任何场景冒出的关闭钮都先点掉，本 tick 跳过正常流程
+            try:
+                if self.check_global_popup():
+                    try:
+                        if not pause_aware_sleep(0.5):
+                            try:
+                                logger.info("挑战已停止")
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                    continue
+            except Exception:
+                pass
             logger.info(f"{'=' * 40}")
             logger.info(f"绘卷刷分 第 {r + 1}/{self.rounds} 轮（每轮探索{self.explore_count}次）")
             logger.info(f"{'=' * 40}")
@@ -562,7 +917,15 @@ class HuiJuan(BaseBot):
             if not self._ensure_explore_list():
                 logger.warn("无法退出探索界面，终止")
                 return False
-            time.sleep(2)
+            try:
+                if not pause_aware_sleep(2.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
 
             # 3. 找结界突破入口（验证在探索列表界面且入口存在）
             entry = self._find_jiejietupo_entry()
@@ -581,7 +944,15 @@ class HuiJuan(BaseBot):
 
             # 5. 点击进入结界突破
             self.click(*entry)
-            time.sleep(3)
+            try:
+                if not pause_aware_sleep(3.0):
+                    try:
+                        logger.info("挑战已停止")
+                    except Exception:
+                        pass
+                    return False
+            except Exception:
+                pass
             if not self._wait_jiejietupo_scene():
                 return False
 
@@ -630,7 +1001,8 @@ class HuiJuan(BaseBot):
 
 def run_huijuanshuafen(window_title: str, rounds: int, explore_per_round: int,
                        sync_mode: bool = False, synchronizer=None,
-                       script_dir: str = "", config: dict = None):
+                       script_dir: str = "", config: dict = None,
+                       window_hwnd: int = None):
     """绘卷刷分入口（由 mode_choice 调用）
 
     Args:
@@ -641,10 +1013,19 @@ def run_huijuanshuafen(window_title: str, rounds: int, explore_per_round: int,
         synchronizer: 同步器
         script_dir: 模式目录（含 images/）
         config: config.json 内容
+        window_hwnd: 显式窗口句柄（优先于标题，改名/多开场景可靠）
     """
     import win32gui
 
-    hwnd = win32gui.FindWindow(None, window_title)
+    hwnd = 0
+    if window_hwnd:
+        try:
+            if win32gui.IsWindow(int(window_hwnd)):
+                hwnd = int(window_hwnd)
+        except Exception:
+            hwnd = 0
+    if not hwnd:
+        hwnd = win32gui.FindWindow(None, window_title)
     if not hwnd:
         logger.warn(f"未找到窗口: {window_title}")
         return False

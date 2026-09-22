@@ -1,6 +1,5 @@
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QSizePolicy, QHeaderView
-from PyQt6.QtCore import Qt
 
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, CardWidget, StrongBodyLabel,
@@ -9,16 +8,6 @@ from qfluentwidgets import (
 
 
 class SyncPage(QWidget):
-    refresh_windows = QtCore.pyqtSignal()
-    select_all = QtCore.pyqtSignal()
-    invert_selection = QtCore.pyqtSignal()
-    set_main_window = QtCore.pyqtSignal()
-    set_sub_windows = QtCore.pyqtSignal()
-    start_sync = QtCore.pyqtSignal()
-    stop_sync = QtCore.pyqtSignal()
-    arrange = QtCore.pyqtSignal()
-    show_instruction = QtCore.pyqtSignal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("sync_page")

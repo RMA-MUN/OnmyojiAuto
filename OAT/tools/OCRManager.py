@@ -1,3 +1,5 @@
+import os
+
 import cv2
 from rapidocr import RapidOCR
 
@@ -87,7 +89,7 @@ class OCRManager:
         if not getattr(results, 'txts', None):
             if debug:
                 logger.info("[OCR Debug] 未识别到文字")
-        return found, text_area, real_text
+            return found, text_area, real_text
 
         if hasattr(results, 'txts'):
             if debug:

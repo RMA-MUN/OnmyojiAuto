@@ -7,7 +7,7 @@ from OAT.utils.do_after_challenge import do_after_challenge
 from OAT.utils.logging import logger
 from OAT.utils.pause_state import is_stale, pause_aware_sleep, wait_if_paused
 from .recognition import RecognitionEngine
-from .task_definition import Task, TaskAction, parse_pipeline
+from .task_definition import Task, parse_pipeline
 
 
 class PipelineRunner:
@@ -305,25 +305,28 @@ def create_and_run_pipeline(
     threshold: int = None,
     find_mode: str = None,
     times: int = 1,
+    window_hwnd: int = None,
 ) -> bool:
     """便捷函数：解析配置 → 创建引擎 → 创建运行器 → 执行
 
     供 source/__init__.py 中的 mode_choice() 调用。
     """
     from OAT.tools import settings
-    from OAT.tools.GetDC import WindowCapture
 
     if threshold is None:
         threshold = settings.FIND_THRESHOLD
     if find_mode is None:
         find_mode = settings.FIND_MODE
 
-    # 获取窗口句柄
+    # 获取窗口句柄（显式句柄优先：改名/多开场景下比标题可靠）
     hwnd = None
     try:
         import win32gui
 
-        hwnd = win32gui.FindWindow(None, window_title)
+        if window_hwnd and win32gui.IsWindow(int(window_hwnd)):
+            hwnd = int(window_hwnd)
+        if not hwnd:
+            hwnd = win32gui.FindWindow(None, window_title)
     except Exception:
         pass
 

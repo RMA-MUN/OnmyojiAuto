@@ -22,6 +22,7 @@ from OAT.pipeline.recognition import RecognitionResult
 from OAT.pipeline.recognition_opencv import OpenCVRecognitionEngine
 from OAT.utils.OCRService import ocr_service
 from OAT.utils.logging import logger
+from OAT.utils.pause_state import wait_if_paused
 
 # Example 项目素材基准分辨率（客户区）
 BASE_W = 1920
@@ -33,6 +34,9 @@ CHAPTER28_PANEL_FRAC = (0.55, 0.10, 0.45, 0.80)
 
 # k28 模板匹配阈值（2026-09-06 ch28-miss 取证：面板内最高分 0.897，默认 0.90 漏检）
 CHAPTER28_K28_THRESHOLD = 0.85
+
+# 全局识别：任何场景下出现都要无条件点掉的弹窗（对标 common_challenge is_global）
+GLOBAL_POPUPS = ("global_xiezhu",)
 
 
 def load_templates(images_dir: str) -> dict:
@@ -153,20 +157,6 @@ class BaseBot:
         except Exception:
             return (0.0, None)
 
-    # ---------- 坐标换算（1920x1080 基准 → 当前客户区） ----------
-
-    def scale_rect(self, rect: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        """等比换算矩形 (x, y, w, h)"""
-        cw, ch = self.client_size()
-        x, y, w, h = rect
-        return (int(x * cw / BASE_W), int(y * ch / BASE_H),
-                int(w * cw / BASE_W), int(h * ch / BASE_H))
-
-    def scale_point(self, x: int, y: int) -> Tuple[int, int]:
-        """等比换算坐标"""
-        cw, ch = self.client_size()
-        return int(x * cw / BASE_W), int(y * ch / BASE_H)
-
     # ---------- 动作（PostMessage 后台模式） ----------
 
     def click(self, x: int, y: int):
@@ -181,7 +171,19 @@ class BaseBot:
         return cx, cy
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, steps: int = 20, step_interval: float = 0.02):
-        """后台拖拽（视角移动 / 列表翻页）"""
+        """后台拖拽（视角移动 / 列表翻页）
+
+        有 backend（模拟器后台）或同步模式时委托 engine.swipe：
+        由 backend 走 NemuIPC/渲染子窗口并做 DPI 换算；其余情况保持原
+        PostMessage 直发链路（PC 桌面版后台）。
+        """
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        if getattr(self.engine, "backend", None) is not None or self.sync_mode:
+            self.engine.swipe(x1, y1, x2, y2,
+                              duration=max(0.05, steps * step_interval),
+                              sync_mode=self.sync_mode)
+            logger.info(f"后台拖拽(swipe) ({x1},{y1}) -> ({x2},{y2})")
+            return
         hwnd = self.hwnd
         if not hwnd or not win32gui.IsWindow(hwnd):
             return
@@ -229,8 +231,8 @@ class BaseBot:
             name: 模板名
             threshold: 匹配阈值（None 用引擎默认）
             region: 限定区域 (x, y, w, h)，客户区坐标；None 表示全窗口
-            timeout: 轮询超时秒数，0 表示只查一次
-            interval: 轮询间隔
+            timeout: 轮询超时秒数，0 表示只查一次（暂停时长不计入超时）
+            interval: 轮询间隔（暂停感知；停止则提前返回 None）
 
         Returns:
             RecognitionResult | None
@@ -239,8 +241,55 @@ class BaseBot:
         if not path or not os.path.exists(path):
             self.warn_missing(name)
             return None
-        start = time.time()
-        while True:
+        try:
+            timeout_f = float(timeout)
+        except Exception:
+            timeout_f = 0.0
+        try:
+            interval_f = float(interval)
+        except Exception:
+            interval_f = 0.3
+        if not interval_f > 0:
+            interval_f = 0.3
+        # 单次查询：仍需响应暂停（阻塞直到恢复；停止则直接返回 None）
+        try:
+            if wait_if_paused() < 0:
+                return None
+        except Exception:
+            pass
+        try:
+            result = self.engine.find_template(path, threshold, region)
+        except Exception as e:
+            logger.warn(f"模板匹配异常 {name}: {e}")
+            result = None
+        if result is not None and result.found:
+            return result
+        if not timeout_f > 0:
+            return None
+        # 轮询：暂停时长不计入超时（按实际休眠递减剩余预算）
+        remaining = timeout_f
+        while remaining > 0:
+            chunk = remaining if remaining < interval_f else interval_f
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                return None
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return None
+            if remaining <= 0:
+                break
             try:
                 result = self.engine.find_template(path, threshold, region)
             except Exception as e:
@@ -248,9 +297,29 @@ class BaseBot:
                 result = None
             if result is not None and result.found:
                 return result
-            if timeout <= 0 or time.time() - start >= timeout:
-                return None
-            time.sleep(interval)
+        return None
+
+    def check_global_popup(self) -> bool:
+        """全局识别：命中任一全局模板就点中心并返回 True；永不抛异常"""
+        try:
+            for name in GLOBAL_POPUPS:
+                try:
+                    r = self.find_img(name, timeout=0)
+                except Exception:
+                    continue
+                if r:
+                    try:
+                        self.click_center(r.region)
+                    except Exception:
+                        return False
+                    try:
+                        logger.info(f"全局识别: 已点击 {name}")
+                    except Exception:
+                        pass
+                    return True
+            return False
+        except Exception:
+            return False
 
     def find_dialog_confirm(self):
         """找'确认退出'类弹窗的确认按钮（OCR精确匹配，返回客户区坐标或None）
@@ -292,9 +361,14 @@ class BaseBot:
         return None
 
     def click_dialog_confirm(self, timeout: float = 5.0) -> bool:
-        """点击确认退出弹窗的确认按钮（模板优先，OCR兜底）"""
-        start = time.time()
-        while time.time() - start < timeout:
+        """点击确认退出弹窗的确认按钮（模板优先，OCR兜底；暂停时长不计入超时）"""
+        try:
+            remaining = float(timeout)
+        except Exception:
+            remaining = 5.0
+        if not remaining > 0:
+            remaining = 5.0
+        while remaining > 0:
             if self.tpl_exists("quit_true"):
                 r = self.find_img("quit_true")
                 if r:
@@ -306,7 +380,25 @@ class BaseBot:
                 logger.info(f"点击确认退出（OCR）({pt[0]},{pt[1]})")
                 self.click(*pt)
                 return True
-            time.sleep(0.5)
+            chunk = remaining if remaining < 0.5 else 0.5
+            try:
+                slept = float(wait_if_paused(chunk))
+            except Exception:
+                try:
+                    time.sleep(chunk)
+                except Exception:
+                    pass
+                slept = chunk
+            if slept < 0:
+                return False
+            remaining -= slept
+            if slept <= 0 and remaining > 0:
+                try:
+                    _fb = min(chunk, remaining)
+                    time.sleep(_fb)
+                    remaining -= _fb
+                except Exception:
+                    return False
         return False
 
     # ---------- 文字识别 ----------

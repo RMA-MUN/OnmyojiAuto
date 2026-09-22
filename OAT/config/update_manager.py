@@ -9,7 +9,6 @@ import sys
 import shutil
 import traceback
 from urllib3.exceptions import InsecureRequestWarning
-from tqdm import tqdm
 
 from OAT.utils.logging import logger
 from OAT.utils.warning_box import warning_box
@@ -55,13 +54,6 @@ class UpdateManager:
         # 确保ignore_versions字段存在
         if "ignore_versions" not in self.config_data:
             self.config_data["ignore_versions"] = []
-
-    def get_latest_release_assets(self) -> dict | None:
-        """
-        获取最新版本的release信息，包括下载链接
-        :return: 包含tag_name、assets等信息的字典，失败返回None
-        """
-        return self.checker.get_latest_release_info()
 
     @staticmethod
     def get_download_url(release_info: dict) -> str | None:
@@ -350,110 +342,3 @@ class UpdateManager:
             traceback.print_exc()
             return False
 
-    @staticmethod
-    def install_new_version(extract_path: str, ignore_folder: list, ignore_files: list = None):
-        """
-        安装最新版本
-        :param extract_path: 安装路径
-        :param ignore_folder: 忽略的文件夹列表，保护更新时不覆盖的文件夹
-        :param ignore_files: 忽略的文件列表，应该忽略用户的配置文件(json,yaml)结尾的配置文件和png,jpg,ico结尾的图片文件
-        :return: None
-        """
-        try:
-            # 确保忽略文件列表存在
-            if ignore_files is None:
-                ignore_files = []
-            
-            # 获取当前工作目录作为安装目标路径
-            target_path = os.getcwd()
-            logger.info(f"开始安装最新版本，从 {extract_path} 到 {target_path}")
-            
-            # 遍历解压目录中的所有文件
-            total_files = 0
-            for root, dirs, files in os.walk(extract_path):
-                # 过滤掉需要忽略的文件夹
-                dirs[:] = [d for d in dirs if d not in ignore_folder]
-                total_files += len(files)
-            
-            # 再次遍历并复制文件，显示进度
-            copied_files = 0
-            with tqdm(total=total_files, desc="安装进度") as bar:
-                for root, dirs, files in os.walk(extract_path):
-                    # 过滤掉需要忽略的文件夹
-                    dirs[:] = [d for d in dirs if d not in ignore_folder]
-                    
-                    # 计算相对路径
-                    rel_path = os.path.relpath(root, extract_path)
-                    if rel_path == ".":
-                        rel_path = ""
-                    
-                    # 确保目标目录存在
-                    target_dir = os.path.join(target_path, rel_path)
-                    if not os.path.exists(target_dir):
-                        os.makedirs(target_dir)
-                    
-                    # 复制文件
-                    for file in files:
-                        # 检查是否需要忽略该文件
-                        if file in ignore_files:
-                            bar.update(1)
-                            continue
-                        
-                        # 检查文件扩展名是否需要忽略
-                        ext = os.path.splitext(file)[1].lower()
-                        if ext in [".json", ".yaml", ".png", ".jpg", ".ico"]:
-                            bar.update(1)
-                            continue
-                        
-                        # 复制文件
-                        src_file = os.path.join(root, file)
-                        dst_file = os.path.join(target_dir, file)
-                        
-                        # 确保目标文件所在目录存在
-                        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-                        
-                        # 复制文件
-                        with open(src_file, 'rb') as fsrc, open(dst_file, 'wb') as fdst:
-                            fdst.write(fsrc.read())
-                        
-                        copied_files += 1
-                        bar.update(1)
-            
-            logger.info(f"安装完成，共复制 {copied_files} 个文件")
-            logger.info(f"请重新启动应用程序以应用更新")
-        except Exception as e:
-            logger.error(f"安装最新版本时出现异常: {e}")
-
-
-
-if __name__ == '__main__':
-    update_manager = UpdateManager()
-    # latest_version = update_manager.get_update()
-    # if latest_version:
-    #     # 将版本号转换为列表
-    #     ignore_version: str = UpdateChecker.split_version(latest_version)
-    #     # 忽略最新版本的更新
-    #     update_manager.ignore_update(ignore_version)
-
-    # 检查是否有更新
-    # update_info = update_manager.get_update()
-    # if update_info:
-    #     print(f"发现新的版本: {update_info}")
-    #     # 开始下载最新版本
-    #     download_url = "https://github.com/RMA-MUN/OnmyojiAuto/releases/download/OAT-v1.5.5/OAT-v1.5.5.zip"
-    #     if update_manager.download_new_version(download_url):
-    #         # 解压最新版本文件
-    #         zip_path = os.path.join(os.path.dirname(__file__), '../update/program/OAT-v1.5.5.zip')
-    #         extract_path = os.path.join(os.path.dirname(__file__), '../update/program/OAT-v1.5.5')
-    #         if update_manager.unzip(zip_path, extract_path):
-    #             # 安装最新版本
-    #             update_manager.install_new_version(extract_path, ignore_folder=['update'],
-    #                                    ignore_files=['config.json', 'update.json'])
-
-    # 从检查更新到下载最新压缩包都是可以使用的，现在修改为将解压文件放到temp/OAT_old目录
-    zip_path = os.path.join(os.path.dirname(__file__), 'temp/OAT-v1.5.5.zip')
-    extract_path = os.path.join(os.path.dirname(__file__), 'temp/OAT_old')
-    if update_manager.unzip(zip_path, extract_path):
-        # 安装最新版本，将解压后的文件从temp/OAT_old安装到当前工作目录
-        update_manager.install_new_version(extract_path, ignore_folder=['update'],
-                                       ignore_files=['config.json', 'update.json'])

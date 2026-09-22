@@ -1,4 +1,4 @@
-APP_VERSION = "2.3.1"
+APP_VERSION = "2.3.2"
 
 import json
 import os
@@ -36,18 +36,17 @@ FIND_THRESHOLD = settings_data.get('find_value', 85)
 FIND_THRESHOLD_VALUE = FIND_THRESHOLD / 100.0  # 转换为0-1之间的值
 
 # 其他配置变量
-THEME = settings_data.get('theme', 'light')
-TRANSPARENCY = settings_data.get('transparency', 50)
-CLOSE_PROGRAM_AFTER_CHALLENGE = settings_data.get('close_program_after_challenge', False)
-CLOSE_GAME_AFTER_CHALLENGE = settings_data.get('close_game_after_challenge', False)
-SYNC_MODE = settings_data.get('sync_mode', 'exactly_sync')
-CUSTOM_RES_WIDTH = settings_data.get('custom_res_width', 1404)
-CUSTOM_RES_HEIGHT = settings_data.get('custom_res_height', 834)
 # 窗口排列相关设置
 WINDOW_ARRANGE_MODE = settings_data.get('window_arrange_mode', 'diagonal')  # 窗口排列方式
 WINDOWS_PER_ROW = settings_data.get('windows_per_row', 3)  # 平铺排列时一行的窗口数量
 # 后台获取图像模式
 BACKEND_GET_IMG_MODE = settings_data.get('capture_window_mode', 'PrintWindow')  # 后台获取图像模式(PrintWindow/BitBlt)
+# 模拟器后台模式（MuMu 免 ADB）
+EMULATOR_TYPE = settings_data.get('emulator_type', 'pc')
+HANDLE_SPEC = settings_data.get('handle_spec', 'auto')
+SCREENSHOT_METHOD = settings_data.get('screenshot_method', 'nemu_ipc')
+CONTROL_METHOD = settings_data.get('control_method', 'window_message')
+MUMU_FOLDER = settings_data.get('mumu_folder', 'E:\\MuMuPlayer')
 
 # 提供更新配置的函数
 def update_settings(key, value):
@@ -70,27 +69,6 @@ def update_settings(key, value):
             global FIND_THRESHOLD, FIND_THRESHOLD_VALUE
             FIND_THRESHOLD = value
             FIND_THRESHOLD_VALUE = value / 100.0
-        elif key == 'theme':
-            global THEME
-            THEME = value
-        elif key == 'transparency':
-            global TRANSPARENCY
-            TRANSPARENCY = value
-        elif key == 'close_program_after_challenge':
-            global CLOSE_PROGRAM_AFTER_CHALLENGE
-            CLOSE_PROGRAM_AFTER_CHALLENGE = value
-        elif key == 'close_game_after_challenge':
-            global CLOSE_GAME_AFTER_CHALLENGE
-            CLOSE_GAME_AFTER_CHALLENGE = value
-        elif key == 'sync_mode':
-            global SYNC_MODE
-            SYNC_MODE = value
-        elif key == 'custom_res_width':
-            global CUSTOM_RES_WIDTH
-            CUSTOM_RES_WIDTH = value
-        elif key == 'custom_res_height':
-            global CUSTOM_RES_HEIGHT
-            CUSTOM_RES_HEIGHT = value
         elif key == 'window_arrange_mode':
             global WINDOW_ARRANGE_MODE
             WINDOW_ARRANGE_MODE = value
@@ -100,6 +78,21 @@ def update_settings(key, value):
         elif key == 'capture_window_mode':
             global BACKEND_GET_IMG_MODE
             BACKEND_GET_IMG_MODE = value
+        elif key == 'emulator_type':
+            global EMULATOR_TYPE
+            EMULATOR_TYPE = value
+        elif key == 'handle_spec':
+            global HANDLE_SPEC
+            HANDLE_SPEC = value
+        elif key == 'screenshot_method':
+            global SCREENSHOT_METHOD
+            SCREENSHOT_METHOD = value
+        elif key == 'control_method':
+            global CONTROL_METHOD
+            CONTROL_METHOD = value
+        elif key == 'mumu_folder':
+            global MUMU_FOLDER
+            MUMU_FOLDER = value
         return True
     except Exception as e:
         logger.error(f"保存配置文件失败: {str(e)}")

@@ -7,6 +7,8 @@
 4. 构建算法，获取窗口位置和尺寸并检查是否为标准尺寸，传递参数给Auto的region
 """
 
+import time
+
 import win32gui
 import win32con
 import pywintypes
@@ -125,21 +127,31 @@ class WindowChecker:
         else:
             hwnd = self.window_handle
 
-        # 检查窗口是否最小化
-        if hwnd:
+        # 检查窗口是否最小化：检测流程必须真实调整窗口尺寸（对齐模板尺度），
+        # iconic 窗口上 resize 可能不生效，先自动恢复再继续；检测完仍可最小化跑后台
+        if hwnd and win32gui.IsIconic(hwnd):
+            try:
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            except Exception as e:
+                logger.error(f'恢复窗口失败: {e}')
+            # 等待窗口真正脱离 iconic 状态（最长 1s）
+            deadline = time.time() + 1.0
+            while time.time() < deadline and win32gui.IsIconic(hwnd):
+                time.sleep(0.1)
             if win32gui.IsIconic(hwnd):
                 try:
-                    warning_box("检测到窗口处于最小化状态，请先恢复窗口再继续操作。")
+                    warning_box("窗口处于最小化状态且自动恢复失败，请手动恢复窗口后再执行窗口检测。")
                 except Exception as e:
                     logger.error(f"显示弹窗失败: {e}")
                 return
+            logger.info('窗口处于最小化状态，已自动恢复窗口后继续检测')
 
         current_size = self.get_window_info()
         if current_size:
             current_width, current_height = current_size[2]
             if current_width != target_width or current_height != target_height:
-                # 尝试调整窗口大小，但不强制要求成功
-                resize_success = self.resize_window(target_width, target_height)
+                # 尝试调整窗口大小，但不强制要求成功（结果以后续实际尺寸为准）
+                self.resize_window(target_width, target_height)
                 
                 # 检查调整后的尺寸
                 updated_size = self.get_window_info()
@@ -153,36 +165,4 @@ class WindowChecker:
                     if not self.window_handle:
                         return
 
-    # 获取所有窗口
-    @staticmethod
-    def creat_hwnd_list(self) -> list:
-        """
-        获取所有窗口
-        """
-        # 先获取到所有的窗口并存储到一个列表里
-        window_hwnd_of_all = []
-        win32gui.EnumWindows(lambda hwnd, param: param.append(hwnd), window_hwnd_of_all)
-        return window_hwnd_of_all
 
-    # 模糊化查找窗口
-    @staticmethod
-    def find_window_by_title(self, title: str) -> Optional[dict]:
-        """
-        先遍历所有窗口，然后将窗口存储到一个列表中
-        然后根据已知的要查找的窗口标题内的存在的字符串，遍历列表，找到包含该字符串的窗口并返回其句柄等信息
-        """
-        # 先获取到所有的窗口并存储到一个列表里
-        window_list_hwnd = self.creat_hwnd_list()
-        # 将窗口标题转换为字符串
-        window_list_title = [win32gui.GetWindowText(hwnd) for hwnd in window_list_hwnd]
-
-        # 遍历窗口标题列表，查找包含title字符串的窗口标题
-        for window_title in window_list_title:
-            if title in window_title:
-                target_dict = {
-                    'hwnd': window_list_hwnd[window_list_title.index(window_title)],
-                    'title': window_title
-                }
-                return target_dict
-            else:
-                continue

@@ -20,6 +20,27 @@ if not hasattr(win32con, 'CAPTUREBLT'):
 PW_CLIENTONLY = 1  # 只捕获客户区
 PW_RENDERFULLCONTENT = 2  # 捕获完整内容，包括被遮挡部分
 
+# 客户端最小化时的统一提示文案：PC 桌面版窗口最小化后系统不再出图，GDI 截图拿不到内容
+MINIMIZED_CAPTURE_TIP = "无法在客户端最小化的情况下捕获窗口内容，请恢复窗口后再操作。"
+
+# 统一弹窗节流间隔（秒）：识别循环每帧都会尝试截图，避免弹窗堆叠
+_MINIMIZE_WARN_INTERVAL = 30.0
+_minimize_warn_ts = 0.0
+
+
+def warn_minimized_capture() -> None:
+    """客户端最小化提示弹窗（全局节流），供各截图链路复用。"""
+    global _minimize_warn_ts
+    import time
+    now = time.time()
+    if now - _minimize_warn_ts < _MINIMIZE_WARN_INTERVAL:
+        return
+    _minimize_warn_ts = now
+    try:
+        warning_box(MINIMIZED_CAPTURE_TIP)
+    except Exception as e:
+        logger.error(f"显示错误弹窗失败: {e}")
+
 
 def effective_client_dy(shot_h: int, client_h: int, title_bar: int) -> int:
     """截图顶部应跳过的行数（标题栏自适应）
@@ -70,17 +91,6 @@ class WindowCapture:
         self._capture_cooldown = False  # 冷却标志
         self._cooldown_duration = 30.0  # 冷却时间（秒）
         self._last_capture_failure = 0.0  # 上次捕获失败的时间戳
-
-    def reset_cooldown(self):
-        """
-        重置捕获冷却状态，允许重新捕获
-
-        说明：
-            在窗口恢复后调用此方法可以重置冷却状态，
-            使程序能够继续正常的捕获操作
-        """
-        self._capture_cooldown = False
-        self._last_capture_failure = 0.0
 
     def get_window_info(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]]:
         """获取窗口的位置和尺寸信息"""
@@ -146,7 +156,7 @@ class WindowCapture:
         try:
             # 确保窗口可见
             if win32gui.IsIconic(self.hwnd):
-                warning_box("窗口最小化，无法使用BitBlt捕获")
+                warn_minimized_capture()
                 return None
 
             # 重新获取客户区尺寸
@@ -219,9 +229,13 @@ class WindowCapture:
         Returns:
             成功时返回捕获的图像数组，失败时返回None
         """
-        # 检查冷却状态，如果在冷却期内则直接返回None
+        # 检查冷却状态：超时自动恢复，避免一次失败后永久返回 None
         if self._capture_cooldown:
-            return None
+            import time
+            if time.time() - self._last_capture_failure >= self._cooldown_duration:
+                self._capture_cooldown = False
+            else:
+                return None
 
         # 检查窗口是否最小化
         if self.is_window_minimized():
@@ -238,12 +252,9 @@ class WindowCapture:
             self._last_capture_failure = current_time
             self._capture_cooldown = True
 
-            # 弹窗提醒用户
-            try:
-                warning_box("窗口处于最小化状态，无法捕获图像，请恢复窗口后再操作。")
-            except Exception as e:
-                logger.error(f"显示错误弹窗失败: {e}")
-            
+            # 弹窗提醒用户（统一文案 + 全局节流）
+            warn_minimized_capture()
+
             return None
 
         # 如果未指定捕获模式，使用配置文件中的设置
@@ -269,6 +280,7 @@ class WindowCapture:
         img = capture_by_mode(capture_mode)
         if img is not None and np.mean(img) > 5:
             self.last_shot_shape = img.shape[:2]
+            self._capture_cooldown = False
             return img
 
         # 如果指定模式失败，尝试另一种模式
@@ -277,6 +289,7 @@ class WindowCapture:
         img = capture_by_mode(fallback_mode)
         if img is not None and np.mean(img) > 5:
             self.last_shot_shape = img.shape[:2]
+            self._capture_cooldown = False
             # 永久切换到 fallback_mode 并更新配置
             if settings.BACKEND_GET_IMG_MODE != fallback_mode:
                 logger.info(f"切换到{fallback_mode}模式")
@@ -404,22 +417,6 @@ class WindowCapture:
             self._cleanup_resources(hWndDC, mfcDC, saveDC, saveBitMap)
 
 
-    def get_raw_dc(self) -> Optional[int]:
-        """获取原始DC句柄"""
-        try:
-            return win32gui.GetDC(self.hwnd)
-        except Exception as e:
-            logger.error(f"获取DC句柄出错: {str(e)}")
-            return None
-
-    def release_dc(self, hDC: int) -> bool:
-        """释放DC句柄"""
-        try:
-            return win32gui.ReleaseDC(self.hwnd, hDC) == 1
-        except Exception as e:
-            logger.error(f"释放DC句柄出错: {str(e)}")
-            return False
-
     def is_window_minimized(self) -> bool:
         """检查窗口是否最小化"""
         try:
@@ -502,6 +499,32 @@ class WindowCapture:
                         return self._find_image_opencv(window_img, target_image, threshold)
                     else:
                         return None
+        except Exception as e:
+            logger.error(f"图像查找出错: {str(e)}")
+            return None
+
+    def find_image_in(self, window_img: np.ndarray, target_image: Union[str, np.ndarray],
+                      threshold: Union[float, int] = None, method: str = "opencv"
+                      ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+        """在给定图像中匹配模板（不截图）
+
+        与 find_image_precise 同一匹配实现，供外部截图通道（如模拟器 backend）复用，
+        保证识别坐标与点击坐标处于同一坐标系。
+        """
+        try:
+            if window_img is None:
+                return None
+            if threshold is None:
+                threshold = settings.FIND_THRESHOLD
+            if isinstance(threshold, (int, float)) and threshold > 1:
+                threshold = threshold / 100.0
+            if method == "opencv":
+                try:
+                    return self._find_image_opencv(window_img, target_image, threshold)
+                except Exception as e:
+                    logger.error(f"OpenCV识别出错: {str(e)}，尝试使用PyScreeze...")
+                    return self._find_image_pyscreeze(window_img, target_image, threshold)
+            return self._find_image_pyscreeze(window_img, target_image, threshold)
         except Exception as e:
             logger.error(f"图像查找出错: {str(e)}")
             return None

@@ -19,17 +19,14 @@ class WindowSynchronizer:
         self.lock = threading.Lock()
         self.shutdown_flag = False
         self.mouse_listener = None
-        self.main_window_hwnd = None
-        self.sub_window_hwnd = []
         self.sync_enabled = False
+        # 模拟器输入路由：{实例 root hwnd: EmulatorBackend}；命中 hwnd 时输入走 backend
+        self._emulator_backends = {}
+        self.backend = None  # 外部注入的 EmulatorBackend（挑战流程），注入即登记进路由表
         # 同步模式：exactly_sync（完全同步）、program_sync（程序同步）、input_sync（键鼠同步）
         self.sync_mode = sync_mode
-        # 管道任务同步：记录 PipelineRunner 当前正在执行的任务名
-        self.pipeline_task_name: Optional[str] = None
-
         # 键盘监听器相关属性
         self.keyboard_listener = None  # 键盘监听器实例
-        self.keyboard_listener_thread = None  # 键盘监听器线程
         
         # 窗口信息缓存，减少重复计算
         self.window_info_cache = {}  # 格式: {hwnd: (timestamp, window_info)}
@@ -37,7 +34,6 @@ class WindowSynchronizer:
         
         # 鼠标状态跟踪
         self.mouse_pressed = False  # 跟踪鼠标左键是否按下
-        self.last_mouse_pos = (0, 0)  # 上次鼠标位置，用于移动事件
 
     def get_all_windows(self, window_titles: List[str]) -> List[Tuple[int, int]]:
         """
@@ -87,12 +83,6 @@ class WindowSynchronizer:
         
         return client_info
         
-    def clear_window_info_cache(self):
-        """
-        清除窗口信息缓存
-        """
-        self.window_info_cache.clear()
-
     def set_main_and_sub_windows(self, main_title: str, sub_titles: List[str], main_hwnd: int = None, sub_hwnds: List[int] = None) -> None:
         """
         设置主窗口和副窗口
@@ -134,12 +124,13 @@ class WindowSynchronizer:
                                 break
                     else:
                         pass
-    def calc_the_position(self, main_window_title: str, sub_window_titles: List[str], screen_x: int, screen_y: int) -> List[Tuple[int, int]]:
+    def calc_the_position(self, main_window_title: str, screen_x: int, screen_y: int,
+                          main_hwnd: int = None) -> List[Tuple[int, int]]:
         """
         计算出在主窗口内的相对位置，然后映射到副窗口中
-        :param main_window_title: 主窗口标题
-        :param sub_window_titles: 副窗口标题列表
+        :param main_window_title: 主窗口标题（拿不到句柄时的回退）
         :param screen_x, screen_y: 屏幕上的点击坐标
+        :param main_hwnd: 主窗口句柄（优先使用，窗口改名也不受影响）
         :return: 副窗口中的相对坐标列表
         """
         try:
@@ -152,9 +143,12 @@ class WindowSynchronizer:
                 logger.error("屏幕坐标不能为负数")
                 return []
             
-            # 获取主窗口信息
+            # 获取主窗口信息：句柄优先（改名无影响），没有才回退标题查找
             main_checker = WindowChecker()
-            main_checker.set_window_title(main_window_title)
+            if main_hwnd and win32gui.IsWindow(int(main_hwnd)):
+                main_checker.set_window_handle(int(main_hwnd))
+            else:
+                main_checker.set_window_title(main_window_title)
             # 使用客户区域信息而非窗口边界，减少边框影响
             main_window_info = main_checker.get_client_info()
 
@@ -243,12 +237,70 @@ class WindowSynchronizer:
             logger.error(f"计算坐标时出错: {e}")
             return []
 
-    def send_mouse_move(self, hwnd: int, relative_x: int, relative_y: int) -> None:
+    @property
+    def backend(self):
+        """外部注入的单个 EmulatorBackend（挑战流程用；赋值时自动登记实例路由）。"""
+        return getattr(self, "_backend", None)
+
+    @backend.setter
+    def backend(self, value) -> None:
+        self._backend = value
+        if value is None:
+            return
+        try:
+            for hwnd in value.instance_hwnds():
+                self._emulator_backends[int(hwnd)] = value
+        except Exception:
+            pass
+
+    def _backend_for(self, hwnd: int):
+        """hwnd → 模拟器 backend；PC 窗口返回 None（回落旧消息链路）。
+
+        未登记的 hwnd 才做句柄树校验，且失败结果也缓存：同步器每次鼠标移动
+        都会调用，不能反复去校验同一个窗口。
+        """
+        try:
+            key = int(hwnd)
+        except (TypeError, ValueError):
+            return None
+        if key in self._emulator_backends:
+            return self._emulator_backends[key]
+        backend = None
+        try:
+            from OAT.tools import settings
+            from OAT.tools.emulator.backend import create_backend
+            from OAT.tools.emulator.mumu_handle import build_handle
+            build_handle(key, wait_tries=1)  # 非 MuMu 句柄树会抛异常
+            backend = create_backend(
+                "mumu12", handle_spec=key,
+                mumu_folder=getattr(settings, "MUMU_FOLDER", "") or "",
+            )
+        except Exception:
+            backend = None
+        self._emulator_backends[key] = backend
+        return backend
+
+    def _route_to_emulator(self, hwnd: int, method: str, *args) -> bool:
+        """命中模拟器实例时调用 backend 的对应方法；返回 True 表示已由 backend 处理。"""
+        backend = self._backend_for(hwnd)
+        if backend is None:
+            return False
+        try:
+            getattr(backend, method)(*args)
+        except Exception as e:
+            logger.error(f"模拟器输入 {method} 失败: {e}")
+        return True
+
+    def send_mouse_move(self, hwnd: int, relative_x: int, relative_y: int, pressed: bool = False) -> None:
         """
         发送鼠标移动消息给指定窗口
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
+        :param pressed: 是否按住左键（拖拽中）
         """
+        if self._route_to_emulator(hwnd, "move", relative_x, relative_y, pressed):
+            return
+
         # 检查窗口是否有效
         if not win32gui.IsWindow(hwnd):
             return
@@ -256,7 +308,8 @@ class WindowSynchronizer:
         # 将相对坐标转换为LPARAM格式
         l_param = relative_x | (relative_y << 16)
         # 发送鼠标移动消息
-        win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, l_param)
+        win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE,
+                             win32con.MK_LBUTTON if pressed else 0, l_param)
         
     def send_mouse_down(self, hwnd: int, relative_x: int, relative_y: int) -> None:
         """
@@ -264,6 +317,9 @@ class WindowSynchronizer:
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
         """
+        if self._route_to_emulator(hwnd, "down", relative_x, relative_y):
+            return
+
         # 检查窗口是否有效
         if not win32gui.IsWindow(hwnd):
             return
@@ -279,6 +335,9 @@ class WindowSynchronizer:
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
         """
+        if self._route_to_emulator(hwnd, "up", relative_x, relative_y):
+            return
+
         # 检查窗口是否有效
         if not win32gui.IsWindow(hwnd):
             return
@@ -294,10 +353,13 @@ class WindowSynchronizer:
         :param hwnd: 窗口句柄
         :param relative_x, relative_y: 相对坐标
         """
+        if self._route_to_emulator(hwnd, "click", relative_x, relative_y):
+            return
+
         # 检查窗口是否有效
         if not win32gui.IsWindow(hwnd):
             return
-            
+
         # 组合发送鼠标消息
         self.send_mouse_move(hwnd, relative_x, relative_y)
         
@@ -312,14 +374,15 @@ class WindowSynchronizer:
         
         self.send_mouse_up(hwnd, relative_x, relative_y)
 
-    def send_mouse_move_to_all(self, relative_x: int, relative_y: int) -> None:
+    def send_mouse_move_to_all(self, relative_x: int, relative_y: int, pressed: bool = False) -> None:
         """
         发送鼠标移动消息给所有副窗口
         :param relative_x, relative_y: 相对坐标
+        :param pressed: 是否按住左键（拖拽中）
         """
         with self.lock:
             for hwnd, title in self.sub_windows:
-                self.send_mouse_move(hwnd, relative_x, relative_y)
+                self.send_mouse_move(hwnd, relative_x, relative_y, pressed)
         
     def send_mouse_down_to_all(self, relative_x: int, relative_y: int) -> None:
         """
@@ -339,15 +402,6 @@ class WindowSynchronizer:
             for hwnd, title in self.sub_windows:
                 self.send_mouse_up(hwnd, relative_x, relative_y)
         
-    def send_click_message_to_all(self, relative_x: int, relative_y: int) -> None:
-        """
-        发送点击消息给所有副窗口
-        :param relative_x, relative_y: 相对坐标
-        """
-        with self.lock:
-            for hwnd, title in self.sub_windows:
-                self.send_click_message(hwnd, relative_x, relative_y)
-
     def send_key_message(self, hwnd: int, key_code: int, is_pressed: bool = True) -> None:
         """
         发送键盘按键消息到指定窗口（兼容普通字符/特殊键）
@@ -401,17 +455,10 @@ class WindowSynchronizer:
                 # 程序同步时，不启动监听器（由程序操作触发同步）
                 pass
 
-            if mouse_started and keyboard_started:
+            if mouse_started or keyboard_started:
                 return True
-            elif mouse_started:
-                return True
-            elif keyboard_started:
-                return True
-            elif self.sync_mode == "program_sync":
-                # 程序同步模式下，虽然没有启动监听器，但同步功能是启用的
-                return True
-            else:
-                return False
+            # 程序同步模式下，虽然没有启动监听器，但同步功能是启用的
+            return self.sync_mode == "program_sync"
     
     def set_sync_mode(self, sync_mode: str):
         """
@@ -463,16 +510,9 @@ class WindowSynchronizer:
             daemon=True
         )
         self.keyboard_listener.start()
-        self.keyboard_listener_thread = None  # 不再需要单独的join线程
 
         self.sync_enabled = True
         return True
-
-    def keyboard_listener(self):
-        """
-        兼容原有命名的键盘监听器入口（实际逻辑在on_key_press/on_key_release）
-        """
-        return self.keyboard_sync()
 
     def on_key_press(self, key: keyboard.Key | keyboard.KeyCode) -> None:
         """
@@ -551,7 +591,6 @@ class WindowSynchronizer:
             if self.keyboard_listener and self.keyboard_listener.is_alive():
                 self.keyboard_listener.stop()
                 self.keyboard_listener = None
-                self.keyboard_listener_thread = None
                 logger.info("键盘监听器已停止")
             else:
                 logger.info("键盘监听器未启动")
@@ -621,10 +660,6 @@ class WindowSynchronizer:
         """设置同步启用"""
         self.sync_enabled = True
 
-    def set_false_enable(self):
-        """设置同步禁用"""
-        self.sync_enabled = False
-
     def on_mouse_move(self, x: int, y: int) -> None:
         """
         处理鼠标移动事件，实现拖拽同步
@@ -644,16 +679,15 @@ class WindowSynchronizer:
         try:
             # 从类属性中获取主窗口信息
             main_window_title = self.main_window[1]
-            # 计算相对位置
-            relative_positions = self.calc_the_position(main_window_title, [], x, y)  # 副窗口标题列表不再需要
+            # 计算相对位置（句柄优先，窗口改名不影响同步）
+            relative_positions = self.calc_the_position(main_window_title, x, y,
+                                                        main_hwnd=self.main_window[0])
 
             # 发送鼠标移动消息给所有副窗口
             if relative_positions:
                 for rel_x, rel_y in relative_positions:
-                    self.send_mouse_move_to_all(rel_x, rel_y)
-            
-            # 更新上次鼠标位置
-            self.last_mouse_pos = (x, y)
+                    self.send_mouse_move_to_all(rel_x, rel_y, pressed=self.mouse_pressed)
+
         except Exception as e:
             logger.error(f"处理鼠标移动事件时出错: {e}")
     
@@ -680,8 +714,9 @@ class WindowSynchronizer:
         try:
             # 从类属性中获取主窗口信息
             main_window_title = self.main_window[1]
-            # 计算相对位置
-            relative_positions = self.calc_the_position(main_window_title, [], x, y)  # 副窗口标题列表不再需要
+            # 计算相对位置（句柄优先，窗口改名不影响同步）
+            relative_positions = self.calc_the_position(main_window_title, x, y,
+                                                        main_hwnd=self.main_window[0])
 
             if relative_positions:
                 for rel_x, rel_y in relative_positions:
@@ -874,7 +909,3 @@ class WindowSynchronizer:
         返回所有副窗口列表
         """
         return self.sub_windows
-
-    def on_pipeline_task(self, task_name: str) -> None:
-        """由 PipelineRunner 调用，通知同步器当前执行的管道任务"""
-        self.pipeline_task_name = task_name

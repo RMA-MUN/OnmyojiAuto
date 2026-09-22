@@ -9,7 +9,8 @@
     "jieshu": "jieshu.png",
     "jiesuan": "jiesuan.png",
     "quit": "quit.png",
-    "quit_true": "quit_true.png"
+    "quit_true": "quit_true.png",
+    "global_xiezhu": "xiezhu_global.png"
   },
   "breakthrough": {
     "jiejietupo_loho": "jiejietupo_loho.png",
@@ -39,6 +40,7 @@
     "jieshu": "结束按钮 - 战斗结束后的结束按钮",
     "jiesuan": "结算按钮 - 战斗结算界面的确认按钮",
     "quit": "退出按钮 - 探索内部的退出按钮",
-    "quit_true": "确认退出 - 退出确认对话框中的确定按钮"
+    "quit_true": "确认退出 - 退出确认对话框中的确定按钮",
+    "global_xiezhu": "全局识别 - 任何场景冒出都要无条件点掉的关闭钮（协作xiezhu同款）"
   }
 }

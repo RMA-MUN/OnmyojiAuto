@@ -5,7 +5,6 @@ import threading
 import traceback
 import glob
 from datetime import datetime
-from functools import lru_cache
 
 import cv2
 import win32gui
@@ -18,8 +17,6 @@ from PyQt6.QtWidgets import (
 )
 
 from qfluentwidgets import (
-    ComboBox, PushButton, PrimaryPushButton,
-    InfoBar, InfoBarPosition,
     FluentIcon as FIF, setTheme, Theme, qconfig, FluentWindow,
 )
 
@@ -136,8 +133,12 @@ class AppUI:
 
 
 class MainWindow(FluentWindow):
+    # 后台线程发现客户端后回传 GUI（跨线程信号自动 queued）
+    client_list_ready = QtCore.pyqtSignal(object)
+
     def __init__(self):
         super().__init__()
+        self.resize(840, 720)
         self.setMicaEffectEnabled(False)
         self.ui = AppUI(self)
 
@@ -174,6 +175,15 @@ class MainWindow(FluentWindow):
 
         self.window_title = "阴阳师-MuMu模拟器专版"
 
+        # 进程发现的客户端选择：selected_hwnd 优先于标题（用户改模拟器名也不受影响）
+        self.selected_hwnd = None
+        self._client_item_map = {}
+        self._pending_client_items = None
+        self._client_popup_open = False
+        self.client_list_ready.connect(self._apply_client_list)
+        self.ui.client_choose.popup_opened.connect(self._on_client_popup_opened)
+        self.ui.client_choose.popup_closed.connect(self._apply_pending_client_list)
+
         self._connect_page_signals()
         self._connect_main_signals()
         self._setup_shortcuts()
@@ -188,6 +198,8 @@ class MainWindow(FluentWindow):
         self.lock = threading.Lock()
 
         self.check_update_silently()
+        # 启动后台刷新一次客户端列表（进程发现，不阻塞 GUI）；之后每次拉开下拉再刷
+        self.refresh_clients_async()
 
     def _connect_page_signals(self):
         self.ui.settings_page.transparency_changed.connect(self.on_transparency_changed)
@@ -271,9 +283,79 @@ class MainWindow(FluentWindow):
         self._load_theme_qss(theme_str)
 
     def update_window_title(self):
-        selected_client = self.ui.client_choose.currentText()
-        self.window_title = selected_client
-        logger.info(f"选择客户端为:{self.window_title}")
+        selected_label = self.ui.client_choose.currentText()
+        client = getattr(self, '_client_item_map', {}).get(selected_label)
+        if client is not None:
+            # 进程发现项：绑定句柄 + 真实标题（改名/多开场景下可靠）
+            self.selected_hwnd = int(client.hwnd) if client.hwnd else None
+            self.window_title = client.title or selected_label
+        else:
+            # 静态标题兜底项：沿用旧标题链路
+            self.selected_hwnd = None
+            self.window_title = selected_label
+        logger.info(f"选择客户端为:{selected_label}")
+
+    def refresh_clients_async(self):
+        """后台线程进程发现客户端（模拟器/PC），完成后经信号回 GUI，不阻塞界面。"""
+        def worker():
+            try:
+                from OAT.tools.ClientDiscovery import build_client_items, discover_clients
+                clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+                titles = []
+                try:
+                    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    client_path = os.path.join(script_dir, 'tools', 'client.json')
+                    with open(client_path, 'r', encoding='utf-8') as f:
+                        titles = list(json.load(f).get('title', {}).values())
+                except Exception:
+                    pass
+                self.client_list_ready.emit(build_client_items(clients, titles))
+            except Exception as e:
+                logger.error(f"客户端列表刷新失败: {e}")
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_client_popup_opened(self):
+        """下拉拉开：标记菜单状态并触发一次进程发现。"""
+        self._client_popup_open = True
+        self.refresh_clients_async()
+
+    def _apply_client_list(self, items):
+        if not items:
+            return
+        if getattr(self, "_client_popup_open", False):
+            # 下拉菜单正开着：暂存，收起后再应用，避免重建打断菜单
+            self._pending_client_items = items
+            return
+        self._set_client_items(items)
+
+    def _apply_pending_client_list(self):
+        self._client_popup_open = False
+        items = self._pending_client_items
+        self._pending_client_items = None
+        if items:
+            self._set_client_items(items)
+
+    def _set_client_items(self, items):
+        """重建下拉条目：按句柄还原之前的选择，无匹配则落到首项。"""
+        combo = self.ui.client_choose
+        prev_hwnd = self.selected_hwnd
+        combo.blockSignals(True)
+        try:
+            combo.clear()
+            for label, _client in items:
+                combo.addItem(label)
+            self._client_item_map = {label: client for label, client in items}
+            target = 0
+            if prev_hwnd is not None:
+                for i, (_label, client) in enumerate(items):
+                    if client is not None and client.hwnd == prev_hwnd:
+                        target = i
+                        break
+            if items:
+                combo.setCurrentIndex(target)
+        finally:
+            combo.blockSignals(False)
+        self.update_window_title()
 
     def refresh_window(self):
         timestamp = self.log_redirect.get_timestamp()
@@ -292,13 +374,15 @@ class MainWindow(FluentWindow):
 
     def window_detection(self, *args):
         logger.info("客户端窗口检测：")
-        automation = OnmyojiAutomation(self.window_title)
+        automation = OnmyojiAutomation(self.window_title, hwnd=getattr(self, 'selected_hwnd', None))
         if automation.is_window_present() is False:
             warning_box("未检测到阴阳师窗口，请先打开游戏")
             return
         automation.print_window_info()
         checker = WindowChecker()
         checker.set_window_title(self.window_title)
+        if getattr(self, 'selected_hwnd', None):
+            checker.set_window_handle(self.selected_hwnd)
         window_size = checker.get_window_info()
         if window_size:
             logger.info(f"当前客户端大小：宽度 {window_size[2][0]}，高度 {window_size[2][1]}")
@@ -347,8 +431,8 @@ class MainWindow(FluentWindow):
             hidden_window = True
             logger.info("=" * 50)
             logger.info("       已启用后台运行模式      ")
-            logger.info("  后台模式只要不将窗口最小化就不会影响程序的运行")
-            logger.info("     后台模式不支持模拟器，请前往桌面版使用    ")
+            logger.info("  桌面版客户端：窗口可遮挡但不可最小化，最小化将无法截取画面  ")
+            logger.info("  MuMu 模拟器：支持完全最小化运行（IPC 后台通道）  ")
             logger.info("=" * 50)
         else:
             hidden_window = False
@@ -385,6 +469,7 @@ class MainWindow(FluentWindow):
                 if self.shutdown_flag:
                     return
             window_title = self.window_title
+            window_hwnd = getattr(self, 'selected_hwnd', None)
             sync_type = getattr(self, 'sync_type', '完全同步')
 
             folder_info = MODE_MAPPING.get(mode)
@@ -421,6 +506,7 @@ class MainWindow(FluentWindow):
             if sub_config:
                 synchronizer = self.sync if hasattr(self, 'sync') else None
                 mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
+                            window_hwnd=window_hwnd,
                             hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
                             sync_mode_value=self.sync_mode_value, explore_per_round=explore_per_round)
             else:
@@ -461,16 +547,32 @@ class MainWindow(FluentWindow):
         QtWidgets.QApplication.quit()
 
     def update_window_table(self):
+        """进程发现优先刷新窗口表；一个客户端都没发现才退回按标题枚举。"""
+        rows = []
+        try:
+            from OAT.tools.ClientDiscovery import build_window_rows, discover_clients
+            clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+            rows = build_window_rows(clients)
+        except Exception as e:
+            logger.error(f"进程发现窗口失败：{e}")
+        if not rows:
+            rows = self._enumerate_windows_by_title()
+        self.update_table_with_window_info(rows)
+
+    def _enumerate_windows_by_title(self):
+        """兜底链路：按 client.json 标题枚举（窗口改名后可能失效）。"""
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         client_path = os.path.join(script_dir, 'tools', 'client.json')
         title_list = []
-        with open(client_path, 'r', encoding='utf-8') as file:
-            titles_get = json.load(file)
-            for _, value in titles_get['title'].items():
-                title_list.append(value)
+        try:
+            with open(client_path, 'r', encoding='utf-8') as file:
+                titles_get = json.load(file)
+                for _, value in titles_get['title'].items():
+                    title_list.append(value)
+        except Exception as e:
+            logger.error(f"读取客户端标题失败：{e}")
         window_synchronizer = WindowSynchronizer()
-        window_info = window_synchronizer.get_all_windows(window_titles=title_list)
-        self.update_table_with_window_info(window_info)
+        return window_synchronizer.get_all_windows(window_titles=title_list)
 
     def update_table_with_window_info(self, window_info):
         self.ui.window_table.setRowCount(0)
@@ -494,20 +596,41 @@ class MainWindow(FluentWindow):
         self.ui.window_table.show()
         logger.info("表格已刷新")
 
+    def _capture_preview_frame(self, hwnd: int):
+        """预览取图：MuMu 句柄树校验通过走后台通道（PrintWindow→IPC→BitBlt，最小化可预览），
+        其余窗口回落 GetDC 窗口截图（最小化时由链路内统一弹窗提示）。"""
+        try:
+            from OAT.tools.emulator.backend import create_backend
+            from OAT.tools.emulator.mumu_handle import build_handle
+            build_handle(int(hwnd), wait_tries=1)  # 非 MuMu 句柄树会抛异常
+            backend = create_backend(
+                "mumu12",
+                handle_spec=int(hwnd),
+                mumu_folder=getattr(settings, 'MUMU_FOLDER', '') or '',
+            )
+            try:
+                img = backend.screenshot()
+                if img is not None:
+                    return img
+            finally:
+                backend.close()
+        except Exception as e:
+            logger.info(f"窗口 {hwnd} 不走 MuMu 后台通道：{e}")
+        return WindowCapture(hwnd=int(hwnd)).capture_window()
+
     def preview_window(self, hwnd, title):
         try:
             screenshot_dir = os.path.join('logs', 'screen_shot')
             if not os.path.exists(screenshot_dir):
                 os.makedirs(screenshot_dir)
-            window_capture = WindowCapture(hwnd=hwnd)
-            img = window_capture.capture_window()
+            img = self._capture_preview_frame(hwnd)
             if img is not None:
                 temp_file_path = os.path.join(screenshot_dir, f"window_preview_{hwnd}.png")
                 cv2.imwrite(temp_file_path, img)
                 self.show_preview_dialog(title, temp_file_path)
             else:
+                # 截图链路内部已对最小化/失败弹窗提示，这里只记日志避免双弹窗
                 logger.error(f"无法捕获窗口 {title} ({hwnd}) 的图像")
-                self.show_error_message("截图失败", "无法捕获窗口图像")
         except Exception as e:
             logger.error(f"预览窗口时出错: {str(e)}")
             self.show_error_message("预览错误", f"发生错误: {str(e)}")
