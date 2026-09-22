@@ -388,19 +388,19 @@ class HomePage(QWidget):
     def get_text(self):
         return '''
             <div style="line-height: 1.0; margin: 0; padding: 0;">
-                <span style="margin: 0;">1.新增绘卷刷分模式（探索+结界突破组合，每轮探索次数可配）</span>
+                <span style="margin: 0;">1.新增 MuMu 模拟器后台模式，最小化窗口后仍能继续执行任务</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">2.日志区新增挑战进度条、暂停/继续按钮与右键菜单</span>
+                <span style="margin: 0;">2.同步器支持模拟器客户端</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">3.新开局自动回收旧线程，急停可干净退出</span>
+                <span style="margin: 0;">3.绘卷刷分接入全局识别好友协助功能</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">4.修复截图标题栏偏移与前后台点击对齐问题</span>
+                <span style="margin: 0;">4.更新程序完成后可一键启动 OAT</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">5.管道任务支持滑动/等待动作与连续匹配预算</span>
+                <span style="margin: 0;">5.修复截图冷却永久锁存，一次失败不再永久无响应</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">6.日志改为按天轮转保留30天</span>
+                <span style="margin: 0;">6.绘卷刷分支持暂停/停止，突破券后台识别</span>
                 <br style="margin: 0;"/>
-                <span style="margin: 0;">7.修复图像配置编辑器格式落后于pipeline的问题</span>
+                <span style="margin: 0;">7.清理无用代码，补充截图/触摸链路单测</span>
             </div>
         '''
 
