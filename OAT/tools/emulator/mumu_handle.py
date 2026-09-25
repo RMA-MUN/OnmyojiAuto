@@ -5,10 +5,11 @@ screenshot_handle_num / window_scale_rate）。
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional, Union
 
 import psutil
 import win32api
@@ -140,6 +141,62 @@ def order_windows(wins: list[tuple[int, str]],
         return (1, _title_priority(t[1]), t[0])
 
     return sorted(wins, key=_key)
+
+
+def is_mumu_root(path: str) -> bool:
+    """判定是否为 MuMu 安装根目录（含 nx_main 或 nx_device 标记目录）。"""
+    root = (path or "").strip().strip('"')
+    if not root or not os.path.isdir(root):
+        return False
+    return (os.path.isdir(os.path.join(root, "nx_main"))
+            or os.path.isdir(os.path.join(root, "nx_device")))
+
+
+def _derive_root(exe_path: str) -> Optional[str]:
+    """从 exe 路径逐级上溯，返回第一个含 nx_main/nx_device 的根目录。
+
+    ex. E:\\MuMuPlayer\\nx_device\\12.0\\shell\\MuMuNxDevice.exe → E:\\MuMuPlayer
+    """
+    d = os.path.dirname(exe_path)
+    for _ in range(8):
+        if not d:
+            return None
+        if is_mumu_root(d):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+    return None
+
+
+def _iter_mumu_process_exes() -> list[str]:
+    """收集所有运行中的 MuMu 进程 exe 路径（进程名匹配，access 失败跳过）。"""
+    lower = {n.lower() for n in MUMU_PROCESS_NAMES}
+    exes: list[str] = []
+    try:
+        for proc in psutil.process_iter(["name", "exe"]):
+            try:
+                name = (proc.info.get("name") or "").lower()
+                if name not in lower:
+                    continue
+                exe = proc.info.get("exe") or ""
+                if exe:
+                    exes.append(exe)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return exes
+
+
+def detect_mumu_folder() -> Optional[str]:
+    """从运行中的 MuMu 进程反推安装根目录；无进程或反推失败返回 None。"""
+    for exe in _iter_mumu_process_exes():
+        root = _derive_root(exe)
+        if root:
+            return root
+    return None
 
 
 def _pid_of(hwnd: int) -> int:

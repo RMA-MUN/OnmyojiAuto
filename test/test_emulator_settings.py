@@ -27,3 +27,54 @@ def test_update_roundtrip_emulator_type():
         _json_path().write_bytes(raw_before)
     assert settings.EMULATOR_TYPE == old
     assert _json_path().read_bytes() == raw_before
+
+
+def test_resolve_mumu_folder_uses_valid_config(monkeypatch):
+    """配置路径有效时直接返回，不触发探测。"""
+    called = []
+    monkeypatch.setattr("OAT.tools.settings._is_valid_mumu_folder", lambda f: True)
+    monkeypatch.setattr("OAT.tools.settings._detect_mumu_folder_safe",
+                        lambda: called.append(1) or "D:\\MuMu12")
+    assert settings.resolve_mumu_folder() == "E:\\MuMuPlayer"
+    assert called == []
+
+
+def test_resolve_mumu_folder_detects_and_persists(monkeypatch):
+    """配置无效时走进程反推，并把结果回写 settings.json。"""
+    raw_before = _json_path().read_bytes()
+    try:
+        monkeypatch.setattr("OAT.tools.settings._is_valid_mumu_folder", lambda f: False)
+        monkeypatch.setattr("OAT.tools.settings._detect_mumu_folder_safe",
+                            lambda: "D:\\MuMu12")
+        assert settings.resolve_mumu_folder() == "D:\\MuMu12"
+        assert settings.MUMU_FOLDER == "D:\\MuMu12"
+        assert settings.settings_data.get("mumu_folder") == "D:\\MuMu12"
+    finally:
+        settings.update_settings("mumu_folder", "E:\\MuMuPlayer")
+        _json_path().write_bytes(raw_before)
+    assert _json_path().read_bytes() == raw_before
+
+
+def test_resolve_mumu_folder_falls_back_when_no_detection(monkeypatch):
+    """探测失败时回落配置值（空则回落默认路径）。"""
+    raw_before = _json_path().read_bytes()
+    try:
+        monkeypatch.setattr("OAT.tools.settings._is_valid_mumu_folder", lambda f: False)
+        monkeypatch.setattr("OAT.tools.settings._detect_mumu_folder_safe", lambda: None)
+        assert settings.resolve_mumu_folder() == "E:\\MuMuPlayer"
+    finally:
+        _json_path().write_bytes(raw_before)
+    assert _json_path().read_bytes() == raw_before
+
+
+def test_resolve_mumu_folder_survives_detect_exception(monkeypatch):
+    """探测抛异常时按失败处理，不向上抛。"""
+    raw_before = _json_path().read_bytes()
+    try:
+        monkeypatch.setattr("OAT.tools.settings._is_valid_mumu_folder", lambda f: False)
+        monkeypatch.setattr("OAT.tools.settings._detect_mumu_folder_safe",
+                            lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+        assert settings.resolve_mumu_folder() == "E:\\MuMuPlayer"
+    finally:
+        _json_path().write_bytes(raw_before)
+    assert _json_path().read_bytes() == raw_before

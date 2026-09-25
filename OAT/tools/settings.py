@@ -2,6 +2,7 @@ APP_VERSION = "2.3.2"
 
 import json
 import os
+from typing import Optional
 
 # 加载设置配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -46,7 +47,8 @@ EMULATOR_TYPE = settings_data.get('emulator_type', 'pc')
 HANDLE_SPEC = settings_data.get('handle_spec', 'auto')
 SCREENSHOT_METHOD = settings_data.get('screenshot_method', 'nemu_ipc')
 CONTROL_METHOD = settings_data.get('control_method', 'window_message')
-MUMU_FOLDER = settings_data.get('mumu_folder', 'E:\\MuMuPlayer')
+DEFAULT_MUMU_FOLDER = 'E:\\MuMuPlayer'
+MUMU_FOLDER = settings_data.get('mumu_folder', DEFAULT_MUMU_FOLDER)
 
 # 提供更新配置的函数
 def update_settings(key, value):
@@ -97,4 +99,36 @@ def update_settings(key, value):
     except Exception as e:
         logger.error(f"保存配置文件失败: {str(e)}")
         return False
+
+
+def _is_valid_mumu_folder(folder) -> bool:
+    """配置目录是否为有效 MuMu 根（惰性导入避免启动加载 win32/psutil）。"""
+    try:
+        from OAT.tools.emulator.mumu_handle import is_mumu_root
+        return is_mumu_root(folder)
+    except Exception:
+        return False
+
+
+def _detect_mumu_folder_safe() -> Optional[str]:
+    """进程反推 MuMu 安装目录；任何异常按未找到处理。"""
+    try:
+        from OAT.tools.emulator.mumu_handle import detect_mumu_folder
+        return detect_mumu_folder()
+    except Exception:
+        return None
+
+
+def resolve_mumu_folder() -> str:
+    """生效的 MuMu 安装目录：配置有效→配置；否则进程反推并回写；再失败→默认。"""
+    if _is_valid_mumu_folder(MUMU_FOLDER):
+        return MUMU_FOLDER
+    try:
+        detected = _detect_mumu_folder_safe()
+    except Exception:
+        detected = None
+    if detected:
+        update_settings('mumu_folder', detected)
+        return detected
+    return MUMU_FOLDER or DEFAULT_MUMU_FOLDER
 

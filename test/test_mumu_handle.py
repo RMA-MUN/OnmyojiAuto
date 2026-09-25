@@ -192,3 +192,75 @@ def test_cli_query_suppresses_console(monkeypatch):
     mh.query_cli_instances("E:\MuMuPlayer")
     mh.query_cli_windows("E:\MuMuPlayer")
     assert captured.get("creationflags") == subprocess.CREATE_NO_WINDOW
+
+
+# ---------- 安装目录自动识别（进程反推） ----------
+
+def test_is_mumu_root(tmp_path):
+    root = tmp_path / "MuMuPlayer"
+    (root / "nx_main").mkdir(parents=True)
+    assert mh.is_mumu_root(str(root)) is True
+
+
+def test_is_mumu_root_device_only(tmp_path):
+    root = tmp_path / "MuMuPlayer"
+    (root / "nx_device").mkdir(parents=True)
+    assert mh.is_mumu_root(str(root)) is True
+
+
+def test_is_mumu_root_rejects_non_root(tmp_path):
+    root = tmp_path / "MuMuPlayer"
+    (root / "nx_main").mkdir(parents=True)
+    # 根目录内部/无关目录都不算 MuMu 根
+    assert mh.is_mumu_root(str(root / "nx_main")) is False
+    assert mh.is_mumu_root(str(tmp_path / "other")) is False
+    assert mh.is_mumu_root(str(tmp_path / "missing")) is False
+    assert mh.is_mumu_root("") is False
+
+
+def test_detect_mumu_folder_from_process(monkeypatch, tmp_path):
+    """从运行中 MuMu 进程的 exe 路径上溯出安装根目录。"""
+    root = tmp_path / "MuMuPlayer"
+    (root / "nx_device" / "12.0" / "shell").mkdir(parents=True)
+    exe = str(root / "nx_device" / "12.0" / "shell" / "MuMuNxDevice.exe")
+    monkeypatch.setattr(mh, "_iter_mumu_process_exes", lambda: [exe])
+    assert mh.detect_mumu_folder() == str(root)
+
+
+def test_detect_mumu_folder_skips_invalid_exe(monkeypatch, tmp_path):
+    """第一个进程 exe 不属于任何 MuMu 根时跳过，取下一个有效根。"""
+    root2 = tmp_path / "MuMuPlayer-2"
+    (root2 / "nx_device").mkdir(parents=True)
+    exes = [
+        str(tmp_path / "elsewhere" / "MuMuNxDevice.exe"),
+        str(root2 / "nx_device" / "12.0" / "shell" / "MuMuNxDevice.exe"),
+    ]
+    monkeypatch.setattr(mh, "_iter_mumu_process_exes", lambda: exes)
+    assert mh.detect_mumu_folder() == str(root2)
+
+
+def test_detect_mumu_folder_none_when_no_process(monkeypatch):
+    monkeypatch.setattr(mh, "_iter_mumu_process_exes", lambda: [])
+    assert mh.detect_mumu_folder() is None
+
+
+def test_detect_mumu_folder_filters_by_process_name(monkeypatch):
+    """只有 MuMu 进程名会被收集，notepad 等无关进程必须排除。"""
+    captured = {}
+
+    class _Proc:
+        def __init__(self, name, exe):
+            self.info = {"name": name, "exe": exe}
+
+    def fake_iter(fields, **kwargs):
+        captured["fields"] = fields
+        return iter([
+            _Proc("MuMuNxDevice.exe", "C:\\MuMu\\nx_device\\12.0\\shell\\MuMuNxDevice.exe"),
+            _Proc("notepad.exe", "C:\\Windows\\notepad.exe"),
+        ])
+
+    monkeypatch.setattr(mh.psutil, "process_iter", fake_iter)
+    # 真实语义：只有根目录（C:\MuMu 本身）含 nx_main/nx_device 标记
+    monkeypatch.setattr(mh, "is_mumu_root", lambda p: p.lower() == "c:\\mumu")
+    assert mh.detect_mumu_folder() == "C:\\MuMu"
+    assert captured["fields"] == ["name", "exe"]
