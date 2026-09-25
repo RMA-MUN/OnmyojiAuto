@@ -300,7 +300,7 @@ class MainWindow(FluentWindow):
         def worker():
             try:
                 from OAT.tools.ClientDiscovery import build_client_items, discover_clients
-                clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+                clients = discover_clients(settings.resolve_mumu_folder())
                 titles = []
                 try:
                     script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -551,7 +551,7 @@ class MainWindow(FluentWindow):
         rows = []
         try:
             from OAT.tools.ClientDiscovery import build_window_rows, discover_clients
-            clients = discover_clients(getattr(settings, 'MUMU_FOLDER', '') or '')
+            clients = discover_clients(settings.resolve_mumu_folder())
             rows = build_window_rows(clients)
         except Exception as e:
             logger.error(f"进程发现窗口失败：{e}")
@@ -606,7 +606,7 @@ class MainWindow(FluentWindow):
             backend = create_backend(
                 "mumu12",
                 handle_spec=int(hwnd),
-                mumu_folder=getattr(settings, 'MUMU_FOLDER', '') or '',
+                mumu_folder=settings.resolve_mumu_folder(),
             )
             try:
                 img = backend.screenshot()

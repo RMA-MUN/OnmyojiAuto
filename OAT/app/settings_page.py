@@ -9,11 +9,12 @@ from qfluentwidgets import (
     OptionsSettingCard,
     FluentIcon as FIF,
     LineEdit,
+    PushButton,
     CaptionLabel, BodyLabel,
     qconfig
 )
 
-from OAT.tools.settings import APP_VERSION, settings_data, update_settings
+from OAT.tools.settings import APP_VERSION, settings_data, update_settings, MUMU_FOLDER
 
 
 class SettingsPage(QWidget):
@@ -44,6 +45,7 @@ class SettingsPage(QWidget):
         scroll_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self._create_general_group(scroll_layout)
+        self._create_emulator_group(scroll_layout)
         self._create_display_group(scroll_layout)
         self._create_sync_group(scroll_layout)
         self._create_about_group(scroll_layout)
@@ -177,6 +179,72 @@ class SettingsPage(QWidget):
         group.addSettingCard(self.clear_cache_card)
 
         parent_layout.addWidget(group)
+
+    def _create_emulator_group(self, parent_layout):
+        group = SettingCardGroup("模拟器设置", self)
+
+        mumu_container = QWidget()
+        mumu_layout = QHBoxLayout(mumu_container)
+        mumu_layout.setContentsMargins(0, 0, 0, 0)
+        mumu_layout.setSpacing(8)
+
+        self.mumu_folder_input = LineEdit(self)
+        self.mumu_folder_input.setPlaceholderText("例如: E:\\MuMuPlayer")
+        self.mumu_folder_input.setText(MUMU_FOLDER or "")
+        self.mumu_folder_input.setFixedWidth(260)
+        self.mumu_folder_input.editingFinished.connect(self._on_mumu_folder_edited)
+        mumu_layout.addWidget(self.mumu_folder_input)
+
+        self.mumu_browse_btn = PushButton("选择...", self)
+        self.mumu_browse_btn.clicked.connect(self._on_mumu_browse)
+        mumu_layout.addWidget(self.mumu_browse_btn)
+
+        self.mumu_auto_btn = PushButton("自动识别", self)
+        self.mumu_auto_btn.clicked.connect(self._on_mumu_auto_detect)
+        mumu_layout.addWidget(self.mumu_auto_btn)
+
+        self.mumu_folder_card = self._create_setting_card(
+            FIF.ROBOT, "MuMu模拟器路径",
+            "MuMu 模拟器安装目录；自动识别需先启动 MuMu 模拟器",
+            self, mumu_container
+        )
+        group.addSettingCard(self.mumu_folder_card)
+
+        parent_layout.addWidget(group)
+
+    def _on_mumu_folder_edited(self):
+        text = self.mumu_folder_input.text().strip().strip('"')
+        if text:
+            update_settings('mumu_folder', text)
+
+    def _on_mumu_browse(self):
+        folder = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "选择 MuMu 模拟器安装目录", MUMU_FOLDER or ""
+        )
+        if folder:
+            update_settings('mumu_folder', folder)
+            self.mumu_folder_input.setText(folder)
+            self.mumu_folder_card.setContent(f"当前路径: {folder}")
+
+    def _on_mumu_auto_detect(self):
+        try:
+            from OAT.tools.emulator.mumu_handle import detect_mumu_folder
+            folder = detect_mumu_folder()
+        except Exception:
+            folder = None
+        if folder:
+            update_settings('mumu_folder', folder)
+            self.mumu_folder_input.setText(folder)
+            self.mumu_folder_card.setContent(f"已识别到: {folder}")
+            QtWidgets.QMessageBox.information(
+                self, "自动识别成功", f"已自动识别 MuMu 模拟器路径:\n{folder}"
+            )
+        else:
+            QtWidgets.QMessageBox.warning(
+                self, "未识别到 MuMu",
+                "未检测到 MuMu 模拟器进程，请先启动 MuMu 模拟器后再试。\n"
+                "也可以点击“选择...”手动指定安装目录。"
+            )
 
     def _create_display_group(self, parent_layout):
         group = SettingCardGroup("显示设置", self)

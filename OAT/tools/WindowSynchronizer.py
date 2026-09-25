@@ -273,7 +273,7 @@ class WindowSynchronizer:
             build_handle(key, wait_tries=1)  # 非 MuMu 句柄树会抛异常
             backend = create_backend(
                 "mumu12", handle_spec=key,
-                mumu_folder=getattr(settings, "MUMU_FOLDER", "") or "",
+                mumu_folder=settings.resolve_mumu_folder(),
             )
         except Exception:
             backend = None

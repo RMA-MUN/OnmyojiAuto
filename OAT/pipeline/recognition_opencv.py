@@ -56,7 +56,7 @@ class OpenCVRecognitionEngine(RecognitionEngine):
                     self.backend = create_backend(
                         "mumu12",
                         handle_spec=settings.HANDLE_SPEC,
-                        mumu_folder=settings.MUMU_FOLDER,
+                        mumu_folder=settings.resolve_mumu_folder(),
                     )
             except Exception:
                 self.backend = None
@@ -89,7 +89,7 @@ class OpenCVRecognitionEngine(RecognitionEngine):
             return create_backend(
                 "mumu12",
                 handle_spec=int(hwnd),
-                mumu_folder=settings.MUMU_FOLDER,
+                mumu_folder=settings.resolve_mumu_folder(),
             )
         except Exception:
             return None
