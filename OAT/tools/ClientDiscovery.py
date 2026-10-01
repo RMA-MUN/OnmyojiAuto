@@ -118,13 +118,22 @@ def _rank_windows(pid: int) -> list[tuple[int, str]]:
 
 
 def client_label(client: ClientInfo) -> str:
-    """下拉框展示文案：模拟器/PC 前缀 + 可辨识名称 + 实例号。"""
+    """下拉框展示文案：模拟器/PC 前缀 + 可辨识名称 + 实例号/PID。
+
+    多开时同款客户端窗口标题相同（如多个桌面版都叫“阴阳师”），
+    标签必须带 PID 才能一一区分（去重与选中映射都以标签为 key）。
+    """
     if client.kind == "emulator":
+        prefix = "模拟器"
         name = client.detail or client.title or f"PID {client.pid}"
         suffix = f" (实例{client.index})" if client.index is not None else ""
-        return f"模拟器 · {name}{suffix}"
-    name = client.title or client.detail or f"PID {client.pid}"
-    return f"PC桌面版 · {name}"
+    else:
+        prefix = "PC桌面版"
+        name = client.title or client.detail or f"PID {client.pid}"
+        suffix = ""
+    if name == f"PID {client.pid}":  # 兜底名已含 PID，不再重复标注
+        return f"{prefix} · {name}{suffix}"
+    return f"{prefix} · {name}{suffix} · PID {client.pid}"
 
 
 def build_client_items(clients: list[ClientInfo],

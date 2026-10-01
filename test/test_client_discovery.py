@@ -80,18 +80,33 @@ def test_client_label_emulator_and_pc():
     emu = cd.ClientInfo(kind="emulator", pid=8188, hwnd=2231448,
                         title="任意名字", index=1, detail="MuMu安卓设备-1")
     pc = cd.ClientInfo(kind="pc", pid=9000, hwnd=555, title="阴阳师", index=None, detail="阴阳师")
-    assert cd.client_label(emu) == "模拟器 · MuMu安卓设备-1 (实例1)"
-    assert cd.client_label(pc) == "PC桌面版 · 阴阳师"
+    assert cd.client_label(emu) == "模拟器 · MuMu安卓设备-1 (实例1) · PID 8188"
+    assert cd.client_label(pc) == "PC桌面版 · 阴阳师 · PID 9000"
     emu_no_index = cd.ClientInfo(kind="emulator", pid=1, hwnd=2, title="X", index=None, detail="")
-    assert cd.client_label(emu_no_index) == "模拟器 · X"
+    assert cd.client_label(emu_no_index) == "模拟器 · X · PID 1"
+
+
+def test_client_label_pid_fallback_no_repeat():
+    """拿不到标题/名称时兜底名本身是 PID，不得再重复标注一遍。"""
+    pc = cd.ClientInfo(kind="pc", pid=7, hwnd=8, title="", index=None, detail="")
+    assert cd.client_label(pc) == "PC桌面版 · PID 7"
 
 
 def test_build_client_items_dedups_clients():
     emu = cd.ClientInfo(kind="emulator", pid=8188, hwnd=2231448,
                         title="T", index=1, detail="MuMu安卓设备-1")
     items = cd.build_client_items([emu, emu], [])
-    assert [label for label, _ in items] == ["模拟器 · MuMu安卓设备-1 (实例1)"]
+    assert [label for label, _ in items] == ["模拟器 · MuMu安卓设备-1 (实例1) · PID 8188"]
     assert items[0][1] is emu
+
+
+def test_build_client_items_same_title_keeps_both():
+    """多开同款客户端（窗口标题相同）：PID 进标签后不得被去重掉。"""
+    a = cd.ClientInfo(kind="pc", pid=101, hwnd=1, title="阴阳师", index=None, detail="阴阳师")
+    b = cd.ClientInfo(kind="pc", pid=102, hwnd=2, title="阴阳师", index=None, detail="阴阳师")
+    items = cd.build_client_items([a, b], [])
+    assert [label for label, _ in items] == \
+        ["PC桌面版 · 阴阳师 · PID 101", "PC桌面版 · 阴阳师 · PID 102"]
 
 
 def test_build_client_items_process_wins_over_fallback():
@@ -99,7 +114,7 @@ def test_build_client_items_process_wins_over_fallback():
     emu = cd.ClientInfo(kind="emulator", pid=8188, hwnd=2231448,
                         title="T", index=1, detail="MuMu安卓设备-1")
     items = cd.build_client_items([emu], ["阴阳师-MuMu模拟器专版", "阴阳师-网易游戏"])
-    assert [label for label, _ in items] == ["模拟器 · MuMu安卓设备-1 (实例1)"]
+    assert [label for label, _ in items] == ["模拟器 · MuMu安卓设备-1 (实例1) · PID 8188"]
     assert items[0][1] is emu
 
 
@@ -156,6 +171,6 @@ def test_build_window_rows_uses_process_label():
                        title="阴阳师-MuMu模拟器专版", index=None, detail="")
     rows = cd.build_window_rows([emu, pc, cd.ClientInfo(kind="pc", pid=1, hwnd=0,
                                                        title="无句柄", index=None)])
-    assert rows == [(2231448, "模拟器 · MuMu安卓设备-1 (实例1)"),
-                    (199048, "PC桌面版 · 阴阳师-MuMu模拟器专版")]
+    assert rows == [(2231448, "模拟器 · MuMu安卓设备-1 (实例1) · PID 8188"),
+                    (199048, "PC桌面版 · 阴阳师-MuMu模拟器专版 · PID 20076")]
     assert cd.build_window_rows([]) == []
