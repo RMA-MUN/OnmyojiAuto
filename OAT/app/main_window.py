@@ -419,13 +419,18 @@ class MainWindow(FluentWindow):
                 sub_mode = self.ui.radioButton2.text()
                 logger.info(f"选择：{mode}, {sub_mode}")
 
-        # 绘卷刷分模式：读取每轮探索次数
+        # 绘卷刷分模式：读取每轮探索次数与打法（探索+突破 / 仅探索）
         explore_per_round = None
+        explore_only = False
         if hasattr(self.ui, 'explore_spin'):
             val = self.ui.explore_spin.value()
             explore_per_round = val if val > 0 else None
             if mode == "绘卷刷分":
                 logger.info(f"绘卷刷分每轮探索次数: {explore_per_round}")
+                if hasattr(self.ui, 'huijuan_mode_combo'):
+                    explore_only = self.ui.huijuan_mode_combo.currentText() == "仅探索"
+                    if explore_only:
+                        logger.info("绘卷刷分打法: 仅探索（不打突破）")
 
         if self.ui.hidden_window_checkbox.isChecked():
             hidden_window = True
@@ -448,7 +453,7 @@ class MainWindow(FluentWindow):
         try:
             thread = threading.Thread(
                 target=self.safe_mode_choice,
-                args=(mode, sub_mode, times, hidden_window, self.sync_mode_flag, explore_per_round)
+                args=(mode, sub_mode, times, hidden_window, self.sync_mode_flag, explore_per_round, explore_only)
             )
             thread.daemon = True
             with self.lock:
@@ -459,7 +464,7 @@ class MainWindow(FluentWindow):
         except ValueError:
             logger.info("请输入有效的整数挑战次数。")
 
-    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False, explore_per_round=None):
+    def safe_mode_choice(self, mode, sub_mode, times, hidden_window=False, sync_mode=False, explore_per_round=None, explore_only=False):
         try:
             try:
                 pause_state.begin_run()
@@ -508,7 +513,8 @@ class MainWindow(FluentWindow):
                 mode_choice(mode, sub_mode, times, config=sub_config, window_title=window_title,
                             window_hwnd=window_hwnd,
                             hidden_window=hidden_window, sync_mode=sync_mode, synchronizer=synchronizer,
-                            sync_mode_value=self.sync_mode_value, explore_per_round=explore_per_round)
+                            sync_mode_value=self.sync_mode_value, explore_per_round=explore_per_round,
+                            explore_only=explore_only)
             else:
                 error_msg = f"读取 {sub_config_path} 配置文件失败。"
                 logger.error(error_msg)

@@ -92,11 +92,23 @@ class HomePage(QWidget):
         card_layout.addWidget(spin_label)
         card_layout.addWidget(self.spinBox)
 
-        # 绘卷刷分专属：每轮刷分内的探索次数（仅绘卷刷分模式显示）
+        # 绘卷刷分专属：打法 + 每轮探索次数（仅绘卷刷分模式显示）
         self.explore_options = QWidget(self)
         explore_layout = QVBoxLayout(self.explore_options)
         explore_layout.setContentsMargins(0, 0, 0, 0)
         explore_layout.setSpacing(8)
+
+        style_label = BodyLabel("绘卷刷分 - 模式选择")
+        self.huijuan_mode_combo = ComboBox(self)
+        self.huijuan_mode_combo.addItems(["探索+突破", "仅探索"])
+        self.huijuan_mode_combo.setToolTip(
+            "探索+突破：每轮先探索N次，再打一轮结界突破（原有流程）\n"
+            "仅探索：只刷探索不打突破，单轮探索次数上限放开"
+        )
+        self.huijuan_mode_combo.currentTextChanged.connect(self._on_huijuan_style_changed)
+        explore_layout.addWidget(style_label)
+        explore_layout.addWidget(self.huijuan_mode_combo)
+
         self.explore_spin = SpinBox(self)
         self.explore_spin.setRange(1, 99)
         self.explore_spin.setValue(5)
@@ -401,6 +413,8 @@ class HomePage(QWidget):
                 <span style="margin: 0;">6.绘卷刷分支持暂停/停止，突破券后台识别</span>
                 <br style="margin: 0;"/>
                 <span style="margin: 0;">7.清理无用代码，补充截图/触摸链路单测</span>
+                <br style="margin: 0;"/>
+                <span style="margin: 0;">8.绘卷刷分新增"仅探索"打法：可跳过突破连续探索，单轮探索次数上限放开</span>
             </div>
         '''
 
@@ -412,6 +426,16 @@ class HomePage(QWidget):
         modes = mode_choice(mode_json_path)
         if modes:
             self.find_mode_combo.addItems(modes)
+
+    def _on_huijuan_style_changed(self, text):
+        """切换绘卷刷分打法：仅探索时放开单轮探索次数上限（无突破打断，99上限失去意义）"""
+        if text == "仅探索":
+            self.explore_spin.setRange(1, 9999)
+            self.explore_spin.setToolTip(
+                "仅探索模式：每轮连续探索N次，不打结界突破（游戏内探索达上限会自动结束）")
+        else:
+            self.explore_spin.setRange(1, 99)
+            self.explore_spin.setToolTip("绘卷刷分模式：每轮刷分先探索N次，再打一轮结界突破")
 
     def on_mode_selected(self, index):
         self.soul_land_options.hide()

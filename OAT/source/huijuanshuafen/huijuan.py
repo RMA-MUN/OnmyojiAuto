@@ -9,6 +9,11 @@
 4. 读取突破券数量（OCR 右上角 "N/30"）
 5. 前往结界突破，打掉全部突破券（3胜刷新）
 6. 关闭结界突破界面 → 下一轮
+
+打法分支（explore_only）：
+- False（默认，探索+突破）：上述完整流程
+- True（仅探索）：跳过 3-6，探索完成后直接进入下一轮继续探索
+  （探索循环结束时在 k28 标题/探索列表界面，下一轮 _enter_explore_28 场景自适应接管）
 """
 
 import json
@@ -39,11 +44,12 @@ class HuiJuan(BaseBot):
     def __init__(self, engine, rounds: int = 1, explore_count: int = 5,
                  sync_mode: bool = False, templates: dict = None,
                  images_dir: str = "", config: dict = None,
-                 window_title: str = ""):
+                 window_title: str = "", explore_only: bool = False):
         super().__init__(engine, sync_mode=sync_mode, templates=templates,
                          images_dir=images_dir)
         self.rounds = rounds
         self.explore_count = explore_count
+        self.explore_only = explore_only
         self.config = config or {}
         self.window_title = window_title
 
@@ -902,8 +908,9 @@ class HuiJuan(BaseBot):
                     continue
             except Exception:
                 pass
+            style_tip = "仅探索" if self.explore_only else "探索+突破"
             logger.info(f"{'=' * 40}")
-            logger.info(f"绘卷刷分 第 {r + 1}/{self.rounds} 轮（每轮探索{self.explore_count}次）")
+            logger.info(f"绘卷刷分 第 {r + 1}/{self.rounds} 轮（{style_tip}，每轮探索{self.explore_count}次）")
             logger.info(f"{'=' * 40}")
 
             # 1. 进入第28章（场景自适应：直接点探索 or 先点第二十八章）
@@ -912,6 +919,10 @@ class HuiJuan(BaseBot):
                 return False
             self.explore.explore_round = 0
             self.explore.start_explore_loop()
+
+            # 仅探索打法：跳过突破环节，直接进入下一轮继续探索
+            if self.explore_only:
+                continue
 
             # 2. 确保回到探索列表界面（分支A前置：在k28标题界面则点quit退出）
             if not self._ensure_explore_list():
@@ -1002,7 +1013,7 @@ class HuiJuan(BaseBot):
 def run_huijuanshuafen(window_title: str, rounds: int, explore_per_round: int,
                        sync_mode: bool = False, synchronizer=None,
                        script_dir: str = "", config: dict = None,
-                       window_hwnd: int = None):
+                       window_hwnd: int = None, explore_only: bool = False):
     """绘卷刷分入口（由 mode_choice 调用）
 
     Args:
@@ -1014,6 +1025,7 @@ def run_huijuanshuafen(window_title: str, rounds: int, explore_per_round: int,
         script_dir: 模式目录（含 images/）
         config: config.json 内容
         window_hwnd: 显式窗口句柄（优先于标题，改名/多开场景可靠）
+        explore_only: True=仅探索不打突破；False=探索+突破循环（原有流程）
     """
     import win32gui
 
@@ -1037,12 +1049,12 @@ def run_huijuanshuafen(window_title: str, rounds: int, explore_per_round: int,
     bot = HuiJuan(engine, rounds=rounds, explore_count=explore_per_round,
                   sync_mode=sync_mode, templates=templates,
                   images_dir=images_dir, config=config or {},
-                  window_title=window_title)
+                  window_title=window_title, explore_only=explore_only)
     return bot.run()
 
 
 if __name__ == '__main__':
-    """单测：python huijuan.py [窗口句柄] [轮数] [每轮探索次数]"""
+    """单测：python huijuan.py [窗口句柄] [轮数] [每轮探索次数] [only=仅探索]"""
     import sys
 
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
@@ -1053,16 +1065,18 @@ if __name__ == '__main__':
     TEST_HWND = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_HWND
     ROUNDS = int(sys.argv[2]) if len(sys.argv) > 2 else 1
     EXPLORE_PER_ROUND = int(sys.argv[3]) if len(sys.argv) > 3 else 5
+    EXPLORE_ONLY = len(sys.argv) > 4 and sys.argv[4].lower() in ("1", "true", "only", "yes")
 
     if not TEST_HWND or not win32gui.IsWindow(TEST_HWND):
         print(f"错误：窗口句柄 {TEST_HWND} 无效")
         sys.exit(1)
 
-    print(f"绘卷刷分单测：轮数={ROUNDS}，每轮探索={EXPLORE_PER_ROUND}")
+    print(f"绘卷刷分单测：轮数={ROUNDS}，每轮探索={EXPLORE_PER_ROUND}，仅探索={EXPLORE_ONLY}")
     run_huijuanshuafen(
         window_title=win32gui.GetWindowText(TEST_HWND),
         rounds=ROUNDS,
         explore_per_round=EXPLORE_PER_ROUND,
         script_dir=os.path.dirname(os.path.abspath(__file__)),
         config={},
+        explore_only=EXPLORE_ONLY,
     )
