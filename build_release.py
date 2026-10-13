@@ -29,6 +29,9 @@ OAT_CMD = [
     "-m", "nuitka",
     "--standalone",
     "--windows-disable-console",
+    # 内嵌 requireAdministrator 清单：打包版启动时由系统在进程创建前弹 UAC，
+    # 不依赖程序内的运行时检测
+    "--windows-uac-admin",
     "--follow-imports",
     "--remove-output",
     "--windows-icon-from-ico=OAT/tools/uiResources/icon.ico",
