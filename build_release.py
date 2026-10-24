@@ -1,7 +1,7 @@
 """一键打包：OAT 本体 + OAT 更新程序，然后合并到同一目录。
 
 流程（对标现有手工命令）：
-  1. nuitka 打包 OAT 本体      -> main.dist/（含 OAT.exe）
+  1. nuitka 打包 OAT 本体      -> main.dist/（含 OAT.exe 与 yyx/yyx-launcher.exe）
   2. nuitka 打包更新程序        -> <updater-dist>/（含 OAT_Updater.exe）
   3. 合并：先拷 OAT 产物到合并目录，再把更新程序产物叠加上去，
      重名文件直接覆盖（两者同版本依赖，DLL 基本一致；关键是两个 exe 落到同一目录）。
@@ -38,6 +38,11 @@ OAT_CMD = [
     "--enable-plugin=pyqt6",
     "--include-data-dir=OAT/tools/uiResources=OAT/tools/uiResources",
     "--include-data-dir=platforms=platforms",
+    # 多开管理器的引导程序：MultiInstanceManager 按 <程序根>/yyx/yyx-launcher.exe 定位，
+    # standalone 下即 <dist>/yyx，必须随包分发。
+    # 只带 exe 不带 ini —— ini 记录用户本地游戏路径（已 gitignore），且每次多开
+    # 启动前会自动重写，缺失时 UI 按空路径处理
+    "--include-data-files=yyx/yyx-launcher.exe=yyx/yyx-launcher.exe",
     "--output-filename=OAT",
     "main.py",
 ]
@@ -58,6 +63,7 @@ UPDATER_CMD = [
 OAT_DIST = os.path.join(ROOT, "main.dist")
 OAT_EXE = "OAT.exe"
 UPDATER_EXE = "OAT_Updater.exe"
+LAUNCHER_REL = os.path.join("yyx", "yyx-launcher.exe")
 
 
 def run(cmd: list[str], desc: str) -> None:
@@ -116,6 +122,8 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
 
     if not args.merge_only and not args.skip_oat:
+        if not os.path.isfile(os.path.join(ROOT, LAUNCHER_REL)):
+            raise SystemExit("[build] 找不到 yyx\\yyx-launcher.exe，无法随包分发多开引导程序")
         run(OAT_CMD, "打包 OAT 本体")
     if not os.path.isfile(os.path.join(OAT_DIST, OAT_EXE)):
         raise SystemExit(f"[build] 找不到 {OAT_DIST}\\{OAT_EXE}，先正常打包一次本体")
@@ -134,11 +142,11 @@ def main(argv: list[str] | None = None) -> None:
         n2, o2 = merge_dirs(updater_dist, args.merge_dir)
         print(f"[build] 更新程序已合并：{n2} 个文件（{o2} 个覆盖）", flush=True)
 
-    for exe in (OAT_EXE, UPDATER_EXE):
-        ok = os.path.isfile(os.path.join(args.merge_dir, exe))
-        print(f"[build] {'OK ' if ok else '缺失'} {exe}", flush=True)
+    for rel in (OAT_EXE, UPDATER_EXE, LAUNCHER_REL):
+        ok = os.path.isfile(os.path.join(args.merge_dir, rel))
+        print(f"[build] {'OK ' if ok else '缺失'} {rel}", flush=True)
         if not ok:
-            raise SystemExit(f"[build] 合并目录缺少 {exe}")
+            raise SystemExit(f"[build] 合并目录缺少 {rel}")
     print(f"[build] 完成：{args.merge_dir}", flush=True)
 
 
