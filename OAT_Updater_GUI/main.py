@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import argparse
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 from OAT_Updater_GUI.ui.update_gui import UpdateGUI
 
@@ -16,6 +17,8 @@ def main():
     """
     # 创建QApplication实例
     app = QApplication(sys.argv)
+    # 界面颜色均为浅色硬编码，配色固定为浅色，避免 Windows 深色模式下调色板文字变白导致白字白底
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
 
     # 获取压缩包路径、更新日志和版本信息
     zip_path = None
